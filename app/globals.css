@@ -1223,6 +1223,82 @@ tbody tr:hover {
   }
 }
 
+/* ============ DRAFT EDITOR + BAN-SAFETY ============ */
+.draft-edit {
+  width: 100%;
+  min-height: 150px;
+  resize: vertical;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 16px 17px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.72;
+  color: #cdd3dd;
+  white-space: pre-wrap;
+}
+.draft-edit:focus {
+  background: var(--bg1);
+}
+
+.safety .ph h2 {
+  display: inline-flex;
+  align-items: center;
+}
+.safety .ph h2 svg {
+  stroke: var(--tx2);
+  stroke-width: 1.7;
+  fill: none;
+}
+.safety-verdict.pass {
+  color: var(--ok);
+}
+.safety-verdict.warn {
+  color: var(--warn);
+}
+.safety-verdict.fail {
+  color: var(--bad);
+}
+.safety.safety-fail {
+  border-color: rgba(240, 97, 109, 0.35);
+}
+.safety.safety-warn {
+  border-color: rgba(227, 179, 65, 0.3);
+}
+.safety-row {
+  display: flex;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--tx3);
+  align-items: flex-start;
+}
+.safety-row:last-child {
+  border-bottom: 0;
+}
+.safety-row .sbody b {
+  color: var(--tx);
+  font-weight: 550;
+}
+.safety-row .sdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+.safety-row.pass .sdot {
+  background: var(--ok);
+}
+.safety-row.warn .sdot {
+  background: var(--warn);
+}
+.safety-row.fail .sdot {
+  background: var(--bad);
+}
+
 /* ============ TRACKING STATUS ============ */
 .track-status {
   display: flex;

@@ -6,6 +6,7 @@ import { Icon } from "@/components/Icon";
 import { platformIcon } from "@/components/ui/platform";
 import { useToast } from "@/components/ui/toast";
 import { ensureDraft, markPosted } from "@/app/app/ships/actions";
+import { checkDraft, safetyVerdict } from "@/lib/bansafety";
 import type { KitRec } from "@/lib/plans";
 
 export function LaunchKit({
@@ -27,8 +28,22 @@ export function LaunchKit({
   const [copied, setCopied] = useState<string | null>(null);
   const [postUrl, setPostUrl] = useState("");
   const [postError, setPostError] = useState<string | null>(null);
+  // Per-tab edits so the user can tweak and re-check before copying.
+  const [edits, setEdits] = useState<Record<string, string>>({});
 
   const active = recs.find((r) => r.id === activeId);
+  const draftBody =
+    active && active.draft
+      ? (edits[active.id] ?? active.draft.body)
+      : "";
+  const safety =
+    active && active.draft
+      ? checkDraft({
+          body: draftBody,
+          platform: active.platform,
+          channelRules: active.channelRules,
+        })
+      : null;
 
   const generate = (recId: string) => {
     start(async () => {
@@ -88,10 +103,7 @@ export function LaunchKit({
             <div className="dh">
               <b>{active.channelName}</b>
               {active.draft && (
-                <button
-                  className="btn btn-gh"
-                  onClick={() => copy(active.draft!.body, "body")}
-                >
+                <button className="btn btn-gh" onClick={() => copy(draftBody, "body")}>
                   <Icon name="copy" /> {copied === "body" ? "Copied" : "Copy"}
                 </button>
               )}
@@ -99,7 +111,15 @@ export function LaunchKit({
 
             {active.draft ? (
               <>
-                <div className="body">{active.draft.body}</div>
+                <textarea
+                  className="draft-edit"
+                  value={draftBody}
+                  onChange={(e) =>
+                    setEdits((m) => ({ ...m, [active.id]: e.target.value }))
+                  }
+                  spellCheck={false}
+                  aria-label="Draft — edit and re-check before posting"
+                />
                 <div className="fn">
                   <Icon name="shield" />
                   <span>
@@ -129,6 +149,40 @@ export function LaunchKit({
               </div>
             )}
           </div>
+
+          {/* Ban-safety check — will this get removed? */}
+          {safety && (
+            <div
+              className={`panel safety safety-${safety.worst}`}
+              style={{ marginTop: 14, maxWidth: 600 }}
+            >
+              <div className="ph">
+                <h2>
+                  <Icon
+                    name="shield"
+                    style={{
+                      width: 13,
+                      height: 13,
+                      verticalAlign: "-2px",
+                      marginRight: 6,
+                    }}
+                  />
+                  Ban-safety check
+                </h2>
+                <span className={`r safety-verdict ${safety.worst}`}>
+                  {safetyVerdict(safety)}
+                </span>
+              </div>
+              {safety.checks.map((c, i) => (
+                <div className={`safety-row ${c.level}`} key={i}>
+                  <span className="sdot" />
+                  <span className="sbody">
+                    <b>{c.label}</b> — {c.detail}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Tracking block — record the post + mint a tracked link */}
           <div className="panel" style={{ marginTop: 14, maxWidth: 600 }}>

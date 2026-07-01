@@ -47,6 +47,8 @@ export function buildDraftPrompt(ctx: DraftContext) {
     "The founder posts it themselves — never write as if auto-posting.",
     "Ground the draft in the channel's rules and the provided ruleNote (the safe way in).",
     "Be specific to the product and the ship. No hype, no emoji spam, no fake metrics.",
+    "Write the draft EXACTLY as it should be pasted — do NOT add 'Title:'/'Body:' labels, section headers, or meta commentary.",
+    "For Show HN, the very first line must be the title, starting with 'Show HN:'.",
     "Respond with ONLY a JSON object: {\"body\":string,\"safetyNote\":string}. safetyNote is one line on how to post safely here.",
   ].join("\n");
 
