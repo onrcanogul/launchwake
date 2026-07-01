@@ -151,7 +151,12 @@ export function AppShell({
           </div>
         </div>
 
-        <div className="content">{children}</div>
+        <div className="content">
+          {/* keyed on route → replays the entrance animation on each navigation */}
+          <div key={pathname} className="lw-page">
+            {children}
+          </div>
+        </div>
       </div>
     </div>
   );
