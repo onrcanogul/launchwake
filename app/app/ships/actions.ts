@@ -1,0 +1,120 @@
+"use server";
+
+import { z } from "zod";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { buildPlan } from "@/lib/analysis";
+import { generateDraft } from "@/lib/drafts";
+import { suggestShip, parseRepo } from "@/lib/github";
+
+async function requireProject() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  const project = await db.project.findFirst({
+    where: { userId: session.user.id },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!project) redirect("/onboarding");
+  return project;
+}
+
+const CreateSchema = z.object({
+  type: z.enum(["LAUNCH", "FEATURE", "BLOG", "OTHER"]),
+  title: z.string().trim().min(3, "Give the ship a short title").max(200),
+  summary: z.string().trim().max(2000).optional(),
+  sourceUrl: z
+    .string()
+    .trim()
+    .url("Enter a valid URL")
+    .optional()
+    .or(z.literal("")),
+});
+
+export type CreateShipState = { error?: string };
+
+/** Create a ship, build its distribution plan, then land on the plan (the aha). */
+export async function createShipAndPlan(
+  _prev: CreateShipState,
+  formData: FormData,
+): Promise<CreateShipState> {
+  const project = await requireProject();
+
+  const parsed = CreateSchema.safeParse({
+    type: formData.get("type"),
+    title: formData.get("title"),
+    summary: formData.get("summary") || undefined,
+    sourceUrl: formData.get("sourceUrl") || undefined,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  let shipId: string;
+  try {
+    const ship = await db.ship.create({
+      data: {
+        projectId: project.id,
+        type: parsed.data.type,
+        title: parsed.data.title,
+        summary: parsed.data.summary || null,
+        sourceUrl: parsed.data.sourceUrl || null,
+      },
+    });
+    shipId = ship.id;
+    await buildPlan(shipId);
+  } catch (err) {
+    return { error: `Could not build a plan: ${(err as Error).message}` };
+  }
+
+  revalidatePath("/app");
+  redirect(`/app/ships/${shipId}/plan`);
+}
+
+/** Re-run analysis for an existing ship. */
+export async function rerunPlan(shipId: string): Promise<void> {
+  await requireProject();
+  await buildPlan(shipId);
+  revalidatePath(`/app/ships/${shipId}/plan`);
+}
+
+export type PullState =
+  | { ok: true; type: string; title: string; summary: string; sourceUrl: string }
+  | { ok: false; error: string };
+
+/** Pull the latest release/commit from the connected repo to prefill the form. */
+export async function pullLatestShip(): Promise<PullState> {
+  const project = await requireProject();
+  if (!project.githubRepo) {
+    return { ok: false, error: "No GitHub repo connected for this project." };
+  }
+  const ref = parseRepo(project.githubRepo);
+  if (!ref) return { ok: false, error: "Connected repo is not a valid owner/repo." };
+
+  try {
+    const suggestion = await suggestShip(ref);
+    if (!suggestion) {
+      return {
+        ok: false,
+        error: "No releases or commits found on the connected repo.",
+      };
+    }
+    return {
+      ok: true,
+      type: suggestion.type,
+      title: suggestion.title,
+      summary: suggestion.summary ?? "",
+      sourceUrl: suggestion.sourceUrl ?? "",
+    };
+  } catch (err) {
+    return { ok: false, error: `GitHub fetch failed: ${(err as Error).message}` };
+  }
+}
+
+/** Generate (or regenerate) the draft for a recommendation, used by Launch kit. */
+export async function ensureDraft(recommendationId: string): Promise<void> {
+  await requireProject();
+  await generateDraft(recommendationId);
+  revalidatePath("/app/ships");
+}
