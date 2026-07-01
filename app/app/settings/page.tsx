@@ -26,7 +26,8 @@ export default async function SettingsPage({
     <AppShell
       project={{ name: p.name, subtitle: projectSubtitle(p) }}
       user={{ name: displayName(ws.user), plan: ws.user.plan }}
-      shipNav={ws.latestShip}
+      ships={ws.ships}
+      activeShip={ws.activeShip}
       channelsCount={ws.channelsCount}
       crumb="Settings"
     >

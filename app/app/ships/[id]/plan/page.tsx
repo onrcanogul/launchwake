@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { RerunButton } from "@/components/ship/RerunButton";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
+import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
 import { nextBestTime } from "@/lib/reminders";
 
 export default async function PlanPage({
@@ -32,10 +33,12 @@ export default async function PlanPage({
         subtitle: projectSubtitle(ws.project),
       }}
       user={{ name: displayName(ws.user), plan: ws.user.plan }}
-      shipNav={{ id: ship.id, title: ship.title }}
+      ships={ws.ships}
+      activeShip={{ id: ship.id, title: ship.title }}
       channelsCount={ws.channelsCount}
       crumb="Where to post"
     >
+      <SyncActiveShip id={ship.id} />
       <div className="phead">
         <div>
           <h1 className="pg">Where to post</h1>

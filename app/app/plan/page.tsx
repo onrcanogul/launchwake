@@ -1,38 +1,31 @@
 import { redirect } from "next/navigation";
 import { getWorkspace, displayName, projectSubtitle } from "@/lib/session";
 import { AppShell } from "@/components/shell/AppShell";
-import { NewShipForm } from "@/components/ship/NewShipForm";
-import { Note } from "@/components/ui/Note";
+import { SelectShipPrompt } from "@/components/ship/SelectShipPrompt";
 
-export default async function NewShipPage() {
+export default async function BarePlanPage() {
   const ws = await getWorkspace();
   if (!ws.project) redirect("/onboarding");
+  if (ws.activeShip) redirect(`/app/ships/${ws.activeShip.id}/plan`);
 
   return (
     <AppShell
       project={{ name: ws.project.name, subtitle: projectSubtitle(ws.project) }}
       user={{ name: displayName(ws.user), plan: ws.user.plan }}
       ships={ws.ships}
-      activeShip={ws.activeShip}
+      activeShip={null}
       channelsCount={ws.channelsCount}
-      crumb="New ship"
+      crumb="Where to post"
     >
       <div className="phead">
         <div>
-          <h1 className="pg">New ship</h1>
+          <h1 className="pg">Where to post</h1>
           <div className="psub">
-            Shipped something worth talking about? Drop it in and get a
-            distribution plan. Nothing is posted automatically.
+            Select a ship to see its distribution plan.
           </div>
         </div>
       </div>
-
-      <NewShipForm githubRepo={ws.project.githubRepo} />
-
-      <Note>
-        LaunchWake never posts for you or uses bot accounts. You get the plan and
-        the drafts — you press publish.
-      </Note>
+      <SelectShipPrompt ships={ws.ships} mode="plan" />
     </AppShell>
   );
 }

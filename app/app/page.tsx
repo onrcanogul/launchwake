@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getWorkspace, displayName } from "@/lib/session";
+import { getWorkspace, displayName, projectSubtitle } from "@/lib/session";
 import { getShipFeed, relativeTime } from "@/lib/ships";
 import { AppShell } from "@/components/shell/AppShell";
 import { Button } from "@/components/ui/Button";
@@ -10,7 +10,6 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Checklist, type ChecklistItem } from "@/components/ui/Checklist";
 import { Badge } from "@/components/ui/Badge";
 import { ShipTypeTag } from "@/components/ui/ShipTypeTag";
-import { HOOKLINE } from "@/lib/demo";
 
 export default async function ShipFeedPage() {
   const ws = await getWorkspace();
@@ -21,9 +20,10 @@ export default async function ShipFeedPage() {
 
   const shell = (children: React.ReactNode) => (
     <AppShell
-      project={{ name: ws.project!.name, subtitle: HOOKLINE.subtitle }}
+      project={{ name: ws.project!.name, subtitle: projectSubtitle(ws.project!) }}
       user={{ name, plan: ws.user.plan }}
-      shipNav={ws.latestShip}
+      ships={ws.ships}
+      activeShip={ws.activeShip}
       channelsCount={ws.channelsCount}
       crumb="Ship feed"
     >
@@ -153,15 +153,20 @@ export default async function ShipFeedPage() {
                 </div>
               </div>
             </div>
-            {s.hasPlan ? (
-              s.signupCount > 0 ? (
-                <Badge dotColor="var(--ok)">{s.signupCount} signups</Badge>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {ws.activeShip?.id === s.id && (
+                <span className="badge ac">active</span>
+              )}
+              {s.hasPlan ? (
+                s.signupCount > 0 ? (
+                  <Badge dotColor="var(--ok)">{s.signupCount} signups</Badge>
+                ) : (
+                  <Badge>View plan →</Badge>
+                )
               ) : (
-                <Badge>View plan →</Badge>
-              )
-            ) : (
-              <Badge accent>Get plan →</Badge>
-            )}
+                <Badge accent>Get plan →</Badge>
+              )}
+            </div>
           </Link>
         ))}
       </Panel>

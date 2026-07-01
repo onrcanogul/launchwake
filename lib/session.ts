@@ -1,14 +1,18 @@
 import { redirect } from "next/navigation";
 import { auth } from "./auth";
 import { db } from "./db";
+import { readActiveShipId } from "./activeShip";
+import { listProjectShips, type ShipListItem } from "./ships";
 import type { Project, User } from "@prisma/client";
 
 export type Workspace = {
   user: Pick<User, "id" | "name" | "email" | "plan">;
   /** The user's primary project, or null if they haven't onboarded yet. */
   project: Project | null;
-  /** Most recent ship (drives progressive ship-scoped nav). */
-  latestShip: { id: string; title: string } | null;
+  /** All ships (for the ship switcher). Empty when no project/ships. */
+  ships: ShipListItem[];
+  /** The globally selected ship (from cookie), or null if none is selected. */
+  activeShip: ShipListItem | null;
   /** Size of the global channel catalog (shown in nav). */
   channelsCount: number;
 };
@@ -28,20 +32,17 @@ export async function getWorkspace(): Promise<Workspace> {
     orderBy: { createdAt: "asc" },
   });
 
-  const latestShip = project
-    ? await db.ship.findFirst({
-        where: { projectId: project.id },
-        orderBy: { detectedAt: "desc" },
-        select: { id: true, title: true },
-      })
-    : null;
+  const ships = project ? await listProjectShips(project.id) : [];
+  const activeShipId = await readActiveShipId();
+  const activeShip = ships.find((s) => s.id === activeShipId) ?? null;
 
   const channelsCount = await db.channel.count();
 
   return {
     user: { id: user.id, name: user.name, email: user.email, plan: user.plan },
     project,
-    latestShip,
+    ships,
+    activeShip,
     channelsCount,
   };
 }

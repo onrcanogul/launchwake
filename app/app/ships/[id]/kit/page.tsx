@@ -5,6 +5,7 @@ import { listProjectShips } from "@/lib/ships";
 import { AppShell } from "@/components/shell/AppShell";
 import { LaunchKit } from "@/components/ship/LaunchKit";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
+import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 
@@ -29,10 +30,12 @@ export default async function KitPage({
     <AppShell
       project={{ name: ws.project.name, subtitle: projectSubtitle(ws.project) }}
       user={{ name: displayName(ws.user), plan: ws.user.plan }}
-      shipNav={{ id: kit.ship.id, title: kit.ship.title }}
+      ships={ws.ships}
+      activeShip={{ id: kit.ship.id, title: kit.ship.title }}
       channelsCount={ws.channelsCount}
       crumb="Launch kit"
     >
+      <SyncActiveShip id={kit.ship.id} />
       <div className="phead">
         <div>
           <h1 className="pg">Launch kit</h1>

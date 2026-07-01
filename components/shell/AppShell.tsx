@@ -5,8 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
 import { NavProgress } from "@/components/shell/NavProgress";
-
-export type ShipNav = { id: string; title: string } | null;
+import {
+  SidebarShipSwitcher,
+  type SwitcherShip,
+} from "@/components/shell/SidebarShipSwitcher";
 
 type NavItem = {
   href: string;
@@ -15,12 +17,17 @@ type NavItem = {
   count?: number;
   /** exact-match only (used for the /app root) */
   exact?: boolean;
+  /** custom active predicate (used for bare + id-scoped ship routes) */
+  match?: (pathname: string) => boolean;
 };
 
 export type AppShellProps = {
   project: { name: string; subtitle?: string | null };
   user: { name: string; plan: "FREE" | "PRO" };
-  shipNav: ShipNav;
+  /** All ships (for the sidebar switcher). */
+  ships: SwitcherShip[];
+  /** The ship in context — the URL ship on ship pages, else the cookie's. */
+  activeShip: { id: string; title: string } | null;
   channelsCount?: number;
   /** current page label for the breadcrumb */
   crumb: string;
@@ -30,7 +37,8 @@ export type AppShellProps = {
 export function AppShell({
   project,
   user,
-  shipNav,
+  ships,
+  activeShip,
   channelsCount,
   crumb,
   children,
@@ -38,6 +46,7 @@ export function AppShell({
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Workspace = project-wide screens (unaffected by the active ship).
   const workspaceNav: NavItem[] = [
     { href: "/app", label: "Ship feed", icon: "grid", exact: true },
     { href: "/app/ships/new", label: "New ship", icon: "plus" },
@@ -47,26 +56,32 @@ export function AppShell({
       icon: "channels",
       count: channelsCount,
     },
+    { href: "/app/results", label: "Results", icon: "results" },
   ];
 
-  const shipScopedNav: NavItem[] = shipNav
-    ? [
-        {
-          href: `/app/ships/${shipNav.id}/plan`,
-          label: "Where to post",
-          icon: "where",
-        },
-        {
-          href: `/app/ships/${shipNav.id}/kit`,
-          label: "Launch kit",
-          icon: "kit",
-        },
-        { href: "/app/results", label: "Results", icon: "results" },
-      ]
-    : [];
+  // Ship-scoped screens point at bare routes that resolve to the active ship
+  // (or show a "select a ship" prompt).
+  const shipNavItems: NavItem[] = [
+    {
+      href: "/app/plan",
+      label: "Where to post",
+      icon: "where",
+      match: (p) => p === "/app/plan" || p.endsWith("/plan"),
+    },
+    {
+      href: "/app/kit",
+      label: "Launch kit",
+      icon: "kit",
+      match: (p) => p === "/app/kit" || p.endsWith("/kit"),
+    },
+  ];
 
   const isActive = (item: NavItem) =>
-    item.exact ? pathname === item.href : pathname.startsWith(item.href);
+    item.match
+      ? item.match(pathname)
+      : item.exact
+        ? pathname === item.href
+        : pathname.startsWith(item.href);
 
   const renderNav = (item: NavItem) => (
     <Link
@@ -82,7 +97,7 @@ export function AppShell({
   );
 
   return (
-    <div className={drawerOpen ? "app drawerbody" : "app"}>
+    <div className="app">
       <NavProgress />
       <div
         className="overlay"
@@ -90,7 +105,10 @@ export function AppShell({
         style={drawerOpen ? { display: "block" } : undefined}
       />
 
-      <aside className="side" style={drawerOpen ? { transform: "translateX(0)" } : undefined}>
+      <aside
+        className="side"
+        style={drawerOpen ? { transform: "translateX(0)" } : undefined}
+      >
         <div className="brand">
           <Icon name="wave" /> LaunchWake
         </div>
@@ -107,12 +125,13 @@ export function AppShell({
         <div className="grp">Workspace</div>
         {workspaceNav.map(renderNav)}
 
-        {shipNav && (
+        {ships.length > 0 && (
           <>
-            <div className="grp" title={shipNav.title}>
-              Ship · {truncate(shipNav.title, 16)}
-            </div>
-            {shipScopedNav.map(renderNav)}
+            <SidebarShipSwitcher
+              ships={ships}
+              activeId={activeShip?.id ?? null}
+            />
+            {shipNavItems.map(renderNav)}
           </>
         )}
 
@@ -162,8 +181,4 @@ export function AppShell({
       </div>
     </div>
   );
-}
-
-function truncate(s: string, n: number) {
-  return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }

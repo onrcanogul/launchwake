@@ -18,7 +18,8 @@ export default async function ChannelsPage() {
     <AppShell
       project={{ name: ws.project.name, subtitle: projectSubtitle(ws.project) }}
       user={{ name: displayName(ws.user), plan: ws.user.plan }}
-      shipNav={ws.latestShip}
+      ships={ws.ships}
+      activeShip={ws.activeShip}
       channelsCount={ws.channelsCount}
       crumb="Channels"
     >
