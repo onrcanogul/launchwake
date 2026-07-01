@@ -7,7 +7,7 @@ import { platformIcon } from "@/components/ui/platform";
 import { useToast } from "@/components/ui/toast";
 import { ensureDraft, markPosted } from "@/app/app/ships/actions";
 import { checkDraft, safetyVerdict } from "@/lib/bansafety";
-import { DRAFT_TONES, type DraftTone } from "@/lib/drafts";
+import { DRAFT_TONES, type DraftTone } from "@/lib/tones";
 import type { KitRec } from "@/lib/plans";
 
 export function LaunchKit({
