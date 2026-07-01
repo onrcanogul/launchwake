@@ -1224,6 +1224,45 @@ tbody tr:hover {
 }
 
 /* ============ DRAFT EDITOR + BAN-SAFETY ============ */
+.draft-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 15px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.draft-controls .seg {
+  margin-bottom: 0;
+}
+.takes {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 10px 15px;
+  border-top: 1px solid var(--line);
+}
+.takes .tk-label {
+  font-size: 11px;
+  color: var(--tx3);
+}
+.tk-chip {
+  font-size: 11px;
+  color: var(--tx2);
+  background: var(--bg2);
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s ease;
+}
+.tk-chip:hover {
+  background: var(--bg3);
+  color: var(--tx);
+}
 .draft-edit {
   width: 100%;
   min-height: 150px;

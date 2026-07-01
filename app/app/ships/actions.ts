@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { buildPlan } from "@/lib/analysis";
-import { generateDraft } from "@/lib/drafts";
+import { generateDraft, isDraftTone, type DraftTone } from "@/lib/drafts";
 import { suggestShip, parseRepo } from "@/lib/github";
 import { recordPostForRecommendation } from "@/lib/attribution";
 import { assertEntitlement, EntitlementError } from "@/lib/billing";
@@ -156,9 +156,13 @@ export async function pullLatestShip(): Promise<PullState> {
 }
 
 /** Generate (or regenerate) the draft for a recommendation, used by Launch kit. */
-export async function ensureDraft(recommendationId: string): Promise<void> {
+export async function ensureDraft(
+  recommendationId: string,
+  tone?: string,
+): Promise<void> {
   await requireProject();
-  await generateDraft(recommendationId);
+  const t: DraftTone = isDraftTone(tone) ? tone : "founder";
+  await generateDraft(recommendationId, t);
   revalidatePath("/app/ships");
 }
 

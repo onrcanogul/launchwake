@@ -7,6 +7,7 @@ import { platformIcon } from "@/components/ui/platform";
 import { useToast } from "@/components/ui/toast";
 import { ensureDraft, markPosted } from "@/app/app/ships/actions";
 import { checkDraft, safetyVerdict } from "@/lib/bansafety";
+import { DRAFT_TONES, type DraftTone } from "@/lib/drafts";
 import type { KitRec } from "@/lib/plans";
 
 export function LaunchKit({
@@ -30,6 +31,9 @@ export function LaunchKit({
   const [postError, setPostError] = useState<string | null>(null);
   // Per-tab edits so the user can tweak and re-check before copying.
   const [edits, setEdits] = useState<Record<string, string>>({});
+  const [tone, setTone] = useState<DraftTone>("founder");
+  // Previous takes per rec (variants) — restore any into the editor.
+  const [history, setHistory] = useState<Record<string, string[]>>({});
 
   const active = recs.find((r) => r.id === activeId);
   const draftBody =
@@ -45,13 +49,29 @@ export function LaunchKit({
         })
       : null;
 
-  const generate = (recId: string) => {
+  const generate = (recId: string, regenerate = false) => {
+    // Keep the current body as a variant before overwriting.
+    if (regenerate && active?.draft) {
+      const current = edits[recId] ?? active.draft.body;
+      setHistory((h) => ({
+        ...h,
+        [recId]: [current, ...(h[recId] ?? [])].slice(0, 4),
+      }));
+      setEdits((m) => {
+        const rest = { ...m };
+        delete rest[recId];
+        return rest;
+      });
+    }
     start(async () => {
-      await ensureDraft(recId);
+      await ensureDraft(recId, tone);
       router.refresh();
-      toast("Draft ready");
+      toast(regenerate ? `New take — ${tone} voice` : "Draft ready");
     });
   };
+
+  const restore = (recId: string, body: string) =>
+    setEdits((m) => ({ ...m, [recId]: body }));
 
   const doMarkPosted = (recId: string) => {
     setPostError(null);
@@ -111,6 +131,29 @@ export function LaunchKit({
 
             {active.draft ? (
               <>
+                <div className="draft-controls">
+                  <div className="seg">
+                    {DRAFT_TONES.map((t) => (
+                      <button
+                        type="button"
+                        key={t.value}
+                        className={tone === t.value ? "on" : ""}
+                        onClick={() => setTone(t.value)}
+                        title={`${t.label} voice`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className="btn btn-s"
+                    disabled={pending}
+                    onClick={() => generate(active.id, true)}
+                  >
+                    <Icon name="refresh" />
+                    {pending ? "Writing…" : "New take"}
+                  </button>
+                </div>
                 <textarea
                   className="draft-edit"
                   value={draftBody}
@@ -120,6 +163,21 @@ export function LaunchKit({
                   spellCheck={false}
                   aria-label="Draft — edit and re-check before posting"
                 />
+                {(history[active.id]?.length ?? 0) > 0 && (
+                  <div className="takes">
+                    <span className="tk-label">Recent takes:</span>
+                    {history[active.id].map((body, i) => (
+                      <button
+                        key={i}
+                        className="tk-chip"
+                        onClick={() => restore(active.id, body)}
+                        title={body.slice(0, 80)}
+                      >
+                        take {history[active.id].length - i}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="fn">
                   <Icon name="shield" />
                   <span>

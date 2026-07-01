@@ -1,11 +1,18 @@
 import { redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
+import { getPlanUsage } from "@/lib/billing";
 import { NewShipForm } from "@/components/ship/NewShipForm";
 import { Note } from "@/components/ui/Note";
 
 export default async function NewShipPage() {
   const ws = await getWorkspace();
   if (!ws.project) redirect("/onboarding");
+
+  const usage = await getPlanUsage(ws.user.id);
+  const plansLeft =
+    usage.planLimit === null
+      ? null
+      : Math.max(0, usage.planLimit - usage.plansThisMonth);
 
   return (
     <>
@@ -19,7 +26,7 @@ export default async function NewShipPage() {
         </div>
       </div>
 
-      <NewShipForm githubRepo={ws.project.githubRepo} />
+      <NewShipForm githubRepo={ws.project.githubRepo} plansLeft={plansLeft} />
 
       <Note>
         LaunchWake never posts for you or uses bot accounts. You get the plan and

@@ -14,6 +14,30 @@ const DraftSchema = z.object({
 });
 export type DraftResult = z.infer<typeof DraftSchema>;
 
+export type DraftTone = "founder" | "technical" | "punchy" | "professional";
+
+export const DRAFT_TONES: { value: DraftTone; label: string }[] = [
+  { value: "founder", label: "Founder" },
+  { value: "technical", label: "Technical" },
+  { value: "punchy", label: "Punchy" },
+  { value: "professional", label: "B2B" },
+];
+
+const TONE_GUIDE: Record<DraftTone, string> = {
+  founder:
+    "Voice: a technical founder sharing personally. First person, honest, build-in-public. Warm, never salesy.",
+  technical:
+    "Voice: precise and plain. Lead with the technical substance and the problem you hit. No fluff, no adjectives.",
+  punchy:
+    "Voice: tight and high-energy. Short sentences, a strong hook, momentum. Still concrete — no hype words.",
+  professional:
+    "Voice: measured and B2B. Clear business value, credible, professional. No slang, no emoji.",
+};
+
+export function isDraftTone(v: unknown): v is DraftTone {
+  return typeof v === "string" && v in TONE_GUIDE;
+}
+
 export type DraftContext = {
   project: Pick<Project, "name" | "description" | "url">;
   ship: Pick<Ship, "type" | "title" | "summary">;
@@ -40,13 +64,14 @@ const PLATFORM_STYLE: Record<string, string> = {
   OTHER: "Match the community's norms; value-first, honest, concise.",
 };
 
-export function buildDraftPrompt(ctx: DraftContext) {
+export function buildDraftPrompt(ctx: DraftContext, tone: DraftTone = "founder") {
   const style = PLATFORM_STYLE[ctx.channel.platform] ?? PLATFORM_STYLE.OTHER;
   const system = [
     "You write platform-native distribution drafts for a technical founder.",
     "The founder posts it themselves — never write as if auto-posting.",
     "Ground the draft in the channel's rules and the provided ruleNote (the safe way in).",
     "Be specific to the product and the ship. No hype, no emoji spam, no fake metrics.",
+    TONE_GUIDE[tone],
     "Write the draft EXACTLY as it should be pasted — do NOT add 'Title:'/'Body:' labels, section headers, or meta commentary.",
     "For Show HN, the very first line must be the title, starting with 'Show HN:'.",
     "Respond with ONLY a JSON object: {\"body\":string,\"safetyNote\":string}. safetyNote is one line on how to post safely here.",
@@ -107,7 +132,10 @@ function firstSentence(text?: string | null): string | undefined {
 }
 
 /** Generate (and persist) a draft for a recommendation. Idempotent per rec. */
-export async function generateDraft(recommendationId: string): Promise<Draft> {
+export async function generateDraft(
+  recommendationId: string,
+  tone: DraftTone = "founder",
+): Promise<Draft> {
   const rec = await db.recommendation.findUnique({
     where: { id: recommendationId },
     include: {
@@ -127,13 +155,14 @@ export async function generateDraft(recommendationId: string): Promise<Draft> {
     ruleNote: rec.ruleNote,
   };
 
+  const prompt = buildDraftPrompt(ctx, tone);
   const result = llmConfigured()
     ? await completeJSON({
         userId: project.userId,
-        system: buildDraftPrompt(ctx).system,
-        prompt: buildDraftPrompt(ctx).prompt,
+        system: prompt.system,
+        prompt: prompt.prompt,
         schema: DraftSchema,
-        label: `draft:${rec.channel.platform}`,
+        label: `draft:${rec.channel.platform}:${tone}`,
       })
     : heuristicDraft(ctx);
 

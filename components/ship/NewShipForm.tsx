@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/toast";
@@ -14,7 +15,13 @@ type Mode = "github" | "url" | "describe";
 
 const TYPES = ["LAUNCH", "FEATURE", "BLOG", "OTHER"] as const;
 
-export function NewShipForm({ githubRepo }: { githubRepo: string | null }) {
+export function NewShipForm({
+  githubRepo,
+  plansLeft,
+}: {
+  githubRepo: string | null;
+  plansLeft: number | null;
+}) {
   const [state, formAction, pending] = useActionState<CreateShipState, FormData>(
     createShipAndPlan,
     {},
@@ -164,8 +171,37 @@ export function NewShipForm({ githubRepo }: { githubRepo: string | null }) {
         </div>
       )}
 
+      {plansLeft !== null &&
+        (plansLeft > 0 ? (
+          <div className="fhint" style={{ marginTop: 14 }}>
+            {plansLeft} of 2 distribution plans left this month on Free.{" "}
+            <Link href="/app/settings" style={{ color: "var(--ac)" }}>
+              Upgrade to Pro
+            </Link>{" "}
+            for unlimited.
+          </div>
+        ) : (
+          <div
+            className="note"
+            style={{ marginTop: 14, borderColor: "var(--acb)" }}
+          >
+            <Icon name="target" />
+            <span>
+              You&apos;ve used both Free plans this month.{" "}
+              <Link href="/app/settings" style={{ color: "var(--ac)", fontWeight: 550 }}>
+                Upgrade to Pro — $29/mo
+              </Link>{" "}
+              for unlimited distribution plans.
+            </span>
+          </div>
+        ))}
+
       <div style={{ marginTop: 18, display: "flex", gap: 9, flexWrap: "wrap" }}>
-        <button type="submit" className="btn btn-p" disabled={pending}>
+        <button
+          type="submit"
+          className="btn btn-p"
+          disabled={pending || plansLeft === 0}
+        >
           <Icon name="target" />
           {pending ? "Building plan…" : "Build distribution plan"}
         </button>
