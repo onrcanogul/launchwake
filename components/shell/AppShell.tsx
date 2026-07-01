@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
+import { NavProgress } from "@/components/shell/NavProgress";
 
 export type ShipNav = { id: string; title: string } | null;
 
@@ -82,6 +83,7 @@ export function AppShell({
 
   return (
     <div className={drawerOpen ? "app drawerbody" : "app"}>
+      <NavProgress />
       <div
         className="overlay"
         onClick={() => setDrawerOpen(false)}
