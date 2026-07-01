@@ -1,33 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { verifyWebhookSignature, parseWebhookEvent } from "@/lib/github";
 import { runAnalysisJob } from "@/lib/jobs";
 
 /**
- * GitHub webhook → auto-detect ships. Verifies the HMAC signature, turns a
- * release/push into a Ship on the matching project, and kicks off analysis.
- * Never posts anything — it only creates the distribution moment.
+ * GitHub webhook → auto-detect ships (the retention engine). Matches the repo to
+ * a project, verifies the signature against that project's own webhook secret,
+ * creates a Ship, and analyzes it AFTER responding (so the webhook stays fast
+ * and never times out). Never posts anything.
  */
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const eventType = req.headers.get("x-github-event");
-
-  // Signature check (required when a secret is configured).
-  if (env.GITHUB_WEBHOOK_SECRET) {
-    const ok = verifyWebhookSignature(
-      rawBody,
-      req.headers.get("x-hub-signature-256"),
-      env.GITHUB_WEBHOOK_SECRET,
-    );
-    if (!ok) {
-      return NextResponse.json({ error: "Bad signature" }, { status: 401 });
-    }
-  }
-
-  if (eventType === "ping") {
-    return NextResponse.json({ ok: true, pong: true });
-  }
+  const signature = req.headers.get("x-hub-signature-256");
 
   let payload: unknown;
   try {
@@ -36,17 +23,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const suggestion = parseWebhookEvent(eventType, payload);
-  if (!suggestion) {
-    return NextResponse.json({ ok: true, ignored: true });
+  const repoFullName = (payload as { repository?: { full_name?: string } })
+    ?.repository?.full_name;
+  if (!repoFullName) {
+    return NextResponse.json({ ok: true, ignored: "no repository" });
   }
 
-  // Match the repo to a project (case-insensitive owner/repo).
   const project = await db.project.findFirst({
-    where: { githubRepo: { equals: suggestion.repoFullName, mode: "insensitive" } },
+    where: { githubRepo: { equals: repoFullName, mode: "insensitive" } },
   });
   if (!project) {
     return NextResponse.json({ ok: true, ignored: "no matching project" });
+  }
+
+  // Verify against the project's secret (or the deployment-wide fallback).
+  const secret = project.webhookSecret ?? env.GITHUB_WEBHOOK_SECRET;
+  if (secret && !verifyWebhookSignature(rawBody, signature, secret)) {
+    return NextResponse.json({ error: "Bad signature" }, { status: 401 });
+  }
+
+  if (eventType === "ping") {
+    return NextResponse.json({ ok: true, pong: true });
+  }
+
+  const suggestion = parseWebhookEvent(eventType, payload);
+  if (!suggestion) {
+    return NextResponse.json({ ok: true, ignored: true });
   }
 
   const ship = await db.ship.create({
@@ -60,9 +62,13 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Analyze (inline for MVP; a no-op-safe seam for Inngest later).
-  await runAnalysisJob(ship.id).catch((err) => {
-    console.error(`[webhook] analysis failed for ship ${ship.id}:`, err);
+  // Analyze after the response — keeps the webhook well under GitHub's timeout.
+  after(async () => {
+    try {
+      await runAnalysisJob(ship.id);
+    } catch (err) {
+      console.error(`[webhook] analysis failed for ship ${ship.id}:`, err);
+    }
   });
 
   return NextResponse.json({ ok: true, shipId: ship.id });

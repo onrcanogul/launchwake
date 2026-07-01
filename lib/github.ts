@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { env } from "./env";
+import { db } from "./db";
 import type { ShipType } from "@prisma/client";
 
 /**
@@ -157,6 +158,44 @@ export function verifyWebhookSignature(
   const a = Buffer.from(signatureHeader);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+export type GithubStatus = {
+  connected: boolean;
+  hasSecret: boolean;
+  autoShips: number;
+  lastAt: Date | null;
+  lastTitle: string | null;
+};
+
+/** Webhook auto-detect status for the Settings GitHub card. */
+export async function getGithubStatus(project: {
+  id: string;
+  githubRepo: string | null;
+  webhookSecret: string | null;
+}): Promise<GithubStatus> {
+  const filter = {
+    projectId: project.id,
+    OR: [
+      { commitSha: { not: null } },
+      { sourceUrl: { contains: "github.com" } },
+    ],
+  };
+  const [autoShips, last] = await Promise.all([
+    db.ship.count({ where: filter }),
+    db.ship.findFirst({
+      where: filter,
+      orderBy: { detectedAt: "desc" },
+      select: { detectedAt: true, title: true },
+    }),
+  ]);
+  return {
+    connected: Boolean(project.githubRepo),
+    hasSecret: Boolean(project.webhookSecret),
+    autoShips,
+    lastAt: last?.detectedAt ?? null,
+    lastTitle: last?.title ?? null,
+  };
 }
 
 export type WebhookShip = ShipSuggestion & { repoFullName: string };

@@ -83,6 +83,7 @@ model Project {
   url                  String?
   githubRepo           String? // "owner/repo"
   githubInstallationId String? // for webhook auto-detect
+  webhookSecret        String? // per-project GitHub webhook signing secret
   ships                Ship[]
   createdAt            DateTime @default(now())
 }

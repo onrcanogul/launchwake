@@ -11,6 +11,8 @@ export type ShipRow = {
   recCount: number;
   postCount: number;
   signupCount: number;
+  /** came in via the GitHub webhook (commit/release) */
+  autoDetected: boolean;
 };
 
 export type FeedStats = {
@@ -75,6 +77,8 @@ export async function getShipFeed(projectId: string): Promise<ShipFeed> {
       recCount: s.plan?._count.recs ?? 0,
       postCount: s.posts.length,
       signupCount,
+      autoDetected:
+        Boolean(s.commitSha) || Boolean(s.sourceUrl?.includes("github.com")),
     };
   });
 

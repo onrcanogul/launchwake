@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getShipFeed, relativeTime } from "@/lib/ships";
+import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 import { StatStrip, type Stat } from "@/components/ui/StatStrip";
@@ -131,7 +132,30 @@ export default async function ShipFeedPage() {
             <div className="lft">
               <ShipTypeTag type={s.type} />
               <div>
-                <div className="tt">{s.title}</div>
+                <div className="tt">
+                  {s.title}
+                  {s.autoDetected && (
+                    <span
+                      title="Auto-detected from GitHub"
+                      style={{
+                        display: "inline-flex",
+                        verticalAlign: "middle",
+                        marginLeft: 7,
+                        color: "var(--tx3)",
+                      }}
+                    >
+                      <Icon
+                        name="github"
+                        style={{
+                          width: 12,
+                          height: 12,
+                          fill: "currentColor",
+                          stroke: "none",
+                        }}
+                      />
+                    </span>
+                  )}
+                </div>
                 <div className="st">
                   {relativeTime(s.detectedAt)} ·{" "}
                   {s.hasPlan
