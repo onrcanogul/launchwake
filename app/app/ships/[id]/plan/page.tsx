@@ -1,7 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getShipWithPlan } from "@/lib/plans";
-import { listProjectShips } from "@/lib/ships";
 import { ChannelCard } from "@/components/channel/ChannelCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
@@ -25,7 +24,7 @@ export default async function PlanPage({
   if (!data) notFound();
 
   const { ship, recs } = data;
-  const ships = await listProjectShips(ws.project.id);
+  const ships = ws.ships;
   const emailAvailable = emailConfigured();
   const slackAvailable = Boolean(ws.project.slackWebhookUrl);
   const building = recs.length === 0 && ship.status === "NEW";

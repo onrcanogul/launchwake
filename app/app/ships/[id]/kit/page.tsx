@@ -1,7 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getShipKit } from "@/lib/plans";
-import { listProjectShips } from "@/lib/ships";
 import { LaunchKit } from "@/components/ship/LaunchKit";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
 import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
@@ -23,7 +22,7 @@ export default async function KitPage({
   const kit = await getShipKit(id, ws.user.id);
   if (!kit) notFound();
 
-  const ships = await listProjectShips(ws.project.id);
+  const ships = ws.ships;
 
   return (
     <>
