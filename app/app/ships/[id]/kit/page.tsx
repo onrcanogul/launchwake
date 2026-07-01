@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { getWorkspace, displayName, projectSubtitle } from "@/lib/session";
 import { getShipKit } from "@/lib/plans";
+import { listProjectShips } from "@/lib/ships";
 import { AppShell } from "@/components/shell/AppShell";
 import { LaunchKit } from "@/components/ship/LaunchKit";
+import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 
@@ -21,6 +23,8 @@ export default async function KitPage({
   const kit = await getShipKit(id, ws.user.id);
   if (!kit) notFound();
 
+  const ships = await listProjectShips(ws.project.id);
+
   return (
     <AppShell
       project={{ name: ws.project.name, subtitle: projectSubtitle(ws.project) }}
@@ -37,6 +41,9 @@ export default async function KitPage({
             your own account — LaunchWake never posts for you.
           </div>
         </div>
+        {ships.length > 1 && (
+          <ShipSwitcher ships={ships} currentId={kit.ship.id} mode="kit" />
+        )}
       </div>
 
       {kit.recs.length === 0 ? (

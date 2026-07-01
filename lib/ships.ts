@@ -93,6 +93,24 @@ export async function getShipFeed(projectId: string): Promise<ShipFeed> {
   return { ships: rows, stats };
 }
 
+export type ShipListItem = {
+  id: string;
+  title: string;
+  type: ShipType;
+  status: ShipStatus;
+};
+
+/** Lightweight list of a project's ships for the in-header ship switcher. */
+export async function listProjectShips(
+  projectId: string,
+): Promise<ShipListItem[]> {
+  return db.ship.findMany({
+    where: { projectId },
+    orderBy: { detectedAt: "desc" },
+    select: { id: true, title: true, type: true, status: true },
+  });
+}
+
 const TYPE_META: Record<ShipType, { label: string }> = {
   LAUNCH: { label: "Launch" },
   FEATURE: { label: "Feature" },

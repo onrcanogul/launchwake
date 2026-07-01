@@ -1,11 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { getWorkspace, displayName, projectSubtitle } from "@/lib/session";
 import { getShipWithPlan } from "@/lib/plans";
+import { listProjectShips } from "@/lib/ships";
 import { AppShell } from "@/components/shell/AppShell";
 import { ChannelCard } from "@/components/channel/ChannelCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { RerunButton } from "@/components/ship/RerunButton";
+import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
 import { nextBestTime } from "@/lib/reminders";
 
 export default async function PlanPage({
@@ -21,6 +23,7 @@ export default async function PlanPage({
   if (!data) notFound();
 
   const { ship, recs } = data;
+  const ships = await listProjectShips(ws.project.id);
 
   return (
     <AppShell
@@ -43,7 +46,12 @@ export default async function PlanPage({
             rules and the safe way in.
           </div>
         </div>
-        {recs.length > 0 && <RerunButton shipId={ship.id} />}
+        <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
+          {ships.length > 1 && (
+            <ShipSwitcher ships={ships} currentId={ship.id} mode="plan" />
+          )}
+          {recs.length > 0 && <RerunButton shipId={ship.id} />}
+        </div>
       </div>
 
       {recs.length === 0 ? (
