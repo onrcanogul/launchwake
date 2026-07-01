@@ -10,7 +10,7 @@ import type { Channel, Draft, Project, Ship } from "@prisma/client";
 
 const DraftSchema = z.object({
   body: z.string().min(1).max(3000),
-  safetyNote: z.string().min(1).max(280),
+  safetyNote: z.string().max(280).nullish(),
 });
 export type DraftResult = z.infer<typeof DraftSchema>;
 
@@ -140,13 +140,13 @@ export async function generateDraft(recommendationId: string): Promise<Draft> {
     update: {
       platform: rec.channel.platform,
       body: result.body,
-      safetyNote: result.safetyNote,
+      safetyNote: result.safetyNote ?? ctx.ruleNote,
     },
     create: {
       recommendationId,
       platform: rec.channel.platform,
       body: result.body,
-      safetyNote: result.safetyNote,
+      safetyNote: result.safetyNote ?? ctx.ruleNote,
     },
   });
 }

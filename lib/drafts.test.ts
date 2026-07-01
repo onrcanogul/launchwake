@@ -35,7 +35,7 @@ describe("heuristicDraft", () => {
     const d = heuristicDraft(base);
     expect(d.body).toMatch(/^Show HN:/);
     expect(d.body).toContain("Hookline");
-    expect(d.safetyNote.length).toBeGreaterThan(0);
+    expect((d.safetyNote ?? "").length).toBeGreaterThan(0);
   });
 
   it("produces an X thread with numbered tweets", () => {

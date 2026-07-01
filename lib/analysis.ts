@@ -37,7 +37,9 @@ const RankingSchema = z.object({
         fitScore: z.number().int().min(0).max(100),
         why: z.string().min(1).max(400),
         ruleNote: z.string().min(1).max(200),
-        bestTime: z.string().max(80).optional(),
+        // Models sometimes emit null; accept null/undefined and fall back to the
+        // channel's catalog best time downstream.
+        bestTime: z.string().max(80).nullish(),
       }),
     )
     .min(1),
