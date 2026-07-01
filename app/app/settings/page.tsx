@@ -7,6 +7,7 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { TrackingSetup } from "@/components/settings/TrackingSetup";
 import { BillingPanel } from "@/components/settings/BillingPanel";
 import { getPlanUsage, billingConfigured } from "@/lib/billing";
+import { getTrackingStatus } from "@/lib/attribution";
 import { env } from "@/lib/env";
 
 export default async function SettingsPage({
@@ -19,6 +20,7 @@ export default async function SettingsPage({
 
   const { upgraded } = await searchParams;
   const usage = await getPlanUsage(ws.user.id);
+  const tracking = await getTrackingStatus(ws.project.id);
   const p = ws.project;
 
   return (
@@ -71,7 +73,7 @@ export default async function SettingsPage({
       </Panel>
 
       <Panel title="Signup tracking">
-        <TrackingSetup appUrl={env.APP_URL} />
+        <TrackingSetup appUrl={env.APP_URL} status={tracking} />
       </Panel>
 
       <Panel title="Plan">

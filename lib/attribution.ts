@@ -168,16 +168,30 @@ export async function ingestSignup(
 export type ResultRow = {
   channelName: string;
   shipTitle: string;
+  trackedUrl: string | null;
+  postUrl: string | null;
   clicks: number;
   signups: number;
   conversion: number; // 0..1
   removed: boolean;
 };
 
+/** Aggregate across all ships — "which channel actually brings customers". */
+export type ChannelRollup = {
+  channelName: string;
+  posts: number;
+  clicks: number;
+  signups: number;
+  conversion: number;
+};
+
 export type ResultsRollup = {
-  rows: ResultRow[];
+  perPost: ResultRow[];
+  perChannel: ChannelRollup[];
   totalClicks: number;
   totalSignups: number;
+  conversion: number;
+  bestChannel: string | null;
   insight: string | null;
 };
 
@@ -194,13 +208,15 @@ export async function getResultsRollup(
     orderBy: { postedAt: "desc" },
   });
 
-  const rows: ResultRow[] = posts.map((p) => {
+  const perPost: ResultRow[] = posts.map((p) => {
     const events = p.trackedLink?.events ?? [];
     const clicks = events.filter((e) => e.type === "CLICK").length;
     const signups = events.filter((e) => e.type === "SIGNUP").length;
     return {
       channelName: p.channel.name,
       shipTitle: p.ship.title,
+      trackedUrl: p.trackedLink ? trackedUrl(p.trackedLink.shortCode) : null,
+      postUrl: p.url,
       clicks,
       signups,
       conversion: clicks > 0 ? signups / clicks : 0,
@@ -208,12 +224,58 @@ export async function getResultsRollup(
     };
   });
 
+  // Roll up by channel across ships.
+  const byChannel = new Map<string, ChannelRollup>();
+  for (const r of perPost) {
+    const c =
+      byChannel.get(r.channelName) ??
+      { channelName: r.channelName, posts: 0, clicks: 0, signups: 0, conversion: 0 };
+    c.posts += 1;
+    c.clicks += r.clicks;
+    c.signups += r.signups;
+    byChannel.set(r.channelName, c);
+  }
+  const perChannel = [...byChannel.values()]
+    .map((c) => ({ ...c, conversion: c.clicks > 0 ? c.signups / c.clicks : 0 }))
+    .sort((a, b) => b.signups - a.signups || b.conversion - a.conversion);
+
+  const totalClicks = perPost.reduce((n, r) => n + r.clicks, 0);
+  const totalSignups = perPost.reduce((n, r) => n + r.signups, 0);
+
   return {
-    rows,
-    totalClicks: rows.reduce((n, r) => n + r.clicks, 0),
-    totalSignups: rows.reduce((n, r) => n + r.signups, 0),
-    insight: buildInsight(rows),
+    perPost,
+    perChannel,
+    totalClicks,
+    totalSignups,
+    conversion: totalClicks > 0 ? totalSignups / totalClicks : 0,
+    bestChannel: perChannel.find((c) => c.signups > 0)?.channelName ?? null,
+    insight: buildInsight(perPost),
   };
+}
+
+export type TrackingStatus = {
+  signups: number;
+  clicks: number;
+  lastSignupAt: Date | null;
+};
+
+/** For the Settings pixel card — is data actually flowing in? */
+export async function getTrackingStatus(
+  projectId: string,
+): Promise<TrackingStatus> {
+  const where = {
+    trackedLink: { post: { ship: { projectId } } },
+  } as const;
+  const [signups, clicks, last] = await Promise.all([
+    db.event.count({ where: { ...where, type: "SIGNUP" } }),
+    db.event.count({ where: { ...where, type: "CLICK" } }),
+    db.event.findFirst({
+      where: { ...where, type: "SIGNUP" },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    }),
+  ]);
+  return { signups, clicks, lastSignupAt: last?.createdAt ?? null };
 }
 
 /**

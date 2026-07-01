@@ -55,8 +55,8 @@ describe("buildInsight", () => {
   });
   it("recommends doubling down on the best converter", () => {
     const rows: ResultRow[] = [
-      { channelName: "Hacker News", shipTitle: "beta", clicks: 100, signups: 5, conversion: 0.05, removed: false },
-      { channelName: "X", shipTitle: "beta", clicks: 100, signups: 2, conversion: 0.02, removed: false },
+      { channelName: "Hacker News", shipTitle: "beta", trackedUrl: null, postUrl: null, clicks: 100, signups: 5, conversion: 0.05, removed: false },
+      { channelName: "X", shipTitle: "beta", trackedUrl: null, postUrl: null, clicks: 100, signups: 2, conversion: 0.02, removed: false },
     ];
     const insight = buildInsight(rows)!;
     expect(insight).toMatch(/Hacker News/);
@@ -64,7 +64,7 @@ describe("buildInsight", () => {
   });
   it("flags a removed post when nothing converts", () => {
     const rows: ResultRow[] = [
-      { channelName: "r/SaaS", shipTitle: "beta", clicks: 10, signups: 0, conversion: 0, removed: true },
+      { channelName: "r/SaaS", shipTitle: "beta", trackedUrl: null, postUrl: null, clicks: 10, signups: 0, conversion: 0, removed: true },
     ];
     const insight = buildInsight(rows)!;
     expect(insight).toMatch(/r\/SaaS/);

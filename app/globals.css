@@ -1203,6 +1203,33 @@ tbody tr:hover {
   }
 }
 
+/* ============ TRACKING STATUS ============ */
+.track-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--tx2);
+  background: var(--bg1);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+}
+.track-status b {
+  color: var(--tx);
+  font-weight: 600;
+}
+.track-status code {
+  color: var(--tx);
+}
+.track-status.ok {
+  border-color: rgba(62, 207, 142, 0.3);
+}
+.track-status.warn {
+  border-color: rgba(227, 179, 65, 0.3);
+}
+
 /* ============ A11Y ============ */
 /* Keyboard focus ring — visible only for keyboard users, not mouse clicks. */
 a:focus-visible,
