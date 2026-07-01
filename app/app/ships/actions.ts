@@ -10,6 +10,8 @@ import { generateDraft } from "@/lib/drafts";
 import { suggestShip, parseRepo } from "@/lib/github";
 import { recordPostForRecommendation } from "@/lib/attribution";
 import { assertEntitlement, EntitlementError } from "@/lib/billing";
+import { nextBestTimeUTC } from "@/lib/reminders";
+import { emailConfigured } from "@/lib/notify";
 
 async function requireProject() {
   const session = await auth();
@@ -127,6 +129,62 @@ export async function ensureDraft(recommendationId: string): Promise<void> {
   await requireProject();
   await generateDraft(recommendationId);
   revalidatePath("/app/ships");
+}
+
+export type ScheduleReminderState =
+  | { ok: true; sendAt: string; method: "EMAIL" | "SLACK" }
+  | { ok: false; error: string };
+
+/** Schedule an email/Slack ping at the channel's best time (never auto-posts). */
+export async function scheduleReminder(
+  recommendationId: string,
+  method: "EMAIL" | "SLACK",
+): Promise<ScheduleReminderState> {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const rec = await db.recommendation.findFirst({
+    where: {
+      id: recommendationId,
+      plan: { ship: { project: { userId: session.user.id } } },
+    },
+    include: {
+      channel: true,
+      plan: { include: { ship: { include: { project: true } } } },
+    },
+  });
+  if (!rec) return { ok: false, error: "Recommendation not found" };
+
+  const ship = rec.plan.ship;
+  const project = ship.project;
+
+  if (method === "EMAIL" && !emailConfigured()) {
+    return { ok: false, error: "Email isn't configured on this deployment yet." };
+  }
+  if (method === "SLACK" && !project.slackWebhookUrl) {
+    return { ok: false, error: "Add a Slack webhook in Settings first." };
+  }
+
+  const bestTime = rec.bestTime ?? rec.channel.bestTime;
+  const sendAt = nextBestTimeUTC(bestTime, new Date());
+  if (!sendAt) {
+    return { ok: false, error: "This channel has no scheduled best time." };
+  }
+
+  await db.reminder.create({
+    data: {
+      userId: session.user.id,
+      shipId: ship.id,
+      channelName: rec.channel.name,
+      shipTitle: ship.title,
+      bestTimeLabel: bestTime,
+      ruleNote: rec.ruleNote,
+      method,
+      sendAt,
+    },
+  });
+
+  return { ok: true, sendAt: sendAt.toISOString(), method };
 }
 
 export type MarkPostedState =

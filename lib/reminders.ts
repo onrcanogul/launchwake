@@ -98,6 +98,67 @@ export function nextBestTime(
   return null;
 }
 
+/**
+ * Rough tz-abbreviation → UTC offset (hours). Summer/DST-ish; good enough to fire
+ * a reminder near the intended local time. Defaults to ET.
+ */
+const TZ_OFFSETS: Record<string, number> = {
+  ET: -4,
+  ET_EDT: -4,
+  EST: -5,
+  EDT: -4,
+  CT: -5,
+  CST: -6,
+  CDT: -5,
+  MT: -6,
+  MST: -7,
+  MDT: -6,
+  PT: -7,
+  PST: -8,
+  PDT: -7,
+  GMT: 0,
+  UTC: 0,
+  BST: 1,
+  CET: 1,
+  CEST: 2,
+};
+
+function tzOffsetHours(bestTime: string): number {
+  const m = bestTime.toUpperCase().match(/\b(E|P|C|M)(T|ST|DT)?\b|\b(GMT|UTC|BST|CET|CEST)\b/);
+  if (!m) return TZ_OFFSETS.ET;
+  const token = (m[0] || "ET").replace(/\s/g, "");
+  return TZ_OFFSETS[token] ?? TZ_OFFSETS.ET;
+}
+
+/**
+ * Absolute UTC instant of the next best-time slot — for actually firing an
+ * email/Slack ping. Interprets the wall time in the string's timezone.
+ * Returns null when there's nothing schedulable.
+ */
+export function nextBestTimeUTC(
+  bestTime: string | null | undefined,
+  from: Date,
+): Date | null {
+  if (!bestTime) return null;
+  const offset = tzOffsetHours(bestTime);
+  // Search wall-clock slots in the target tz until one is in the future (UTC).
+  for (let probe = 0; probe < 3; probe++) {
+    const wall = nextBestTime(bestTime, new Date(from.getTime() + probe * 60_000));
+    if (!wall) return null;
+    // wall is local-to-tz; convert to UTC by subtracting the offset.
+    const utcMs = Date.UTC(
+      wall.year,
+      wall.month - 1,
+      wall.day,
+      wall.hour - offset,
+      wall.minute,
+    );
+    if (utcMs > from.getTime()) return new Date(utcMs);
+    from = new Date(utcMs + 60_000); // advance past this slot and retry
+  }
+  return null;
+}
+
 function pad(n: number): string {
   return n.toString().padStart(2, "0");
 }
@@ -131,6 +192,35 @@ export type ICSInput = {
   /** stamp; pass a fixed value in tests for determinism */
   stamp?: string;
 };
+
+export type ReminderLike = {
+  shipId: string;
+  channelName: string;
+  shipTitle: string;
+  bestTimeLabel?: string | null;
+  ruleNote?: string | null;
+};
+
+/** Email/Slack copy for a due reminder (pure). Reminder only — never posts. */
+export function reminderMessage(
+  r: ReminderLike,
+  appUrl: string,
+): { subject: string; text: string } {
+  const url = `${appUrl.replace(/\/$/, "")}/app/ships/${r.shipId}/kit`;
+  const subject = `Time to post "${r.shipTitle}" to ${r.channelName}`;
+  const text = [
+    `It's a good time to post to ${r.channelName}${
+      r.bestTimeLabel ? ` (${r.bestTimeLabel})` : ""
+    }.`,
+    r.ruleNote ? `Safe way in: ${r.ruleNote}` : "",
+    `Your draft is ready: ${url}`,
+    "",
+    "— LaunchWake · reminder only, you post it yourself.",
+  ]
+    .filter((l) => l !== "")
+    .join("\n");
+  return { subject, text };
+}
 
 /** Build a minimal, valid VCALENDAR with one floating-time VEVENT. */
 export function buildICS(input: ICSInput): string {

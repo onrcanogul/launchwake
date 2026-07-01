@@ -61,6 +61,10 @@ const schema = z.object({
   // ── Inngest (later) ───────────────────────────────────
   INNGEST_EVENT_KEY: OptionalString,
   INNGEST_SIGNING_KEY: OptionalString,
+
+  // ── Cron (reminder delivery) ──────────────────────────
+  // Shared secret; the scheduler must send it to /api/cron/reminders.
+  CRON_SECRET: OptionalString,
 });
 
 function loadEnv() {

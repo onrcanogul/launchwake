@@ -7,6 +7,7 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { TrackingSetup } from "@/components/settings/TrackingSetup";
 import { BillingPanel } from "@/components/settings/BillingPanel";
 import { GithubWebhook } from "@/components/settings/GithubWebhook";
+import { SlackConnect } from "@/components/settings/SlackConnect";
 import { getPlanUsage, billingConfigured } from "@/lib/billing";
 import { getTrackingStatus } from "@/lib/attribution";
 import { getGithubStatus } from "@/lib/github";
@@ -70,10 +71,15 @@ export default async function SettingsPage({
         <div className="setrow">
           <div className="l">
             <b>Slack</b>
-            <span>Get a ping when a new ship is detected</span>
+            <span>Ping you at the best time to post &amp; on new ships</span>
           </div>
-          <Button variant="secondary">Connect</Button>
+          {p.slackWebhookUrl ? (
+            <Badge dotColor="var(--ok)">Connected</Badge>
+          ) : (
+            <Badge>Not set</Badge>
+          )}
         </div>
+        <SlackConnect current={p.slackWebhookUrl} />
       </Panel>
 
       <Panel title="GitHub auto-detect" right="ships land in your feed">

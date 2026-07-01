@@ -2,6 +2,7 @@ import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import { RISK, type BanRiskValue } from "@/components/ui/risk";
 import { platformIcon } from "@/components/ui/platform";
+import { RemindMenu, type RemindProps } from "@/components/channel/RemindMenu";
 
 export type ChannelCardData = {
   name: string;
@@ -22,11 +23,11 @@ export type ChannelCardData = {
 export function ChannelCard({
   data,
   draftHref,
-  remindHref,
+  remind,
 }: {
   data: ChannelCardData;
   draftHref: string;
-  remindHref?: string;
+  remind?: RemindProps;
 }) {
   const risk = RISK[data.banRisk];
   const fit = Math.max(0, Math.min(100, data.fitScore));
@@ -77,11 +78,7 @@ export function ChannelCard({
           </div>
         )}
         <div className="act" style={{ display: "flex", gap: 8 }}>
-          {remindHref && (
-            <a className="btn btn-s" href={remindHref} download>
-              <Icon name="calendar" /> Remind me
-            </a>
-          )}
+          {remind && <RemindMenu {...remind} />}
           <Button variant="primary" href={draftHref}>
             Get draft
           </Button>

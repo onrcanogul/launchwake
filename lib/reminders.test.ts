@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { nextBestTime, buildICS } from "./reminders";
+import {
+  nextBestTime,
+  nextBestTimeUTC,
+  reminderMessage,
+  buildICS,
+} from "./reminders";
 
 // A fixed reference: Monday 2026-07-06 12:00 UTC.
 const MON = new Date("2026-07-06T12:00:00Z");
@@ -32,6 +37,41 @@ describe("nextBestTime", () => {
   it("returns null for unschedulable strings", () => {
     expect(nextBestTime("Invite only", MON)).toBeNull();
     expect(nextBestTime(null, MON)).toBeNull();
+  });
+});
+
+describe("nextBestTimeUTC", () => {
+  it("converts 'Tue–Thu 8am ET' to the correct UTC instant", () => {
+    // ET summer = UTC-4, so 8am ET = 12:00 UTC on the next Tuesday.
+    const d = nextBestTimeUTC("Tue–Thu 8am ET", MON)!;
+    expect(d.toISOString()).toBe("2026-07-07T12:00:00.000Z");
+  });
+  it("converts 'Tue 00:01 PT' correctly", () => {
+    // PT summer = UTC-7, so 00:01 PT = 07:01 UTC.
+    const d = nextBestTimeUTC("Tue 00:01 PT", MON)!;
+    expect(d.toISOString()).toBe("2026-07-07T07:01:00.000Z");
+  });
+  it("returns null for unschedulable strings", () => {
+    expect(nextBestTimeUTC("Invite only", MON)).toBeNull();
+  });
+});
+
+describe("reminderMessage", () => {
+  it("builds subject + text with the draft link, reminder-only", () => {
+    const { subject, text } = reminderMessage(
+      {
+        shipId: "s1",
+        channelName: "Hacker News — Show HN",
+        shipTitle: "Slack alerts",
+        bestTimeLabel: "Tue–Thu 8am ET",
+        ruleNote: "build story, no marketing",
+      },
+      "https://launchwake.dev",
+    );
+    expect(subject).toContain("Slack alerts");
+    expect(subject).toContain("Hacker News");
+    expect(text).toContain("https://launchwake.dev/app/ships/s1/kit");
+    expect(text).toMatch(/reminder only/i);
   });
 });
 

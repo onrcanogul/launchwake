@@ -9,6 +9,7 @@ import { RerunButton } from "@/components/ship/RerunButton";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
 import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
 import { nextBestTime } from "@/lib/reminders";
+import { emailConfigured } from "@/lib/notify";
 
 export default async function PlanPage({
   params,
@@ -24,6 +25,8 @@ export default async function PlanPage({
 
   const { ship, recs } = data;
   const ships = await listProjectShips(ws.project.id);
+  const emailAvailable = emailConfigured();
+  const slackAvailable = Boolean(ws.project.slackWebhookUrl);
 
   return (
     <>
@@ -75,7 +78,16 @@ export default async function PlanPage({
                 outcomeNote: rec.outcomeNote,
               }}
               draftHref={`/app/ships/${ship.id}/kit?rec=${rec.id}`}
-              remindHref={schedulable ? `/api/ics/${rec.id}` : undefined}
+              remind={
+                schedulable
+                  ? {
+                      recId: rec.id,
+                      icsHref: `/api/ics/${rec.id}`,
+                      emailAvailable,
+                      slackAvailable,
+                    }
+                  : undefined
+              }
             />
           );
         })

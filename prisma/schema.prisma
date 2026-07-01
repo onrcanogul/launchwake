@@ -26,6 +26,7 @@ model User {
   projects         Project[]
   accounts         Account[]
   sessions         Session[]
+  reminders        Reminder[]
   createdAt        DateTime  @default(now())
 }
 
@@ -84,6 +85,7 @@ model Project {
   githubRepo           String? // "owner/repo"
   githubInstallationId String? // for webhook auto-detect
   webhookSecret        String? // per-project GitHub webhook signing secret
+  slackWebhookUrl      String? // Slack incoming webhook for reminders / new-ship pings
   ships                Ship[]
   createdAt            DateTime @default(now())
 }
@@ -236,6 +238,38 @@ model Event {
 enum EventType {
   CLICK
   SIGNUP
+}
+
+// Scheduled "post at the best time" reminder (email/Slack ping — never posts).
+model Reminder {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shipId        String
+  channelName   String
+  shipTitle     String
+  bestTimeLabel String?
+  ruleNote      String?
+  method        ReminderMethod
+  sendAt        DateTime
+  status        ReminderStatus @default(PENDING)
+  error         String?
+  sentAt        DateTime?
+  createdAt     DateTime       @default(now())
+
+  @@index([status, sendAt])
+}
+
+enum ReminderMethod {
+  EMAIL
+  SLACK
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELED
 }
 
 // Aggregated outcome data per channel (the flywheel / moat).
