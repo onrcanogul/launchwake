@@ -180,6 +180,7 @@ model Recommendation {
   bestTime  String?
   whyText   String // one-line rationale, product-specific
   ruleNote  String? // the safe way in for THIS post
+  outcomeNote String? // flywheel evidence, e.g. "Proven: 3.2% conv for dev-tools"
   draft     Draft?
 }
 

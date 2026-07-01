@@ -13,6 +13,7 @@ export type RecView = {
   bestTime: string | null;
   whyText: string;
   ruleNote: string | null;
+  outcomeNote: string | null;
   hasDraft: boolean;
 };
 
@@ -63,6 +64,7 @@ export async function getShipWithPlan(
       bestTime: r.bestTime,
       whyText: r.whyText,
       ruleNote: r.ruleNote,
+      outcomeNote: r.outcomeNote,
       hasDraft: Boolean(r.draft),
     })) ?? [];
 

@@ -72,6 +72,7 @@ export default async function PlanPage({
                 bestTime: rec.bestTime,
                 whyText: rec.whyText,
                 ruleNote: rec.ruleNote,
+                outcomeNote: rec.outcomeNote,
               }}
               draftHref={`/app/ships/${ship.id}/kit?rec=${rec.id}`}
               remindHref={schedulable ? `/api/ics/${rec.id}` : undefined}

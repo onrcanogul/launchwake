@@ -10,7 +10,7 @@ import {
   productTagFor,
   rollupAllChannelStats,
   getOutcomeSignals,
-  outcomeBoost,
+  outcomeEvidence,
 } from "./stats";
 import type { BanRisk, Channel, Project, Ship } from "@prisma/client";
 
@@ -224,9 +224,10 @@ export async function buildPlan(shipId: string): Promise<string> {
     .map((r) => {
       const channel = bySlug.get(r.slug)!;
       const signal = signals.get(channel.id);
+      const evidence = outcomeEvidence(signal, productTag);
       const fitScore = Math.max(
         0,
-        Math.min(100, r.fitScore + outcomeBoost(signal)),
+        Math.min(100, r.fitScore + evidence.boost),
       );
       return {
         channel,
@@ -235,6 +236,7 @@ export async function buildPlan(shipId: string): Promise<string> {
         bestTime: r.bestTime ?? channel.bestTime,
         whyText: r.why,
         ruleNote: r.ruleNote,
+        outcomeNote: evidence.note,
       };
     })
     .sort((a, b) => b.fitScore - a.fitScore);
@@ -254,6 +256,7 @@ export async function buildPlan(shipId: string): Promise<string> {
           bestTime: e.bestTime,
           whyText: e.whyText,
           ruleNote: e.ruleNote,
+          outcomeNote: e.outcomeNote,
         })),
       },
     },

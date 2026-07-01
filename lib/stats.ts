@@ -114,14 +114,67 @@ export async function getOutcomeSignals(
   return map;
 }
 
+/** Human label for a product bucket ("devtools-webdev" → "dev-tools"). */
+const BUCKET_LABELS: Record<string, string> = {
+  devtools: "dev-tools",
+  saas: "SaaS",
+  webdev: "web-dev",
+  devops: "DevOps",
+  infra: "infra",
+  ai: "AI",
+  opensource: "open-source",
+  selfhosted: "self-hosted",
+  node: "Node",
+  javascript: "JS",
+  frontend: "frontend",
+  backend: "backend",
+  b2b: "B2B",
+  founders: "founder",
+  general: "products like yours",
+};
+
+export function bucketLabel(productTag: string): string {
+  const first = productTag.split("-")[0];
+  return BUCKET_LABELS[first] ?? "products like yours";
+}
+
+export type OutcomeEvidence = {
+  /** fit-score adjustment (can be negative) */
+  boost: number;
+  /** legible evidence for the plan card, or null when there's no signal yet */
+  note: string | null;
+};
+
 /**
- * Fit-score adjustment from real outcomes (pure). Channels that convert for
- * similar products get a boost; channels that got removed get a penalty.
+ * Turn a channel's real outcomes into a fit adjustment + a legible note — the
+ * flywheel made visible. Conversion-rate driven, ramped by sample size so a
+ * single lucky post doesn't dominate. Removals penalise and are called out.
  */
-export function outcomeBoost(signal?: OutcomeSignal): number {
-  if (!signal) return 0;
+export function outcomeEvidence(
+  signal: OutcomeSignal | undefined,
+  productTag: string,
+): OutcomeEvidence {
+  if (!signal || signal.posts === 0) return { boost: 0, note: null };
+
+  const label = bucketLabel(productTag);
+  const conv = signal.clicks > 0 ? signal.signups / signal.clicks : 0;
+  // Confidence ramps from 0→1 as we accumulate up to ~5 posts of evidence.
+  const confidence = Math.min(1, signal.posts / 5);
+
   let boost = 0;
-  if (signal.signups > 0) boost += Math.min(10, signal.signups * 2);
-  if (signal.removals > 0) boost -= 5;
-  return boost;
+  let note: string | null = null;
+
+  if (signal.signups > 0) {
+    boost += Math.round(Math.min(12, conv * 100 * 1.5) * confidence);
+    const convStr = conv > 0 ? `${(conv * 100).toFixed(1)}% conv` : `${signal.signups} signups`;
+    note = `Proven: ${convStr} for ${label} (${signal.posts} post${signal.posts === 1 ? "" : "s"})`;
+  }
+
+  if (signal.removals > 0) {
+    boost -= 4 + signal.removals;
+    const removalNote = `${signal.removals} removal${signal.removals === 1 ? "" : "s"} on ${label} — post carefully`;
+    note = note ? `${note} · ${removalNote}` : removalNote;
+  }
+
+  return { boost, note };
 }

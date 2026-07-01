@@ -12,6 +12,7 @@ export type ChannelCardData = {
   bestTime?: string | null;
   whyText: string;
   ruleNote?: string | null;
+  outcomeNote?: string | null;
 };
 
 /**
@@ -52,6 +53,13 @@ export function ChannelCard({
       </div>
 
       <div className="why">{data.whyText}</div>
+
+      {data.outcomeNote && (
+        <div className="evidence">
+          <Icon name="results" />
+          {data.outcomeNote}
+        </div>
+      )}
 
       <div className="ft">
         <div className="m">
