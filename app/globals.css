@@ -1204,6 +1204,21 @@ tbody tr:hover {
 }
 
 /* ============ SHIP SWITCHER (in-header dropdown) ============ */
+@keyframes lw-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.lw-spin {
+  width: 13px;
+  height: 13px;
+  border: 1.6px solid var(--line2);
+  border-top-color: var(--ac);
+  border-radius: 50%;
+  animation: lw-rotate 0.7s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
 .shipsw {
   position: relative;
 }

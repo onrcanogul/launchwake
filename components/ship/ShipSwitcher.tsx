@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { ShipTypeTag, type ShipTypeValue } from "@/components/ui/ShipTypeTag";
@@ -23,8 +23,19 @@ export function ShipSwitcher({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  // Optimistic selection: reflect the picked ship instantly, before the server
+  // component for the new ship finishes loading.
+  const [pendingId, setPendingId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const current = ships.find((s) => s.id === currentId);
+
+  const activeId = pendingId ?? currentId;
+  const active = ships.find((s) => s.id === activeId);
+
+  // Clear the optimistic id once the real route (currentId prop) catches up.
+  useEffect(() => {
+    setPendingId(null);
+  }, [currentId]);
 
   useEffect(() => {
     if (!open) return;
@@ -42,7 +53,9 @@ export function ShipSwitcher({
 
   const pick = (id: string) => {
     setOpen(false);
-    if (id !== currentId) router.push(`/app/ships/${id}/${mode}`);
+    if (id === currentId) return;
+    setPendingId(id); // instant dropdown feedback
+    startTransition(() => router.push(`/app/ships/${id}/${mode}`));
   };
 
   return (
@@ -61,9 +74,13 @@ export function ShipSwitcher({
             whiteSpace: "nowrap",
           }}
         >
-          {current?.title ?? "Select ship"}
+          {active?.title ?? "Select ship"}
         </span>
-        <Icon name="chevronDown" />
+        {pending ? (
+          <span className="lw-spin" aria-label="Switching" />
+        ) : (
+          <Icon name="chevronDown" />
+        )}
       </button>
 
       {open && (
@@ -71,14 +88,14 @@ export function ShipSwitcher({
           {ships.map((s) => (
             <button
               key={s.id}
-              className={["shipsw-item", s.id === currentId ? "on" : ""].join(" ")}
+              className={["shipsw-item", s.id === activeId ? "on" : ""].join(" ")}
               onClick={() => pick(s.id)}
               role="option"
-              aria-selected={s.id === currentId}
+              aria-selected={s.id === activeId}
             >
               <ShipTypeTag type={s.type} />
               <span className="t">{s.title}</span>
-              {s.id === currentId && (
+              {s.id === activeId && (
                 <Icon name="check" style={{ width: 13, height: 13, stroke: "var(--ac)" }} />
               )}
             </button>
