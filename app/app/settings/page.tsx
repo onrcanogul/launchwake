@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { getWorkspace, displayName, projectSubtitle } from "@/lib/session";
-import { AppShell } from "@/components/shell/AppShell";
+import { getWorkspace } from "@/lib/session";
 import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -23,14 +22,7 @@ export default async function SettingsPage({
   const p = ws.project;
 
   return (
-    <AppShell
-      project={{ name: p.name, subtitle: projectSubtitle(p) }}
-      user={{ name: displayName(ws.user), plan: ws.user.plan }}
-      ships={ws.ships}
-      activeShip={ws.activeShip}
-      channelsCount={ws.channelsCount}
-      crumb="Settings"
-    >
+    <>
       <div className="phead">
         <div>
           <h1 className="pg">Settings</h1>
@@ -89,6 +81,6 @@ export default async function SettingsPage({
           justUpgraded={upgraded === "1"}
         />
       </Panel>
-    </AppShell>
+    </>
   );
 }

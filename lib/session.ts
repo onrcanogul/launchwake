@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "./auth";
 import { db } from "./db";
@@ -17,8 +18,11 @@ export type Workspace = {
   channelsCount: number;
 };
 
-/** Load the signed-in user's workspace. Redirects to /login if unauthenticated. */
-export async function getWorkspace(): Promise<Workspace> {
+/**
+ * Load the signed-in user's workspace. Redirects to /login if unauthenticated.
+ * Wrapped in cache() so the layout and page share one result per request.
+ */
+export const getWorkspace = cache(async (): Promise<Workspace> => {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
@@ -45,7 +49,7 @@ export async function getWorkspace(): Promise<Workspace> {
     activeShip,
     channelsCount,
   };
-}
+});
 
 /** Display name fallback (email local-part) for the shell. */
 export function displayName(user: Pick<User, "name" | "email">): string {

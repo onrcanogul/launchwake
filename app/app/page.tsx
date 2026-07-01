@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getWorkspace, displayName, projectSubtitle } from "@/lib/session";
+import { getWorkspace } from "@/lib/session";
 import { getShipFeed, relativeTime } from "@/lib/ships";
-import { AppShell } from "@/components/shell/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 import { StatStrip, type Stat } from "@/components/ui/StatStrip";
@@ -16,20 +15,8 @@ export default async function ShipFeedPage() {
   if (!ws.project) redirect("/onboarding");
 
   const { ships, stats } = await getShipFeed(ws.project.id);
-  const name = displayName(ws.user);
 
-  const shell = (children: React.ReactNode) => (
-    <AppShell
-      project={{ name: ws.project!.name, subtitle: projectSubtitle(ws.project!) }}
-      user={{ name, plan: ws.user.plan }}
-      ships={ws.ships}
-      activeShip={ws.activeShip}
-      channelsCount={ws.channelsCount}
-      crumb="Ship feed"
-    >
-      {children}
-    </AppShell>
-  );
+  const shell = (children: React.ReactNode) => <>{children}</>;
 
   const header = (
     <div className="phead">

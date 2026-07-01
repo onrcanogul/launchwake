@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
-import { getWorkspace, displayName, projectSubtitle } from "@/lib/session";
+import { getWorkspace } from "@/lib/session";
 import { getChannelDirectory } from "@/lib/catalog";
-import { AppShell } from "@/components/shell/AppShell";
 import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { Note } from "@/components/ui/Note";
@@ -15,14 +14,7 @@ export default async function ChannelsPage() {
   const platforms = new Set(rows.map((r) => r.platform)).size;
 
   return (
-    <AppShell
-      project={{ name: ws.project.name, subtitle: projectSubtitle(ws.project) }}
-      user={{ name: displayName(ws.user), plan: ws.user.plan }}
-      ships={ws.ships}
-      activeShip={ws.activeShip}
-      channelsCount={ws.channelsCount}
-      crumb="Channels"
-    >
+    <>
       <div className="phead">
         <div>
           <h1 className="pg">Channels</h1>
@@ -77,6 +69,6 @@ export default async function ChannelsPage() {
         This map gets sharper over time — LaunchWake learns which channels
         actually convert for products like yours.
       </Note>
-    </AppShell>
+    </>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { ShipTypeTag, type ShipTypeValue } from "@/components/ui/ShipTypeTag";
 
@@ -24,17 +24,21 @@ export function SidebarShipSwitcher({
   activeId: string | null;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
-  const currentId = pendingId ?? activeId;
+  // On a ship page the URL is the source of truth; elsewhere use the cookie-
+  // resolved activeId. This stays correct even though the shell layout is cached.
+  const urlShipId = pathname.match(/^\/app\/ships\/([^/]+)\/(?:plan|kit)/)?.[1];
+  const currentId = pendingId ?? urlShipId ?? activeId;
   const active = ships.find((s) => s.id === currentId);
 
   useEffect(() => {
     setPendingId(null);
-  }, [activeId]);
+  }, [pathname]);
 
   useEffect(() => {
     if (!open) return;

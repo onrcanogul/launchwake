@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
-import { getWorkspace, displayName, projectSubtitle } from "@/lib/session";
+import { getWorkspace } from "@/lib/session";
 import { getResultsRollup } from "@/lib/attribution";
-import { AppShell } from "@/components/shell/AppShell";
 import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -14,14 +13,7 @@ export default async function ResultsPage() {
   const { rows, totalSignups, insight } = await getResultsRollup(ws.project.id);
 
   return (
-    <AppShell
-      project={{ name: ws.project.name, subtitle: projectSubtitle(ws.project) }}
-      user={{ name: displayName(ws.user), plan: ws.user.plan }}
-      ships={ws.ships}
-      activeShip={ws.activeShip}
-      channelsCount={ws.channelsCount}
-      crumb="Results"
-    >
+    <>
       <div className="phead">
         <div>
           <h1 className="pg">Results</h1>
@@ -108,6 +100,6 @@ export default async function ResultsPage() {
           </div>
         </Panel>
       )}
-    </AppShell>
+    </>
   );
 }

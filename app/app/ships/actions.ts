@@ -78,7 +78,7 @@ export async function createShipAndPlan(
     return { error: `Could not build a plan: ${(err as Error).message}` };
   }
 
-  revalidatePath("/app");
+  revalidatePath("/app", "layout"); // refresh the cached shell (ship switcher list)
   redirect(`/app/ships/${shipId}/plan`);
 }
 

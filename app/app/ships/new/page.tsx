@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { getWorkspace, displayName, projectSubtitle } from "@/lib/session";
-import { AppShell } from "@/components/shell/AppShell";
+import { getWorkspace } from "@/lib/session";
 import { NewShipForm } from "@/components/ship/NewShipForm";
 import { Note } from "@/components/ui/Note";
 
@@ -9,14 +8,7 @@ export default async function NewShipPage() {
   if (!ws.project) redirect("/onboarding");
 
   return (
-    <AppShell
-      project={{ name: ws.project.name, subtitle: projectSubtitle(ws.project) }}
-      user={{ name: displayName(ws.user), plan: ws.user.plan }}
-      ships={ws.ships}
-      activeShip={ws.activeShip}
-      channelsCount={ws.channelsCount}
-      crumb="New ship"
-    >
+    <>
       <div className="phead">
         <div>
           <h1 className="pg">New ship</h1>
@@ -33,6 +25,6 @@ export default async function NewShipPage() {
         LaunchWake never posts for you or uses bot accounts. You get the plan and
         the drafts — you press publish.
       </Note>
-    </AppShell>
+    </>
   );
 }

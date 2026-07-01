@@ -1,8 +1,7 @@
 import { notFound, redirect } from "next/navigation";
-import { getWorkspace, displayName, projectSubtitle } from "@/lib/session";
+import { getWorkspace } from "@/lib/session";
 import { getShipWithPlan } from "@/lib/plans";
 import { listProjectShips } from "@/lib/ships";
-import { AppShell } from "@/components/shell/AppShell";
 import { ChannelCard } from "@/components/channel/ChannelCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
@@ -27,17 +26,7 @@ export default async function PlanPage({
   const ships = await listProjectShips(ws.project.id);
 
   return (
-    <AppShell
-      project={{
-        name: ws.project.name,
-        subtitle: projectSubtitle(ws.project),
-      }}
-      user={{ name: displayName(ws.user), plan: ws.user.plan }}
-      ships={ws.ships}
-      activeShip={{ id: ship.id, title: ship.title }}
-      channelsCount={ws.channelsCount}
-      crumb="Where to post"
-    >
+    <>
       <SyncActiveShip id={ship.id} />
       <div className="phead">
         <div>
@@ -90,6 +79,6 @@ export default async function PlanPage({
           );
         })
       )}
-    </AppShell>
+    </>
   );
 }

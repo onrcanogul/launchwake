@@ -29,10 +29,20 @@ export type AppShellProps = {
   /** The ship in context — the URL ship on ship pages, else the cookie's. */
   activeShip: { id: string; title: string } | null;
   channelsCount?: number;
-  /** current page label for the breadcrumb */
-  crumb: string;
   children: ReactNode;
 };
+
+function crumbFor(pathname: string): string {
+  if (pathname === "/app") return "Ship feed";
+  if (pathname.startsWith("/app/ships/new")) return "New ship";
+  if (pathname.startsWith("/app/channels")) return "Channels";
+  if (pathname.startsWith("/app/results")) return "Results";
+  if (pathname.startsWith("/app/settings")) return "Settings";
+  if (pathname === "/app/plan" || pathname.endsWith("/plan"))
+    return "Where to post";
+  if (pathname === "/app/kit" || pathname.endsWith("/kit")) return "Launch kit";
+  return "";
+}
 
 export function AppShell({
   project,
@@ -40,11 +50,11 @@ export function AppShell({
   ships,
   activeShip,
   channelsCount,
-  crumb,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const crumb = crumbFor(pathname);
 
   // Workspace = project-wide screens (unaffected by the active ship).
   const workspaceNav: NavItem[] = [

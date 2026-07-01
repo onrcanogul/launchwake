@@ -1,8 +1,7 @@
 import { notFound, redirect } from "next/navigation";
-import { getWorkspace, displayName, projectSubtitle } from "@/lib/session";
+import { getWorkspace } from "@/lib/session";
 import { getShipKit } from "@/lib/plans";
 import { listProjectShips } from "@/lib/ships";
-import { AppShell } from "@/components/shell/AppShell";
 import { LaunchKit } from "@/components/ship/LaunchKit";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
 import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
@@ -27,14 +26,7 @@ export default async function KitPage({
   const ships = await listProjectShips(ws.project.id);
 
   return (
-    <AppShell
-      project={{ name: ws.project.name, subtitle: projectSubtitle(ws.project) }}
-      user={{ name: displayName(ws.user), plan: ws.user.plan }}
-      ships={ws.ships}
-      activeShip={{ id: kit.ship.id, title: kit.ship.title }}
-      channelsCount={ws.channelsCount}
-      crumb="Launch kit"
-    >
+    <>
       <SyncActiveShip id={kit.ship.id} />
       <div className="phead">
         <div>
@@ -63,6 +55,6 @@ export default async function KitPage({
       ) : (
         <LaunchKit recs={kit.recs} initialRecId={rec} />
       )}
-    </AppShell>
+    </>
   );
 }

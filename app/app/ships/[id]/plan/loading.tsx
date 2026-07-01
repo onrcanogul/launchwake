@@ -1,6 +1,6 @@
 export default function PlanLoading() {
   return (
-    <div className="content">
+    <>
       <div className="phead">
         <div>
           <h1 className="pg">Where to post</h1>
@@ -14,7 +14,10 @@ export default function PlanLoading() {
               <div className="skel" style={{ width: 17, height: 17 }} />
             </div>
             <div style={{ flex: 1 }}>
-              <div className="skel" style={{ width: 180, height: 13, marginBottom: 6 }} />
+              <div
+                className="skel"
+                style={{ width: 180, height: 13, marginBottom: 6 }}
+              />
               <div className="skel" style={{ width: 120, height: 11 }} />
             </div>
             <div className="skel" style={{ width: 64, height: 12 }} />
@@ -27,6 +30,6 @@ export default function PlanLoading() {
           </div>
         </div>
       ))}
-    </div>
+    </>
   );
 }
