@@ -53,7 +53,9 @@ export function OnboardingForm() {
       <div style={{ display: "flex", gap: 9, marginTop: 22 }}>
         <button type="submit" className="btn btn-p" disabled={pending}>
           <Icon name="arrowRight" />
-          {pending ? "Finding your first ship…" : "Analyze my first ship"}
+          {pending
+            ? "Analyzing where your users are…"
+            : "Analyze my first ship"}
         </button>
       </div>
     </form>

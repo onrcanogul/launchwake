@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseRepo, suggestShip, type ShipSuggestion } from "@/lib/github";
 import { assertEntitlement, EntitlementError } from "@/lib/billing";
+import { buildPlan } from "@/lib/analysis";
 
 const Schema = z.object({
   name: z.string().trim().min(1, "Product name is required").max(120),
@@ -60,9 +61,11 @@ export async function createProject(
     },
   });
 
-  // First-run aha: create the first ship immediately (from the repo's latest
-  // release/commit, or a synthetic launch) so the user lands straight on their
-  // first plan. The plan itself builds on the plan page (perceived-magic skeleton).
+  // First-run aha: create the first ship (from the repo's latest release/commit,
+  // or a synthetic launch) AND build its plan now, at creation time — so the plan
+  // page just renders the finished plan and never triggers analysis on open.
+  // (Consistent with New ship and the GitHub webhook.) If the build fails, the
+  // ship stays NEW and the plan page's AutoBuildPlan is the fallback.
   let firstShipId: string | null = null;
   try {
     let suggestion: ShipSuggestion | null = null;
@@ -91,9 +94,10 @@ export async function createProject(
         },
       });
       firstShipId = ship.id;
+      await buildPlan(ship.id);
     }
   } catch (err) {
-    console.warn("[onboarding] first-ship creation failed:", err);
+    console.warn("[onboarding] first-ship analysis failed (page will retry):", err);
   }
 
   revalidatePath("/app", "layout");
