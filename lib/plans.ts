@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { trackedUrl } from "./attribution";
-import type { BanRisk, Platform, ShipType } from "@prisma/client";
+import type { BanRisk, Platform, ShipType, ShipStatus } from "@prisma/client";
 
 export type RecView = {
   id: string;
@@ -23,6 +23,7 @@ export type ShipWithPlan = {
     type: ShipType;
     title: string;
     summary: string | null;
+    status: ShipStatus;
   };
   project: { id: string; name: string; userId: string };
   recs: RecView[];
@@ -74,6 +75,7 @@ export async function getShipWithPlan(
       type: ship.type,
       title: ship.title,
       summary: ship.summary,
+      status: ship.status,
     },
     project: ship.project,
     recs,

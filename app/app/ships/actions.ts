@@ -91,6 +91,37 @@ export async function rerunPlan(shipId: string): Promise<void> {
   revalidatePath(`/app/ships/${shipId}/plan`);
 }
 
+/**
+ * Build the plan for a ship only if it doesn't have one yet (idempotent). Used by
+ * the first-run auto-analysis so the user lands straight on their first plan.
+ */
+export async function ensurePlan(
+  shipId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const project = await requireProject();
+  const ship = await db.ship.findFirst({
+    where: { id: shipId, projectId: project.id },
+    include: { plan: { select: { id: true } } },
+  });
+  if (!ship) return { ok: false, error: "Ship not found" };
+  if (ship.plan) return { ok: true };
+
+  try {
+    await assertEntitlement(project.userId, "create_plan");
+  } catch (err) {
+    if (err instanceof EntitlementError) return { ok: false, error: err.message };
+    throw err;
+  }
+
+  try {
+    await buildPlan(shipId);
+  } catch (err) {
+    return { ok: false, error: `Could not build a plan: ${(err as Error).message}` };
+  }
+  revalidatePath(`/app/ships/${shipId}/plan`);
+  return { ok: true };
+}
+
 export type PullState =
   | { ok: true; type: string; title: string; summary: string; sourceUrl: string }
   | { ok: false; error: string };

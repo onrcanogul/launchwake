@@ -2,9 +2,10 @@
 
 import { z } from "zod";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { parseRepo } from "@/lib/github";
+import { parseRepo, suggestShip, type ShipSuggestion } from "@/lib/github";
 import { assertEntitlement, EntitlementError } from "@/lib/billing";
 
 const Schema = z.object({
@@ -49,7 +50,7 @@ export async function createProject(
     githubRepo = `${ref.owner}/${ref.repo}`;
   }
 
-  await db.project.create({
+  const project = await db.project.create({
     data: {
       userId: session.user.id,
       name: parsed.data.name,
@@ -59,5 +60,43 @@ export async function createProject(
     },
   });
 
-  redirect("/app/ships/new");
+  // First-run aha: create the first ship immediately (from the repo's latest
+  // release/commit, or a synthetic launch) so the user lands straight on their
+  // first plan. The plan itself builds on the plan page (perceived-magic skeleton).
+  let firstShipId: string | null = null;
+  try {
+    let suggestion: ShipSuggestion | null = null;
+    if (githubRepo) {
+      const ref = parseRepo(githubRepo);
+      if (ref) suggestion = await suggestShip(ref);
+    }
+    if (!suggestion && (parsed.data.url || parsed.data.description)) {
+      suggestion = {
+        type: "LAUNCH",
+        title: `Launch: ${parsed.data.name}`,
+        summary: parsed.data.description || `Introducing ${parsed.data.name}.`,
+        sourceUrl: parsed.data.url || null,
+        commitSha: null,
+      };
+    }
+    if (suggestion) {
+      const ship = await db.ship.create({
+        data: {
+          projectId: project.id,
+          type: suggestion.type,
+          title: suggestion.title,
+          summary: suggestion.summary,
+          sourceUrl: suggestion.sourceUrl,
+          commitSha: suggestion.commitSha,
+        },
+      });
+      firstShipId = ship.id;
+    }
+  } catch (err) {
+    console.warn("[onboarding] first-ship creation failed:", err);
+  }
+
+  revalidatePath("/app", "layout");
+  // Land on the first plan (aha) when we have a ship; else the new-ship form.
+  redirect(firstShipId ? `/app/ships/${firstShipId}/plan` : "/app/ships/new");
 }
