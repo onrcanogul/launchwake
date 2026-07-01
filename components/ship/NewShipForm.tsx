@@ -3,6 +3,7 @@
 import { useActionState, useState, useTransition } from "react";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/toast";
 import {
   createShipAndPlan,
   pullLatestShip,
@@ -25,6 +26,7 @@ export function NewShipForm({ githubRepo }: { githubRepo: string | null }) {
   const [sourceUrl, setSourceUrl] = useState("");
   const [pullMsg, setPullMsg] = useState<string | null>(null);
   const [pullPending, startPull] = useTransition();
+  const { toast } = useToast();
 
   const doPull = () => {
     setPullMsg(null);
@@ -36,8 +38,10 @@ export function NewShipForm({ githubRepo }: { githubRepo: string | null }) {
         setSummary(res.summary);
         setSourceUrl(res.sourceUrl);
         setPullMsg("Pulled the latest from your repo — review and build the plan.");
+        toast("Pulled latest from GitHub");
       } else {
         setPullMsg(res.error);
+        toast(res.error, "error");
       }
     });
   };

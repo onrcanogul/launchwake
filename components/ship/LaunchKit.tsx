@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { platformIcon } from "@/components/ui/platform";
+import { useToast } from "@/components/ui/toast";
 import { ensureDraft, markPosted } from "@/app/app/ships/actions";
 import type { KitRec } from "@/lib/plans";
 
@@ -15,6 +16,7 @@ export function LaunchKit({
   initialRecId?: string;
 }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [pending, start] = useTransition();
   const [posting, startPost] = useTransition();
   const [activeId, setActiveId] = useState(
@@ -32,6 +34,7 @@ export function LaunchKit({
     start(async () => {
       await ensureDraft(recId);
       router.refresh();
+      toast("Draft ready");
     });
   };
 
@@ -42,8 +45,10 @@ export function LaunchKit({
       if (res.ok) {
         setPostUrl("");
         router.refresh();
+        toast("Marked as posted — tracked link ready");
       } else {
         setPostError(res.error);
+        toast(res.error, "error");
       }
     });
   };
@@ -53,8 +58,9 @@ export function LaunchKit({
       await navigator.clipboard.writeText(text);
       setCopied(key);
       setTimeout(() => setCopied(null), 1500);
+      toast(key === "link" ? "Tracked link copied" : "Draft copied");
     } catch {
-      /* clipboard unavailable */
+      toast("Couldn't copy to clipboard", "error");
     }
   };
 

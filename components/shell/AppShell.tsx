@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
@@ -55,6 +55,12 @@ export function AppShell({
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const crumb = crumbFor(pathname);
+
+  // The shell is persistent now, so close the mobile drawer whenever the route
+  // changes (nav link, ship switcher, back/forward — anything).
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
 
   // Workspace = project-wide screens (unaffected by the active ship).
   const workspaceNav: NavItem[] = [
@@ -182,7 +188,7 @@ export function AppShell({
           </div>
         </div>
 
-        <div className="content">
+        <div className="content" id="main">
           {/* keyed on route → replays the entrance animation on each navigation */}
           <div key={pathname} className="lw-page">
             {children}

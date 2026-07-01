@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/Icon";
+import { useToast } from "@/components/ui/toast";
 
 /** Shows the signup-tracking snippet the user drops on their product site. */
 export function TrackingSetup({ appUrl }: { appUrl: string }) {
@@ -22,14 +23,16 @@ export function TrackingSetup({ appUrl }: { appUrl: string }) {
 })();
 </script>`;
 
+  const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(snippet);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
+      toast("Snippet copied");
     } catch {
-      /* clipboard unavailable */
+      toast("Couldn't copy to clipboard", "error");
     }
   };
 

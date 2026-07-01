@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Icon } from "@/components/Icon";
+import { useToast } from "@/components/ui/toast";
 import { startCheckout, openPortal } from "@/app/app/settings/actions";
 import type { PlanUsage } from "@/lib/billing";
 
@@ -14,6 +15,7 @@ export function BillingPanel({
   billingConfigured: boolean;
   justUpgraded: boolean;
 }) {
+  const { toast } = useToast();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const pro = usage.plan === "PRO";
@@ -23,7 +25,10 @@ export function BillingPanel({
     start(async () => {
       const res = await fn();
       if (res.url) window.location.href = res.url;
-      else if (res.error) setError(res.error);
+      else if (res.error) {
+        setError(res.error);
+        toast(res.error, "error");
+      }
     });
   };
 

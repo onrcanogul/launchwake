@@ -1203,6 +1203,88 @@ tbody tr:hover {
   }
 }
 
+/* ============ A11Y ============ */
+/* Keyboard focus ring — visible only for keyboard users, not mouse clicks. */
+a:focus-visible,
+button:focus-visible,
+[role="option"]:focus-visible,
+[tabindex]:focus-visible,
+.oauth:focus-visible,
+.connrow:focus-visible,
+.tab:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+  border-radius: 5px;
+}
+.inp:focus-visible {
+  outline: none; /* keeps its own accent ring */
+}
+
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 300;
+  background: var(--ac);
+  color: #04140f;
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 8px 12px;
+  border-radius: var(--r);
+  transform: translateY(-160%);
+  transition: transform 0.16s ease;
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* ============ TOASTS ============ */
+.toaster {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--bg2);
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  padding: 10px 13px;
+  font-size: 12.5px;
+  color: var(--tx);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  max-width: 320px;
+  animation: lw-fade-up 0.24s var(--ease) both;
+}
+.toast svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--ok);
+  stroke-width: 1.9;
+  fill: none;
+  flex-shrink: 0;
+}
+.toast-error {
+  border-color: rgba(240, 97, 109, 0.35);
+}
+@media (max-width: 880px) {
+  .toaster {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+  }
+  .toast {
+    max-width: none;
+  }
+}
+
 /* ============ SHIP SWITCHER (in-header dropdown) ============ */
 @keyframes lw-rotate {
   to {
