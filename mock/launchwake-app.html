@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LaunchWake</title>
+<style>
+  :root{
+    --bg:#0A0B0F;--bg1:#0D0F14;--bg2:#111318;--bg3:#15181E;--hover:#161922;
+    --line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.11);
+    --tx:#E7E9ED;--tx2:#9CA3B0;--tx3:#646B79;
+    --ac:#3ECFB6;--ac2:#4ee0c6;--acd:rgba(62,207,182,.14);--acb:rgba(62,207,182,.35);
+    --ok:#3ECF8E;--warn:#E3B341;--bad:#F0616D;--vi:#8B93F8;--r:7px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--tx);font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:0}
+  .num{font-variant-numeric:tabular-nums}
+  a{color:inherit;text-decoration:none}svg{display:block}
+  ::selection{background:rgba(62,207,182,.25)}
+
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:var(--r);font-weight:550;font-size:12.5px;cursor:pointer;border:1px solid transparent;transition:.12s;font-family:inherit}
+  .btn svg{width:14px;height:14px;stroke:currentColor;stroke-width:1.7;fill:none}
+  .btn-p{background:var(--ac);color:#04140f}.btn-p:hover{background:var(--ac2)}
+  .btn-s{background:var(--bg2);border-color:var(--line2);color:var(--tx)}.btn-s:hover{background:var(--bg3)}
+  .btn-gh{background:transparent;color:var(--tx2)}.btn-gh:hover{background:var(--hover);color:var(--tx)}
+  .btn-lg{padding:10px 16px;font-size:13.5px;width:100%;justify-content:center}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:2px 8px;border-radius:5px;background:var(--bg2);border:1px solid var(--line);color:var(--tx2);font-weight:500}
+  .badge.ac{background:var(--acd);border-color:var(--acb);color:var(--ac)}
+  .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+
+  .screen{display:none;min-height:100vh}.screen.on{display:block}
+
+  /* ============ AUTH ============ */
+  .auth{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;position:relative;overflow:hidden}
+  .auth .waves{position:absolute;bottom:0;left:0;width:100%;opacity:.5;pointer-events:none}
+  .authcard{width:100%;max-width:380px;position:relative;z-index:2}
+  .authlogo{display:flex;align-items:center;gap:10px;justify-content:center;font-weight:600;font-size:18px;margin-bottom:6px}
+  .authlogo svg{width:26px;height:26px}
+  .auth h1{font-size:20px;font-weight:600;text-align:center;letter-spacing:-.02em}
+  .auth .sub{text-align:center;color:var(--tx2);font-size:13px;margin:4px 0 26px}
+  .authbox{border:1px solid var(--line);background:var(--bg1);border-radius:12px;padding:22px}
+  .oauth{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;padding:11px;border:1px solid var(--line2);border-radius:var(--r);background:var(--bg2);color:var(--tx);font-weight:550;font-size:13px;cursor:pointer;margin-bottom:12px}
+  .oauth:hover{background:var(--bg3)}.oauth svg{width:17px;height:17px;fill:currentColor}
+  .divider{display:flex;align-items:center;gap:12px;color:var(--tx3);font-size:11px;margin:14px 0}
+  .divider::before,.divider::after{content:"";height:1px;background:var(--line);flex:1}
+  .inp{width:100%;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r);padding:10px 12px;color:var(--tx);font-size:13px;outline:0;font-family:inherit}
+  .inp:focus{border-color:var(--acb);box-shadow:0 0 0 3px var(--acd)}
+  .authfoot{text-align:center;color:var(--tx3);font-size:12px;margin-top:18px}
+  .authfoot a{color:var(--ac)}
+  .skip{position:absolute;top:20px;right:24px;color:var(--tx3);font-size:12px;cursor:pointer;z-index:3}
+  .skip:hover{color:var(--tx)}
+
+  /* ============ ONBOARDING ============ */
+  .ob{max-width:620px;margin:0 auto;padding:70px 24px}
+  .steps{display:flex;gap:8px;margin-bottom:30px}
+  .stp{flex:1;height:3px;border-radius:2px;background:var(--bg3)}
+  .stp.on{background:var(--ac)}
+  .ob h1{font-size:24px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px}
+  .ob .lead{color:var(--tx2);font-size:14px;margin-bottom:26px}
+  .seg{display:inline-flex;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:3px;gap:2px;margin-bottom:16px}
+  .seg button{background:transparent;border:0;color:var(--tx2);padding:6px 12px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:550;font-family:inherit}
+  .seg button.on{background:var(--bg3);color:var(--tx)}
+  .fl{display:block;font-size:12px;font-weight:550;margin-bottom:7px;color:var(--tx2)}
+  .conn{display:flex;flex-direction:column;gap:10px;margin:8px 0 20px}
+  .connrow{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:14px 16px;cursor:pointer}
+  .connrow:hover{border-color:var(--line2);background:var(--bg1)}
+  .connrow .ic{width:34px;height:34px;border-radius:8px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center}
+  .connrow .ic svg{width:18px;height:18px;stroke:var(--tx2);stroke-width:1.6;fill:none}
+  .connrow b{font-size:13px}.connrow p{color:var(--tx3);font-size:11.5px}
+  .connrow .chk{margin-left:auto;color:var(--ac)}
+
+  /* ============ APP ============ */
+  .app{display:grid;grid-template-columns:224px 1fr;min-height:100vh}
+  .overlay{display:none}
+
+  .side{background:var(--bg1);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;padding:12px 10px;z-index:60}
+  .brand{display:flex;align-items:center;gap:9px;padding:8px 8px 4px;font-weight:600;font-size:14px}
+  .brand svg{width:20px;height:20px}
+  .ws{display:flex;align-items:center;gap:9px;padding:8px;border-radius:var(--r);margin:10px 0 6px;cursor:pointer}
+  .ws:hover{background:var(--hover)}
+  .ws .sq{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#1c8f80,#2a5bd7);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff}
+  .ws .nm{flex:1;min-width:0}.ws .nm b{font-size:12.5px;font-weight:600;display:block}
+  .ws .nm span{font-size:11px;color:var(--tx3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .grp{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3);padding:14px 8px 5px}
+  .nav{display:flex;align-items:center;gap:9px;padding:6.5px 8px;border-radius:var(--r);color:var(--tx2);cursor:pointer;font-weight:450;font-size:12.5px;position:relative}
+  .nav svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.6;fill:none;flex-shrink:0}
+  .nav:hover{background:var(--hover);color:var(--tx)}.nav.on{background:var(--bg2);color:var(--tx)}
+  .nav.on::before{content:"";position:absolute;left:-10px;top:7px;bottom:7px;width:2px;border-radius:2px;background:var(--ac)}
+  .nav .cnt{margin-left:auto;font-size:11px;color:var(--tx3);background:var(--bg3);padding:1px 6px;border-radius:5px}
+  .side .sp{margin-top:auto}
+  .usr{display:flex;align-items:center;gap:9px;padding:8px;border-top:1px solid var(--line);margin-top:8px}
+  .usr .av{width:24px;height:24px;border-radius:50%;background:#2a5bd7;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:11px;color:#fff}
+  .usr .nm b{font-size:12px;display:block}.usr .nm span{font-size:10.5px;color:var(--tx3)}
+
+  .main{display:flex;flex-direction:column;min-width:0}
+  .bar{height:48px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:sticky;top:0;background:rgba(10,11,15,.85);backdrop-filter:blur(8px);z-index:20}
+  .burger{display:none;background:transparent;border:0;color:var(--tx);cursor:pointer;padding:4px}
+  .burger svg{width:20px;height:20px;stroke:currentColor;stroke-width:1.8;fill:none}
+  .crumb{display:flex;align-items:center;gap:8px;color:var(--tx3);font-size:12.5px}
+  .crumb b{color:var(--tx);font-weight:550}
+  .crumb svg{width:13px;height:13px;stroke:var(--tx3);stroke-width:1.6;fill:none}
+  .search{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:5px 9px;color:var(--tx3);font-size:12px;width:170px}
+  .search svg{width:13px;height:13px;stroke:currentColor;stroke-width:1.6;fill:none}
+  .kbd{margin-left:auto;font-size:10px;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--tx3)}
+
+  .content{padding:28px 40px;max-width:1160px;width:100%;margin:0 auto}
+  .bar{padding-left:max(22px,calc((100% - 1160px)/2 + 40px));padding-right:max(22px,calc((100% - 1160px)/2 + 40px))}
+  .phead{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:12px;flex-wrap:wrap}
+  h1.pg{font-size:19px;font-weight:600;letter-spacing:-.02em}
+  .psub{color:var(--tx2);font-size:12.5px;margin-top:3px;max-width:560px}
+  .view{display:none}.view.on{display:block}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:22px}
+  .stat{padding:15px 17px;border-right:1px solid var(--line)}.stat:last-child{border-right:0}
+  .stat .l{color:var(--tx3);font-size:11.5px;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+  .stat .l svg{width:13px;height:13px;stroke:currentColor;stroke-width:1.6;fill:none}
+  .stat .v{font-size:23px;font-weight:600;letter-spacing:-.02em}
+  .stat .v small{font-size:13px;color:var(--tx2);font-weight:500}
+  .stat .d{font-size:11.5px;margin-top:5px;color:var(--tx3)}
+  .up{color:var(--ok)}
+
+  .panel{border:1px solid var(--line);border-radius:10px;margin-bottom:18px;overflow:hidden}
+  .ph{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .ph h2{font-size:13px;font-weight:600}.ph .r{color:var(--tx3);font-size:11.5px}
+  .li{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);gap:12px}
+  .li:last-child{border-bottom:0}.li:hover{background:var(--bg1);cursor:pointer}
+  .li .lft{display:flex;align-items:center;gap:11px;min-width:0}
+  .ico{width:28px;height:28px;border-radius:6px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .ico svg{width:15px;height:15px;stroke:var(--tx2);stroke-width:1.6;fill:none}
+  .li .tt{font-size:12.5px;font-weight:500}.li .st{font-size:11.5px;color:var(--tx3)}
+  .tag-t{font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;padding:2px 6px;border-radius:4px}
+  .t-launch{background:rgba(62,207,182,.14);color:var(--ac)}
+  .t-feat{background:rgba(139,147,248,.14);color:var(--vi)}
+  .t-blog{background:rgba(227,179,65,.14);color:var(--warn)}
+
+  .card{border:1px solid var(--line);border-radius:10px;padding:20px;max-width:600px}
+  .fhint{color:var(--tx3);font-size:11.5px;margin-top:7px}
+  textarea.inp{min-height:90px;resize:vertical}
+  .note{display:flex;gap:9px;align-items:flex-start;background:var(--bg1);border:1px solid var(--line);border-radius:8px;padding:11px 13px;color:var(--tx2);font-size:12px;margin-top:16px;max-width:600px}
+  .note svg{width:15px;height:15px;stroke:var(--ac);stroke-width:1.6;fill:none;flex-shrink:0;margin-top:1px}
+
+  .chan{border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
+  .chan .top{display:flex;align-items:center;gap:13px;padding:15px 17px 13px;flex-wrap:wrap}
+  .chan .top .ico{width:34px;height:34px;border-radius:8px}.chan .top .ico svg{width:17px;height:17px}
+  .chan h3{font-size:13.5px;font-weight:600}.chan .aud{font-size:11.5px;color:var(--tx3);margin-top:1px}
+  .fit{margin-left:auto;text-align:right;min-width:120px}
+  .fit .fr{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+  .fit .fn{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+  .fit .fk{font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.05em}
+  .meter{width:64px;height:4px;border-radius:2px;background:var(--bg3);overflow:hidden}.meter span{display:block;height:100%;background:var(--ac)}
+  .chan .why{padding:0 17px 13px;color:var(--tx2);font-size:12.5px}
+  .chan .ft{display:flex;align-items:center;gap:22px;padding:11px 17px;border-top:1px solid var(--line);flex-wrap:wrap}
+  .chan .ft .m{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--tx3)}
+  .chan .ft .m b{color:var(--tx);font-weight:550}
+  .chan .ft .m svg{width:13px;height:13px;stroke:var(--tx3);stroke-width:1.6;fill:none}
+  .chan .ft .act{margin-left:auto}
+
+  .tabs{display:flex;gap:3px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+  .tab{padding:9px 13px;color:var(--tx3);cursor:pointer;font-weight:500;font-size:12.5px;border-bottom:1.5px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:7px;white-space:nowrap}
+  .tab svg{width:14px;height:14px;stroke:currentColor;stroke-width:1.6;fill:none}
+  .tab:hover{color:var(--tx2)}.tab.on{color:var(--tx);border-bottom-color:var(--ac)}
+  .kv{display:none}.kv.on{display:block}
+  .draft{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .draft .dh{display:flex;align-items:center;justify-content:space-between;padding:11px 15px;border-bottom:1px solid var(--line)}
+  .draft .dh b{font-size:12.5px}
+  .draft .body{padding:16px 17px;white-space:pre-wrap;font-size:13px;line-height:1.72;color:#CDD3DD}
+  .draft .fn{padding:10px 15px;border-top:1px solid var(--line);color:var(--tx3);font-size:11.5px;display:flex;gap:8px;align-items:flex-start;background:var(--bg1)}
+  .draft .fn svg{width:14px;height:14px;stroke:var(--ac);stroke-width:1.6;fill:none;flex-shrink:0;margin-top:1px}
+
+  .tblwrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;min-width:520px}
+  th{text-align:left;color:var(--tx3);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;padding:11px 16px;font-weight:600;border-bottom:1px solid var(--line)}
+  td{padding:13px 16px;border-bottom:1px solid var(--line);font-size:12.5px;vertical-align:middle}
+  tr:last-child td{border-bottom:0}tbody tr:hover{background:var(--bg1)}
+  .cbar{height:5px;border-radius:3px;background:var(--bg3);overflow:hidden;width:90px;margin-top:5px}.cbar span{display:block;height:100%;background:var(--ac)}
+
+  .setrow{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line);gap:12px}
+  .setrow:last-child{border-bottom:0}
+  .setrow .l b{font-size:12.5px;display:block}.setrow .l span{font-size:11.5px;color:var(--tx3)}
+
+  /* ============ RESPONSIVE ============ */
+  @media(max-width:880px){
+    .app{grid-template-columns:1fr}
+    .side{position:fixed;left:0;top:0;width:250px;transform:translateX(-100%);transition:transform .22s ease;box-shadow:0 0 40px rgba(0,0,0,.5)}
+    body.drawer .side{transform:translateX(0)}
+    body.drawer .overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50}
+    .burger{display:block}
+    .search{display:none}
+    .content{padding:20px 18px}
+    .stats{grid-template-columns:1fr 1fr}
+    .stat:nth-child(2){border-right:0}.stat:nth-child(1),.stat:nth-child(2){border-bottom:1px solid var(--line)}
+    .fit{margin-left:0;text-align:left;width:100%}.fit .fr{justify-content:flex-start}
+    .chan .ft{gap:14px}.chan .ft .act{margin-left:0;width:100%}
+    h1.pg{font-size:18px}
+  }
+  @media(max-width:480px){.stats{grid-template-columns:1fr}.stat{border-right:0!important;border-bottom:1px solid var(--line)}.stat:last-child{border-bottom:0}}
+</style>
+</head>
+<body>
+
+<!-- ==================== LOGIN ==================== -->
+<section class="screen on" id="s-login">
+  <div class="auth">
+    <span class="skip" onclick="show('app')">Skip to app →</span>
+    <div class="authcard">
+      <div class="authlogo">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M2 15c2.2 0 2.2-3 4.4-3s2.2 3 4.4 3 2.2-3 4.4-3 2.2 3 4.4 3" stroke="#3ECFB6" stroke-width="1.8" stroke-linecap="round"/><path d="M2 19c2.2 0 2.2-2.4 4.4-2.4s2.2 2.4 4.4 2.4 2.2-2.4 4.4-2.4 2.2 2.4 4.4 2.4" stroke="#2a5bd7" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg>
+        LaunchWake
+      </div>
+      <p class="sub">Marketing intel for founders who'd rather be coding.</p>
+      <div class="authbox">
+        <button class="oauth" onclick="show('onboard')">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.6 2 12.2c0 4.5 2.9 8.3 6.8 9.6.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.2-3.4-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9.3 9.3 0 015 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .3.3.6.9.6 1.9v2.8c0 .3.2.6.7.5A10 10 0 0022 12.2C22 6.6 17.5 2 12 2z"/></svg>
+          Continue with GitHub
+        </button>
+        <div class="divider">or</div>
+        <label class="fl">Work email</label>
+        <input class="inp" placeholder="you@startup.dev" style="margin-bottom:12px">
+        <button class="btn btn-p btn-lg" onclick="show('onboard')">Continue</button>
+      </div>
+      <p class="authfoot">New here? <a onclick="show('onboard')">Create an account</a></p>
+    </div>
+    <svg class="waves" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0,70 C150,30 300,110 450,70 C600,30 750,110 900,70 C1050,30 1200,110 1200,70 L1200,120 L0,120 Z" fill="#0D0F14"/><path d="M0,80 C150,45 300,110 450,80 C600,45 750,110 900,80 C1050,45 1200,110 1200,80" fill="none" stroke="#3ECFB6" stroke-width="1.5" opacity=".35"/></svg>
+  </div>
+</section>
+
+<!-- ==================== ONBOARDING ==================== -->
+<section class="screen" id="s-onboard">
+  <div class="ob">
+    <div class="steps"><div class="stp on"></div><div class="stp on"></div><div class="stp"></div></div>
+    <h1>Connect what you're building</h1>
+    <p class="lead">LaunchWake watches for every ship — releases, features, changelogs, blog posts — and turns each one into a distribution plan.</p>
+    <div class="conn">
+      <div class="connrow" onclick="pick(this)"><div class="ic"><svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 00-.9-2.6c3-.3 6.2-1.5 6.2-6.7A5.2 5.2 0 0019 4.8 4.9 4.9 0 0018.9 1S17.7.6 15 2.5a13 13 0 00-6 0C6.3.6 5.1 1 5.1 1A4.9 4.9 0 005 4.8a5.2 5.2 0 00-1.4 3.6c0 5.2 3.2 6.4 6.2 6.7a3.4 3.4 0 00-.9 2.6V22"/></svg></div><div><b>Connect GitHub repo</b><p>Auto-detect releases &amp; changelog · recommended</p></div><span class="chk">✓</span></div>
+      <div class="connrow" onclick="pick(this)"><div class="ic"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1.5 1.5M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1.5-1.5"/></svg></div><div><b>Add product URL</b><p>hookline.dev</p></div><span class="chk" style="color:var(--tx3)">›</span></div>
+      <div class="connrow" onclick="pick(this)"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/></svg></div><div><b>Connect changelog / blog RSS</b><p>Optional</p></div><span class="chk" style="color:var(--tx3)">›</span></div>
+    </div>
+    <div style="display:flex;gap:9px">
+      <button class="btn btn-p" onclick="show('app')"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Finish &amp; open dashboard</button>
+      <button class="btn btn-gh" onclick="show('app')">Skip for now</button>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== APP ==================== -->
+<section class="screen" id="s-app">
+<div class="app">
+  <div class="overlay" onclick="drawer(false)"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="side">
+    <div class="brand"><svg viewBox="0 0 24 24" fill="none"><path d="M2 15c2.2 0 2.2-3 4.4-3s2.2 3 4.4 3 2.2-3 4.4-3 2.2 3 4.4 3" stroke="#3ECFB6" stroke-width="1.8" stroke-linecap="round"/><path d="M2 19c2.2 0 2.2-2.4 4.4-2.4s2.2 2.4 4.4 2.4 2.2-2.4 4.4-2.4 2.2 2.4 4.4 2.4" stroke="#2a5bd7" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg> LaunchWake</div>
+    <div class="ws"><div class="sq">H</div><div class="nm"><b>Hookline</b><span>webhook testing tool</span></div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#646B79" stroke-width="1.8"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></svg></div>
+    <div class="grp">Workspace</div>
+    <div class="nav on" onclick="go('feed',this)"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg> Ship feed</div>
+    <div class="nav" onclick="go('analyze',this)"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg> New ship</div>
+    <div class="nav" onclick="go('channels',this)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg> Channels <span class="cnt">42</span></div>
+    <div class="grp">Ship · Slack alerts</div>
+    <div class="nav" onclick="go('where',this)"><svg viewBox="0 0 24 24"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> Where to post <span class="cnt">9</span></div>
+    <div class="nav" onclick="go('kit',this)"><svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg> Launch kit</div>
+    <div class="nav" onclick="go('results',this)"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 14l3-3 3 3 5-6"/></svg> Results</div>
+    <div class="sp"></div>
+    <div class="nav" onclick="go('settings',this)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 00-1.7-1l-.3-2.5H10.4l-.3 2.5a7 7 0 00-1.7 1l-2.3-1-2 3.4L6 11a7 7 0 000 2l-2 1.5 2 3.4 2.3-1a7 7 0 001.7 1l.3 2.5h3.2l.3-2.5a7 7 0 001.7-1l2.3 1 2-3.4-2-1.5a7 7 0 00.1-1z"/></svg> Settings</div>
+    <div class="usr"><div class="av">O</div><div class="nm"><b>Onurcan</b><span>Free plan · <a onclick="go('settings',null)" style="color:var(--ac)">Upgrade</a></span></div></div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="bar">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="burger" onclick="drawer(true)"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+        <div class="crumb"><span>Hookline</span><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><b id="crumb">Ship feed</b></div>
+      </div>
+      <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg> Search<span class="kbd">⌘K</span></div>
+    </div>
+
+    <div class="content">
+
+      <!-- ===== SHIP FEED (continuous) ===== -->
+      <section class="view on" id="feed">
+        <div class="phead"><div><h1 class="pg">Ship feed</h1><div class="psub">Every release, feature and post becomes a distribution moment. LaunchWake tells you where to take each one.</div></div>
+          <button class="btn btn-p" onclick="go('analyze',navAt(1))"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> New ship</button></div>
+        <div class="stats">
+          <div class="stat"><div class="l">This month · reach</div><div class="v num">61.2k</div><div class="d up">+12.4k vs last</div></div>
+          <div class="stat"><div class="l">Signups driven</div><div class="v num">318</div><div class="d up">from 6 ships</div></div>
+          <div class="stat"><div class="l">Ships distributed</div><div class="v num">6<small> / 8</small></div><div class="d">2 need a plan</div></div>
+          <div class="stat"><div class="l">Best channel</div><div class="v" style="font-size:16px;margin-top:4px">Hacker News</div><div class="d up">3.9% conv</div></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><h2>Recent ships</h2><span class="r">auto-detected from GitHub</span></div>
+          <div class="li" onclick="go('where',navAt(3))"><div class="lft"><span class="tag-t t-feat">Feature</span><div><div class="tt">Added Slack alerts for failed webhooks</div><div class="st">pushed 6h ago · not distributed yet</div></div></div><span class="badge ac">Get plan →</span></div>
+          <div class="li" onclick="go('where',navAt(3))"><div class="lft"><span class="tag-t t-blog">Blog</span><div><div class="tt">How we cut webhook latency by 40%</div><div class="st">2 days ago · 3 channels suggested</div></div></div><span class="badge">1 posted · 22 signups</span></div>
+          <div class="li" onclick="go('results',navAt(5))"><div class="lft"><span class="tag-t t-launch">Launch</span><div><div class="tt">v1.0 public beta</div><div class="st">4 days ago · 7 posts live</div></div></div><span class="badge"><span class="dot" style="background:var(--ok)"></span> 128 signups</span></div>
+          <div class="li" onclick="go('results',navAt(5))"><div class="lft"><span class="tag-t t-feat">Feature</span><div><div class="tt">Replay any event to localhost</div><div class="st">1 week ago · 4 posts live</div></div></div><span class="badge"><span class="dot" style="background:var(--ok)"></span> 74 signups</span></div>
+        </div>
+      </section>
+
+      <!-- ===== NEW SHIP ===== -->
+      <section class="view" id="analyze">
+        <div class="phead"><div><h1 class="pg">New ship</h1><div class="psub">Shipped something worth talking about? Drop it in and get a distribution plan. Nothing is posted automatically.</div></div></div>
+        <div class="card">
+          <div class="seg"><button class="on" onclick="seg(this)">From GitHub</button><button onclick="seg(this)">Paste URL</button><button onclick="seg(this)">Describe</button></div>
+          <label class="fl">Pick a recent commit / release</label>
+          <input class="inp" value="feat: Slack alerts for failed webhooks">
+          <div class="fhint">Detected from your connected repo. LaunchWake reads the diff + your product context to find the right audience.</div>
+          <label class="fl" style="margin-top:16px">What makes this worth sharing? <span style="color:var(--tx3);font-weight:400">(optional)</span></label>
+          <textarea class="inp">Now Hookline pings your Slack the moment a webhook fails in prod — no more finding out from an angry customer.</textarea>
+          <div style="margin-top:18px;display:flex;gap:9px;flex-wrap:wrap"><button class="btn btn-p" onclick="go('where',navAt(3))"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg> Build distribution plan</button><button class="btn btn-s">Save draft</button></div>
+        </div>
+        <div class="note"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg> LaunchWake never posts for you or uses bot accounts. You get the plan and the drafts — you press publish.</div>
+      </section>
+
+      <!-- ===== CHANNELS (intelligence library) ===== -->
+      <section class="view" id="channels">
+        <div class="phead"><div><h1 class="pg">Channels</h1><div class="psub">Your living map of where Hookline's audience gathers — with each community's rules, ban risk and your track record.</div></div><span class="badge">42 relevant · 5 platforms</span></div>
+        <div class="panel"><div class="tblwrap"><table>
+          <thead><tr><th>Channel</th><th>Fit</th><th>Ban risk</th><th>Best time</th><th style="text-align:right">Your signups</th></tr></thead>
+          <tbody>
+            <tr><td><b>Hacker News</b> · Show HN</td><td class="num">94</td><td><span class="dot" style="background:var(--ok)"></span> Low</td><td>Tue–Thu 8am ET</td><td class="num" style="text-align:right">61</td></tr>
+            <tr><td><b>Product Hunt</b></td><td class="num">90</td><td><span class="dot" style="background:var(--ok)"></span> Low</td><td>Tue 00:01 PT</td><td class="num" style="text-align:right">—</td></tr>
+            <tr><td><b>Indie Hackers</b> · Show IH</td><td class="num">88</td><td><span class="dot" style="background:var(--ok)"></span> Low</td><td>Weekday am</td><td class="num" style="text-align:right">19</td></tr>
+            <tr><td><b>r/webdev</b></td><td class="num">86</td><td><span class="dot" style="background:var(--warn)"></span> Medium</td><td>Mon/Wed 9am</td><td class="num" style="text-align:right">8</td></tr>
+            <tr><td><b>Lobste.rs</b></td><td class="num">82</td><td><span class="dot" style="background:var(--warn)"></span> Medium</td><td>invite only</td><td class="num" style="text-align:right">—</td></tr>
+            <tr><td><b>dev.to</b></td><td class="num">79</td><td><span class="dot" style="background:var(--ok)"></span> Low</td><td>any</td><td class="num" style="text-align:right">12</td></tr>
+          </tbody>
+        </table></div></div>
+        <div class="note"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg> This map gets sharper over time — LaunchWake learns which channels actually convert for products like yours.</div>
+      </section>
+
+      <!-- ===== WHERE TO POST ===== -->
+      <section class="view" id="where">
+        <div class="phead"><div><h1 class="pg">Where to post</h1><div class="psub">Distribution plan for <b style="color:var(--tx)">“Added Slack alerts”</b> — 9 channels ranked by fit, with rules and the safe way in.</div></div><button class="btn btn-s"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 018-8 8 8 0 016 2.7L21 9M20 12a8 8 0 01-8 8 8 8 0 01-6-2.7L3 15"/></svg> Re-run</button></div>
+
+        <div class="chan"><div class="top"><div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg></div><div><h3>Hacker News — Show HN</h3><div class="aud">~5M developers · very high intent</div></div><div class="fit"><div class="fr"><div class="meter"><span style="width:94%"></span></div><span class="fn">94</span></div><div class="fk">fit score</div></div></div>
+          <div class="why">Infra-adjacent devs love reliability features. Frame it as “I got tired of finding out from customers” — problem-first.</div>
+          <div class="ft"><div class="m"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg> Ban risk <b style="color:var(--ok)">Low</b></div><div class="m"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg> Best <b>Tue–Thu 8am ET</b></div><div class="m"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg> Rule <b>build story, no marketing tone</b></div><div class="act"><button class="btn btn-p" onclick="go('kit',navAt(4))">Get draft</button></div></div>
+        </div>
+        <div class="chan"><div class="top"><div class="ico"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H5l-1 4z"/></svg></div><div><h3>r/webdev</h3><div class="aud">2.6M members · strict self-promo rules</div></div><div class="fit"><div class="fr"><div class="meter"><span style="width:86%"></span></div><span class="fn">86</span></div><div class="fk">fit score</div></div></div>
+          <div class="why">Audience is here but promotion gets removed. Post the “how we alert on failures” approach as a guide; mention the tool as context.</div>
+          <div class="ft"><div class="m"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg> Ban risk <b style="color:var(--warn)">Medium</b></div><div class="m"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg> Best <b>Mon/Wed 9am</b></div><div class="m"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg> Rule <b>90/10 · no link in title</b></div><div class="act"><button class="btn btn-p" onclick="go('kit',navAt(4))">Get draft</button></div></div>
+        </div>
+        <div class="chan"><div class="top"><div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 13s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg></div><div><h3>Indie Hackers — Show IH</h3><div class="aud">warm founder community</div></div><div class="fit"><div class="fr"><div class="meter"><span style="width:88%"></span></div><span class="fn">88</span></div><div class="fk">fit score</div></div></div>
+          <div class="why">Share the feature + why you built it + a metric. High reply rate, low ban risk.</div>
+          <div class="ft"><div class="m"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg> Ban risk <b style="color:var(--ok)">Low</b></div><div class="m"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg> Best <b>weekday am</b></div><div class="m"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg> Rule <b>value-first · share numbers</b></div><div class="act"><button class="btn btn-p" onclick="go('kit',navAt(4))">Get draft</button></div></div>
+        </div>
+        <div style="text-align:center;color:var(--tx3);font-size:12px;padding:6px">Showing 3 of 9 · Product Hunt, dev.to, Lobste.rs, X, LinkedIn below</div>
+      </section>
+
+      <!-- ===== LAUNCH KIT ===== -->
+      <section class="view" id="kit">
+        <div class="phead"><div><h1 class="pg">Launch kit</h1><div class="psub">Drafts for “Added Slack alerts”. Copy, tweak, post from your own account.</div></div></div>
+        <div class="tabs">
+          <div class="tab on" onclick="tab('hn',this)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg> Show HN</div>
+          <div class="tab" onclick="tab('x',this)"><svg viewBox="0 0 24 24"><path d="M4 4l7 8-7 8M13 4h7l-7 8 7 8h-7"/></svg> X thread</div>
+          <div class="tab" onclick="tab('rd',this)"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H5l-1 4z"/></svg> r/webdev</div>
+          <div class="tab" onclick="tab('li',this)"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 10v7M7 7v.01M12 17v-4a2 2 0 014 0v4"/></svg> LinkedIn</div>
+        </div>
+        <div class="kv on" id="k-hn"><div class="draft"><div class="dh"><b>Hacker News — Show HN</b><button class="btn btn-gh"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg> Copy</button></div>
+          <div class="body">Show HN: Hookline now pings your Slack the second a webhook fails
+
+I kept finding out about failed webhooks from annoyed customers, not from my own tooling. So I added real-time Slack alerts to Hookline — when an endpoint starts failing, you know in seconds, with the payload and error attached.
+
+Free while in beta. Curious how others catch webhook failures today — polling? logs? nothing until a customer emails?</div>
+          <div class="fn"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg> Leads with the problem, ends with a question — HN rewards discussion, not pitches.</div></div></div>
+        <div class="kv" id="k-x"><div class="draft"><div class="dh"><b>X — thread</b><button class="btn btn-gh"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg> Copy</button></div>
+          <div class="body">1/ You should not find out your webhooks are failing from an angry customer.
+
+Hookline now pings your Slack the moment one breaks. 🧵
+
+2/ Endpoint starts throwing 500s → you get the payload, the error, and the retry status in Slack within seconds. No dashboards to babysit.
+
+3/ Free in beta → hookline.dev</div>
+          <div class="fn"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg> Hook line first, link last. Post Tue–Thu morning.</div></div></div>
+        <div class="kv" id="k-rd"><div class="draft"><div class="dh"><b>r/webdev — value-first</b><button class="btn btn-gh"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg> Copy</button></div>
+          <div class="body">How do you get alerted when a webhook silently starts failing?
+
+Sharing my setup: capture failures, attach the payload + error, and push to Slack instead of waiting for a customer to notice. [walkthrough]
+
+(Built the alerting into a small tool I maintain — happy to share, but the pattern works with anything.)</div>
+          <div class="fn"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg> 90/10 rule — value first, tool as a footnote, no link in title.</div></div></div>
+        <div class="kv" id="k-li"><div class="draft"><div class="dh"><b>LinkedIn — founder post</b><button class="btn btn-gh"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg> Copy</button></div>
+          <div class="body">Finding out your webhooks are down from a customer email is a special kind of pain.
+
+Hookline now sends a Slack alert the moment an endpoint starts failing — with the payload and error attached.
+
+If your product depends on Stripe/GitHub/Twilio webhooks, I'd love your feedback. Link in comments.</div>
+          <div class="fn"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg> Link in first comment — LinkedIn throttles posts with outbound links.</div></div></div>
+      </section>
+
+      <!-- ===== RESULTS ===== -->
+      <section class="view" id="results">
+        <div class="phead"><div><h1 class="pg">Results</h1><div class="psub">Which posts drove signups across all your ships. Do more of what works.</div></div><span class="badge ac">318 signups tracked</span></div>
+        <div class="panel"><div class="tblwrap"><table>
+          <thead><tr><th>Channel</th><th>Ship</th><th style="text-align:right">Clicks</th><th style="text-align:right">Signups</th><th>Conversion</th></tr></thead>
+          <tbody>
+            <tr><td><span class="dot" style="background:#ff6a2b"></span> Hacker News</td><td class="mono" style="color:var(--tx3)">v1.0 beta</td><td class="num" style="text-align:right">1,240</td><td class="num" style="text-align:right;font-weight:600">61</td><td>4.9%<div class="cbar"><span style="width:98%"></span></div></td></tr>
+            <tr><td><span class="dot" style="background:#e6e8ec"></span> X</td><td class="mono" style="color:var(--tx3)">v1.0 beta</td><td class="num" style="text-align:right">820</td><td class="num" style="text-align:right;font-weight:600">34</td><td>4.1%<div class="cbar"><span style="width:70%"></span></div></td></tr>
+            <tr><td><span class="dot" style="background:#8B93F8"></span> Indie Hackers</td><td class="mono" style="color:var(--tx3)">replay feature</td><td class="num" style="text-align:right">410</td><td class="num" style="text-align:right;font-weight:600">19</td><td>4.6%<div class="cbar"><span style="width:46%"></span></div></td></tr>
+            <tr><td><span class="dot" style="background:#E3B341"></span> dev.to</td><td class="mono" style="color:var(--tx3)">latency blog</td><td class="num" style="text-align:right">660</td><td class="num" style="text-align:right;font-weight:600">22</td><td>3.3%<div class="cbar"><span style="width:52%"></span></div></td></tr>
+            <tr><td><span class="dot" style="background:#f0616d"></span> r/SaaS</td><td class="mono" style="color:var(--tx3)">v1.0 (removed)</td><td class="num" style="text-align:right">90</td><td class="num" style="text-align:right;font-weight:600">0</td><td style="color:var(--bad)">removed</td></tr>
+          </tbody>
+        </table></div></div>
+        <div class="panel"><div class="ph"><h2>What LaunchWake sees</h2><span class="badge ac">insight</span></div>
+          <div style="padding:15px 16px;color:var(--tx2);line-height:1.65">Hacker News and Indie Hackers convert best for Hookline — technical, story-driven audiences. Your dev.to blog posts quietly outperform social. <span style="color:var(--tx)">For the next ship, prioritise HN + a dev.to writeup, and skip r/SaaS.</span></div>
+        </div>
+      </section>
+
+      <!-- ===== SETTINGS ===== -->
+      <section class="view" id="settings">
+        <div class="phead"><div><h1 class="pg">Settings</h1><div class="psub">Connections, tracking and plan.</div></div></div>
+        <div class="panel"><div class="ph"><h2>Connections</h2></div>
+          <div class="setrow"><div class="l"><b>GitHub — hookline/api</b><span>Auto-detects ships from commits &amp; releases</span></div><span class="badge"><span class="dot" style="background:var(--ok)"></span> Connected</span></div>
+          <div class="setrow"><div class="l"><b>Product URL</b><span>hookline.dev</span></div><span class="badge"><span class="dot" style="background:var(--ok)"></span> Verified</span></div>
+          <div class="setrow"><div class="l"><b>Signup tracking</b><span>Add the LaunchWake pixel to attribute signups</span></div><button class="btn btn-s">Set up</button></div>
+          <div class="setrow"><div class="l"><b>Slack</b><span>Get a ping when a new ship is detected</span></div><button class="btn btn-s">Connect</button></div>
+        </div>
+        <div class="panel"><div class="ph"><h2>Plan</h2></div>
+          <div class="setrow"><div class="l"><b>Free</b><span>1 project · 2 distribution plans / month</span></div><button class="btn btn-p">Upgrade to Pro — $29/mo</button></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+</section>
+
+<script>
+  const titles={feed:'Ship feed',analyze:'New ship',channels:'Channels',where:'Where to post',kit:'Launch kit',results:'Results',settings:'Settings'};
+  function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));document.getElementById('s-'+id).classList.add('on');window.scrollTo(0,0);}
+  function navAt(i){return document.querySelectorAll('#s-app .side .nav')[i];}
+  function go(id,el){
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+    document.getElementById(id).classList.add('on');
+    document.querySelectorAll('#s-app .side .nav').forEach(n=>n.classList.remove('on'));
+    if(el)el.classList.add('on');
+    const c=document.getElementById('crumb');if(titles[id])c.textContent=titles[id];
+    drawer(false);window.scrollTo({top:0,behavior:'smooth'});
+  }
+  function seg(b){b.parentNode.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');}
+  function tab(id,t){document.querySelectorAll('.kv').forEach(v=>v.classList.remove('on'));document.getElementById('k-'+id).classList.add('on');t.parentNode.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');}
+  function pick(el){const c=el.querySelector('.chk');c.textContent='✓';c.style.color='var(--ac)';}
+  function drawer(open){document.body.classList.toggle('drawer',open);}
+</script>
+</body>
+</html>
