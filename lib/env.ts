@@ -30,9 +30,18 @@ const schema = z.object({
   EMAIL_SERVER: OptionalString,
   EMAIL_FROM: OptionalString,
 
+  // ── LLM provider selection ────────────────────────────
+  // Anthropic (Claude) is the documented default; OpenAI is an alternate.
+  LLM_PROVIDER: z.enum(["anthropic", "openai"]).default("anthropic"),
+
   // ── Anthropic Claude ──────────────────────────────────
   ANTHROPIC_API_KEY: OptionalString,
   ANTHROPIC_MODEL: z.string().default("claude-opus-4-8"),
+
+  // ── OpenAI (alternate provider) ───────────────────────
+  OPENAI_API_KEY: OptionalString,
+  OPENAI_MODEL: z.string().default("gpt-4o"),
+
   LLM_MAX_TOKENS_PER_REQUEST: z.coerce.number().int().positive().default(8000),
   LLM_MAX_TOKENS_PER_USER_DAY: z.coerce
     .number()

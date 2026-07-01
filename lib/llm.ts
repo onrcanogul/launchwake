@@ -1,19 +1,77 @@
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { z } from "zod";
 import { env, requireEnv } from "./env";
 
 /**
- * Anthropic wrapper. All LLM calls go through here so we get: one client, strict
- * JSON output validated by zod (with a single repair retry), token logging, and a
- * cheap two-level budget guard (per request + per user per day).
+ * LLM wrapper. All LLM calls go through here so we get: provider abstraction
+ * (Anthropic default, OpenAI alternate via LLM_PROVIDER), strict JSON output
+ * validated by zod (with a single repair retry), token logging, and a cheap
+ * two-level budget guard (per request + per user per day).
  */
 
-let client: Anthropic | null = null;
-function getClient(): Anthropic {
-  if (!client) {
-    client = new Anthropic({ apiKey: requireEnv("ANTHROPIC_API_KEY", "LLM analysis") });
+// ── Generic message shape (provider-agnostic) ──────────────
+type Role = "user" | "assistant";
+type Msg = { role: Role; content: string };
+type ModelResponse = { text: string; tokens: number };
+
+// ── Clients (lazy) ─────────────────────────────────────────
+let anthropic: Anthropic | null = null;
+let openai: OpenAI | null = null;
+
+function anthropicClient(): Anthropic {
+  if (!anthropic) {
+    anthropic = new Anthropic({
+      apiKey: requireEnv("ANTHROPIC_API_KEY", "LLM analysis (Anthropic)"),
+    });
   }
-  return client;
+  return anthropic;
+}
+
+function openaiClient(): OpenAI {
+  if (!openai) {
+    openai = new OpenAI({
+      apiKey: requireEnv("OPENAI_API_KEY", "LLM analysis (OpenAI)"),
+    });
+  }
+  return openai;
+}
+
+function activeModel(): string {
+  return env.LLM_PROVIDER === "openai" ? env.OPENAI_MODEL : env.ANTHROPIC_MODEL;
+}
+
+async function callProvider(
+  system: string,
+  messages: Msg[],
+  maxTokens: number,
+): Promise<ModelResponse> {
+  if (env.LLM_PROVIDER === "openai") {
+    // response_format json_object requires the word "json" in the prompt — our
+    // system prompt already asks for a JSON object.
+    const res = await openaiClient().chat.completions.create({
+      model: env.OPENAI_MODEL,
+      max_tokens: maxTokens,
+      response_format: { type: "json_object" },
+      messages: [{ role: "system", content: system }, ...messages],
+    });
+    return {
+      text: res.choices[0]?.message?.content ?? "",
+      tokens: res.usage?.total_tokens ?? 0,
+    };
+  }
+
+  const res = await anthropicClient().messages.create({
+    model: env.ANTHROPIC_MODEL,
+    max_tokens: maxTokens,
+    system,
+    messages,
+  });
+  const text = res.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+  return { text, tokens: res.usage.input_tokens + res.usage.output_tokens };
 }
 
 // ── Budget guard (in-memory; cheap MVP guard, resets on deploy) ────────────
@@ -45,13 +103,6 @@ function recordUsage(userId: string, tokens: number) {
 }
 
 export class LLMError extends Error {}
-
-function extractText(msg: Anthropic.Message): string {
-  return msg.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
-}
 
 /** Pull a JSON object out of a model response, tolerating ```json fences / prose. */
 function parseJsonLoose(text: string): unknown {
@@ -90,24 +141,17 @@ export async function completeJSON<T>(opts: CompleteJSONOptions<T>): Promise<T> 
     env.LLM_MAX_TOKENS_PER_REQUEST,
   );
 
-  const messages: Anthropic.MessageParam[] = [{ role: "user", content: prompt }];
+  const messages: Msg[] = [{ role: "user", content: prompt }];
 
   let lastText = "";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const msg = await getClient().messages.create({
-      model: env.ANTHROPIC_MODEL,
-      max_tokens: maxTokens,
-      system,
-      messages,
-    });
-
-    const used = msg.usage.input_tokens + msg.usage.output_tokens;
-    recordUsage(userId, used);
+    const { text, tokens } = await callProvider(system, messages, maxTokens);
+    recordUsage(userId, tokens);
     console.log(
-      `[llm:${label}] model=${env.ANTHROPIC_MODEL} in=${msg.usage.input_tokens} out=${msg.usage.output_tokens} user=${userId} attempt=${attempt}`,
+      `[llm:${label}] provider=${env.LLM_PROVIDER} model=${activeModel()} tokens=${tokens} user=${userId} attempt=${attempt}`,
     );
 
-    lastText = extractText(msg);
+    lastText = text;
     try {
       const json = parseJsonLoose(lastText);
       return schema.parse(json);
@@ -117,7 +161,6 @@ export async function completeJSON<T>(opts: CompleteJSONOptions<T>): Promise<T> 
           `Model returned invalid JSON after retry: ${(err as Error).message}`,
         );
       }
-      // Feed the bad output back and ask for a strict repair.
       messages.push({ role: "assistant", content: lastText });
       messages.push({
         role: "user",
@@ -130,7 +173,9 @@ export async function completeJSON<T>(opts: CompleteJSONOptions<T>): Promise<T> 
   throw new LLMError("Unreachable: completeJSON exhausted attempts.");
 }
 
-/** True when an API key is configured — lets callers offer a graceful fallback. */
+/** True when the ACTIVE provider has a key — lets callers offer a fallback. */
 export function llmConfigured(): boolean {
-  return Boolean(env.ANTHROPIC_API_KEY);
+  return env.LLM_PROVIDER === "openai"
+    ? Boolean(env.OPENAI_API_KEY)
+    : Boolean(env.ANTHROPIC_API_KEY);
 }
