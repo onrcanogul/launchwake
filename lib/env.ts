@@ -51,6 +51,8 @@ const schema = z.object({
 
   // ── GitHub API ────────────────────────────────────────
   GITHUB_TOKEN: OptionalString,
+  // Shared secret for verifying inbound GitHub webhooks (ship auto-detect).
+  GITHUB_WEBHOOK_SECRET: OptionalString,
 
   // ── Stripe (later) ────────────────────────────────────
   STRIPE_SECRET_KEY: OptionalString,

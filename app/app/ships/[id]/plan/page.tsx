@@ -6,6 +6,7 @@ import { ChannelCard } from "@/components/channel/ChannelCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { RerunButton } from "@/components/ship/RerunButton";
+import { nextBestTime } from "@/lib/reminders";
 
 export default async function PlanPage({
   params,
@@ -57,22 +58,26 @@ export default async function PlanPage({
           }
         />
       ) : (
-        recs.map((rec) => (
-          <ChannelCard
-            key={rec.id}
-            data={{
-              name: rec.channelName,
-              platform: rec.platform,
-              audienceDesc: rec.audienceDesc,
-              fitScore: rec.fitScore,
-              banRisk: rec.banRisk,
-              bestTime: rec.bestTime,
-              whyText: rec.whyText,
-              ruleNote: rec.ruleNote,
-            }}
-            draftHref={`/app/ships/${ship.id}/kit?rec=${rec.id}`}
-          />
-        ))
+        recs.map((rec) => {
+          const schedulable = nextBestTime(rec.bestTime, new Date()) !== null;
+          return (
+            <ChannelCard
+              key={rec.id}
+              data={{
+                name: rec.channelName,
+                platform: rec.platform,
+                audienceDesc: rec.audienceDesc,
+                fitScore: rec.fitScore,
+                banRisk: rec.banRisk,
+                bestTime: rec.bestTime,
+                whyText: rec.whyText,
+                ruleNote: rec.ruleNote,
+              }}
+              draftHref={`/app/ships/${ship.id}/kit?rec=${rec.id}`}
+              remindHref={schedulable ? `/api/ics/${rec.id}` : undefined}
+            />
+          );
+        })
       )}
     </AppShell>
   );

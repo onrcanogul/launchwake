@@ -6,6 +6,12 @@ import {
   type ChannelLike,
   type ScoredChannel,
 } from "./channels";
+import {
+  productTagFor,
+  rollupAllChannelStats,
+  getOutcomeSignals,
+  outcomeBoost,
+} from "./stats";
 import type { BanRisk, Channel, Project, Ship } from "@prisma/client";
 
 /**
@@ -197,15 +203,39 @@ export async function buildPlan(shipId: string): Promise<string> {
     ranking = heuristicRank(scored, input);
   }
 
-  // Keep only rankings that reference a real candidate slug (drop hallucinations),
-  // sort by fit, and persist.
-  const valid = ranking.rankings
-    .filter((r) => bySlug.has(r.slug))
-    .sort((a, b) => b.fitScore - a.fitScore);
-
-  if (valid.length === 0) {
+  // Keep only rankings that reference a real candidate slug (drop hallucinations).
+  const grounded = ranking.rankings.filter((r) => bySlug.has(r.slug));
+  if (grounded.length === 0) {
     throw new Error("Analysis produced no valid recommendations.");
   }
+
+  // Flywheel: refresh outcome stats and re-rank by real results for this product
+  // profile. Channels that converted for similar products rise; removals raise
+  // ban risk and apply a penalty.
+  await rollupAllChannelStats();
+  const productTag = productTagFor(
+    `${ship.project.name} ${ship.project.description ?? ""} ${ship.project.url ?? ""}`,
+  );
+  const signals = await getOutcomeSignals(productTag);
+
+  const enriched = grounded
+    .map((r) => {
+      const channel = bySlug.get(r.slug)!;
+      const signal = signals.get(channel.id);
+      const fitScore = Math.max(
+        0,
+        Math.min(100, r.fitScore + outcomeBoost(signal)),
+      );
+      return {
+        channel,
+        fitScore,
+        banRisk: computeBanRisk(channel, signal?.removals ?? 0),
+        bestTime: r.bestTime ?? channel.bestTime,
+        whyText: r.why,
+        ruleNote: r.ruleNote,
+      };
+    })
+    .sort((a, b) => b.fitScore - a.fitScore);
 
   // Replace any existing plan for this ship (supports "Re-run").
   await db.distributionPlan.deleteMany({ where: { shipId } });
@@ -214,18 +244,15 @@ export async function buildPlan(shipId: string): Promise<string> {
     data: {
       shipId,
       recs: {
-        create: valid.map((r, i) => {
-          const channel = bySlug.get(r.slug)!;
-          return {
-            channelId: channel.id,
-            rank: i,
-            fitScore: r.fitScore,
-            banRisk: computeBanRisk(channel),
-            bestTime: r.bestTime ?? channel.bestTime,
-            whyText: r.why,
-            ruleNote: r.ruleNote,
-          };
-        }),
+        create: enriched.map((e, i) => ({
+          channelId: e.channel.id,
+          rank: i,
+          fitScore: e.fitScore,
+          banRisk: e.banRisk,
+          bestTime: e.bestTime,
+          whyText: e.whyText,
+          ruleNote: e.ruleNote,
+        })),
       },
     },
   });

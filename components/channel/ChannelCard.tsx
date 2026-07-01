@@ -21,9 +21,11 @@ export type ChannelCardData = {
 export function ChannelCard({
   data,
   draftHref,
+  remindHref,
 }: {
   data: ChannelCardData;
   draftHref: string;
+  remindHref?: string;
 }) {
   const risk = RISK[data.banRisk];
   const fit = Math.max(0, Math.min(100, data.fitScore));
@@ -66,7 +68,12 @@ export function ChannelCard({
             <Icon name="rules" /> Rule <b>{data.ruleNote}</b>
           </div>
         )}
-        <div className="act">
+        <div className="act" style={{ display: "flex", gap: 8 }}>
+          {remindHref && (
+            <a className="btn btn-s" href={remindHref} download>
+              <Icon name="calendar" /> Remind me
+            </a>
+          )}
           <Button variant="primary" href={draftHref}>
             Get draft
           </Button>

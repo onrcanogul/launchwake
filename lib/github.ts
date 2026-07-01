@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "crypto";
 import { env } from "./env";
 import type { ShipType } from "@prisma/client";
 
@@ -140,4 +141,79 @@ function truncate(text: string | null, n: number): string | null {
   if (!text) return null;
   const t = text.trim();
   return t.length > n ? t.slice(0, n - 1) + "…" : t;
+}
+
+// ── Webhooks (ship auto-detect, Milestone 4) ───────────────
+
+/** Verify a GitHub webhook HMAC-SHA256 signature (constant-time). */
+export function verifyWebhookSignature(
+  rawBody: string,
+  signatureHeader: string | null,
+  secret: string,
+): boolean {
+  if (!signatureHeader) return false;
+  const expected =
+    "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
+  const a = Buffer.from(signatureHeader);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+export type WebhookShip = ShipSuggestion & { repoFullName: string };
+
+/**
+ * Turn a GitHub webhook payload into a ship suggestion. Handles `release`
+ * (published) and `push` (head commit on the default branch). Returns null for
+ * events we ignore (ping, non-default-branch pushes, drafts, etc.). Pure.
+ */
+export function parseWebhookEvent(
+  eventType: string | null,
+  payload: unknown,
+): WebhookShip | null {
+  if (!payload || typeof payload !== "object") return null;
+  const p = payload as Record<string, unknown>;
+  const repo = p.repository as { full_name?: string } | undefined;
+  const repoFullName = repo?.full_name;
+  if (!repoFullName) return null;
+
+  if (eventType === "release") {
+    if (p.action !== "published") return null;
+    const rel = p.release as
+      | { name?: string | null; tag_name?: string; body?: string | null; html_url?: string; draft?: boolean }
+      | undefined;
+    if (!rel || rel.draft) return null;
+    const title = rel.name || rel.tag_name || "New release";
+    return {
+      repoFullName,
+      type: /\b(v?1\.0|beta|launch)\b/i.test(title) ? "LAUNCH" : "FEATURE",
+      title,
+      summary: truncate(rel.body ?? null, 500),
+      sourceUrl: rel.html_url ?? null,
+      commitSha: null,
+    };
+  }
+
+  if (eventType === "push") {
+    // Only the default branch's head commit.
+    const ref = typeof p.ref === "string" ? p.ref : "";
+    const defaultBranch =
+      (p.repository as { default_branch?: string } | undefined)
+        ?.default_branch ?? "main";
+    if (ref !== `refs/heads/${defaultBranch}`) return null;
+    const head = p.head_commit as
+      | { id?: string; message?: string; url?: string }
+      | undefined;
+    if (!head?.message) return null;
+    const firstLine = head.message.split("\n")[0];
+    return {
+      repoFullName,
+      type: "FEATURE",
+      title: firstLine,
+      summary: truncate(head.message.split("\n").slice(1).join("\n"), 500),
+      sourceUrl: head.url ?? null,
+      commitSha: head.id ?? null,
+    };
+  }
+
+  return null;
 }
