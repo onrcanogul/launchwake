@@ -37,6 +37,7 @@ export async function getShipFeed(projectId: string): Promise<ShipFeed> {
       posts: {
         select: {
           id: true,
+          channel: { select: { name: true } },
           trackedLink: {
             select: { events: { select: { type: true } } },
           },
@@ -45,13 +46,25 @@ export async function getShipFeed(projectId: string): Promise<ShipFeed> {
     },
   });
 
+  // Aggregate signups per channel for the "best channel" stat.
+  const signupsByChannel = new Map<string, number>();
+  let totalClicks = 0;
+
   const rows: ShipRow[] = ships.map((s) => {
-    const signupCount = s.posts.reduce(
-      (n, p) =>
-        n +
-        (p.trackedLink?.events.filter((e) => e.type === "SIGNUP").length ?? 0),
-      0,
-    );
+    let signupCount = 0;
+    for (const p of s.posts) {
+      const events = p.trackedLink?.events ?? [];
+      const clicks = events.filter((e) => e.type === "CLICK").length;
+      const signups = events.filter((e) => e.type === "SIGNUP").length;
+      totalClicks += clicks;
+      signupCount += signups;
+      if (signups > 0) {
+        signupsByChannel.set(
+          p.channel.name,
+          (signupsByChannel.get(p.channel.name) ?? 0) + signups,
+        );
+      }
+    }
     return {
       id: s.id,
       type: s.type,
@@ -65,16 +78,16 @@ export async function getShipFeed(projectId: string): Promise<ShipFeed> {
     };
   });
 
-  const clicks = 0; // filled by attribution rollups (Milestone 2)
-  const signups = rows.reduce((n, r) => n + r.signupCount, 0);
+  const bestChannel =
+    [...signupsByChannel.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
   const stats: FeedStats = {
     shipsTotal: rows.length,
     shipsDistributed: rows.filter((r) => r.postCount > 0 || r.hasPlan).length,
     shipsNeedingPlan: rows.filter((r) => !r.hasPlan).length,
-    clicks,
-    signups,
-    bestChannel: null,
+    clicks: totalClicks,
+    signups: rows.reduce((n, r) => n + r.signupCount, 0),
+    bestChannel,
   };
 
   return { ships: rows, stats };

@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { buildPlan } from "@/lib/analysis";
 import { generateDraft } from "@/lib/drafts";
 import { suggestShip, parseRepo } from "@/lib/github";
+import { recordPostForRecommendation } from "@/lib/attribution";
 
 async function requireProject() {
   const session = await auth();
@@ -117,4 +118,25 @@ export async function ensureDraft(recommendationId: string): Promise<void> {
   await requireProject();
   await generateDraft(recommendationId);
   revalidatePath("/app/ships");
+}
+
+export type MarkPostedState =
+  | { ok: true; trackedUrl: string }
+  | { ok: false; error: string };
+
+/** Record that the user posted a channel and mint its tracked link. */
+export async function markPosted(
+  recommendationId: string,
+  postedUrl?: string,
+): Promise<MarkPostedState> {
+  await requireProject();
+  try {
+    const res = await recordPostForRecommendation(recommendationId, postedUrl);
+    revalidatePath("/app");
+    revalidatePath("/app/results");
+    revalidatePath("/app/ships");
+    return { ok: true, trackedUrl: res.trackedUrl };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
 }

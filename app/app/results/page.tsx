@@ -11,7 +11,7 @@ export default async function ResultsPage() {
   const ws = await getWorkspace();
   if (!ws.project) redirect("/onboarding");
 
-  const { rows, totalSignups } = await getResultsRollup(ws.project.id);
+  const { rows, totalSignups, insight } = await getResultsRollup(ws.project.id);
 
   return (
     <AppShell
@@ -94,6 +94,16 @@ export default async function ResultsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </Panel>
+      )}
+
+      {insight && (
+        <Panel title="What LaunchWake sees" right={<Badge accent>insight</Badge>}>
+          <div
+            style={{ padding: "15px 16px", color: "var(--tx2)", lineHeight: 1.65 }}
+          >
+            {insight}
           </div>
         </Panel>
       )}

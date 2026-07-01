@@ -95,9 +95,18 @@ export default async function ShipFeedPage() {
   // ── Loaded state ───────────────────────────────────────
   const statItems: Stat[] = [
     {
+      label: "Clicks tracked",
+      value: stats.clicks.toLocaleString(),
+      detail:
+        stats.shipsNeedingPlan > 0
+          ? `${stats.shipsNeedingPlan} ship${stats.shipsNeedingPlan === 1 ? "" : "s"} need a plan`
+          : "all ships planned",
+    },
+    {
       label: "Signups driven",
       value: stats.signups.toLocaleString(),
       detail: `from ${stats.shipsTotal} ship${stats.shipsTotal === 1 ? "" : "s"}`,
+      detailUp: stats.signups > 0,
     },
     {
       label: "Ships distributed",
@@ -111,11 +120,6 @@ export default async function ShipFeedPage() {
         stats.shipsNeedingPlan > 0
           ? `${stats.shipsNeedingPlan} need a plan`
           : "all planned",
-    },
-    {
-      label: "Needs a plan",
-      value: stats.shipsNeedingPlan.toString(),
-      detail: stats.shipsNeedingPlan > 0 ? "get a plan →" : "you're caught up",
     },
     {
       label: "Best channel",

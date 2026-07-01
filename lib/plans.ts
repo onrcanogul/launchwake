@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { trackedUrl } from "./attribution";
 import type { BanRisk, Platform, ShipType } from "@prisma/client";
 
 export type RecView = {
@@ -84,6 +85,7 @@ export type KitRec = {
   platform: Platform;
   ruleNote: string | null;
   draft: { body: string; safetyNote: string | null } | null;
+  post: { url: string | null; trackedUrl: string | null } | null;
 };
 
 export type ShipKit = {
@@ -99,6 +101,7 @@ export async function getShipKit(
   const ship = await db.ship.findFirst({
     where: { id: shipId, project: { userId: ownerId } },
     include: {
+      posts: { include: { trackedLink: true } },
       plan: {
         include: {
           recs: {
@@ -111,17 +114,30 @@ export async function getShipKit(
   });
   if (!ship) return null;
 
+  const postByChannel = new Map(ship.posts.map((p) => [p.channelId, p]));
+
   const recs: KitRec[] =
-    ship.plan?.recs.map((r) => ({
-      id: r.id,
-      channelSlug: r.channel.slug,
-      channelName: r.channel.name,
-      platform: r.channel.platform,
-      ruleNote: r.ruleNote,
-      draft: r.draft
-        ? { body: r.draft.body, safetyNote: r.draft.safetyNote }
-        : null,
-    })) ?? [];
+    ship.plan?.recs.map((r) => {
+      const post = postByChannel.get(r.channelId);
+      return {
+        id: r.id,
+        channelSlug: r.channel.slug,
+        channelName: r.channel.name,
+        platform: r.channel.platform,
+        ruleNote: r.ruleNote,
+        draft: r.draft
+          ? { body: r.draft.body, safetyNote: r.draft.safetyNote }
+          : null,
+        post: post
+          ? {
+              url: post.url,
+              trackedUrl: post.trackedLink
+                ? trackedUrl(post.trackedLink.shortCode)
+                : null,
+            }
+          : null,
+      };
+    }) ?? [];
 
   return { ship: { id: ship.id, title: ship.title }, recs };
 }

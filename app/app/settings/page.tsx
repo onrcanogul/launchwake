@@ -5,6 +5,8 @@ import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { TrackingSetup } from "@/components/settings/TrackingSetup";
+import { env } from "@/lib/env";
 
 export default async function SettingsPage() {
   const ws = await getWorkspace();
@@ -65,6 +67,10 @@ export default async function SettingsPage() {
           </div>
           <Button variant="secondary">Connect</Button>
         </div>
+      </Panel>
+
+      <Panel title="Signup tracking">
+        <TrackingSetup appUrl={env.APP_URL} />
       </Panel>
 
       <Panel title="Plan">
