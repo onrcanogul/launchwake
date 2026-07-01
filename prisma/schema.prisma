@@ -1,0 +1,252 @@
+// LaunchWake schema. See docs/DATA_MODEL.md.
+// Channel is global + seeded (the intelligence asset). Users never create channels.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Auth + user
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  emailVerified    DateTime?
+  name             String?
+  image            String?
+  githubId         String?   @unique
+  plan             Plan      @default(FREE)
+  stripeCustomerId String?
+  projects         Project[]
+  accounts         Account[]
+  sessions         Session[]
+  createdAt        DateTime  @default(now())
+}
+
+enum Plan {
+  FREE
+  PRO
+}
+
+// Auth.js (NextAuth) adapter models — keep these.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Product + ships
+// ─────────────────────────────────────────────────────────────
+
+// The product the user is marketing (e.g., "Hookline").
+model Project {
+  id                   String   @id @default(cuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                 String
+  description          String? // used as LLM context for fit scoring
+  url                  String?
+  githubRepo           String? // "owner/repo"
+  githubInstallationId String? // for webhook auto-detect
+  ships                Ship[]
+  createdAt            DateTime @default(now())
+}
+
+// A distribution moment: release / feature / blog / other.
+model Ship {
+  id         String            @id @default(cuid())
+  projectId  String
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type       ShipType
+  title      String
+  summary    String? // what makes it worth sharing
+  sourceUrl  String? // release URL / blog URL
+  commitSha  String?
+  status     ShipStatus        @default(NEW)
+  plan       DistributionPlan?
+  posts      Post[]
+  detectedAt DateTime          @default(now())
+}
+
+enum ShipType {
+  LAUNCH
+  FEATURE
+  BLOG
+  OTHER
+}
+
+enum ShipStatus {
+  NEW
+  PLANNED
+  POSTED
+  DONE
+}
+
+// ─────────────────────────────────────────────────────────────
+// Channel intelligence (global, seeded)
+// ─────────────────────────────────────────────────────────────
+
+model Channel {
+  id             String           @id @default(cuid())
+  slug           String           @unique // "hn-show", "r-webdev", "product-hunt"
+  name           String // "Hacker News — Show HN"
+  platform       Platform
+  url            String?
+  audienceDesc   String? // "~5M developers, high intent"
+  rules          String? // human-readable posting rules
+  defaultBanRisk BanRisk          @default(LOW)
+  bestTime       String? // "Tue–Thu 8am ET"
+  tags           String[] // ["devtools","backend","infra"] for fit matching
+  recs           Recommendation[]
+  posts          Post[]
+  stats          ChannelStat[]
+}
+
+enum Platform {
+  HACKERNEWS
+  REDDIT
+  PRODUCTHUNT
+  INDIEHACKERS
+  DEVTO
+  LOBSTERS
+  X
+  LINKEDIN
+  OTHER
+}
+
+enum BanRisk {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// ─────────────────────────────────────────────────────────────
+// The hero output: plan + ranked recommendations + drafts
+// ─────────────────────────────────────────────────────────────
+
+model DistributionPlan {
+  id        String           @id @default(cuid())
+  shipId    String           @unique
+  ship      Ship             @relation(fields: [shipId], references: [id], onDelete: Cascade)
+  recs      Recommendation[]
+  createdAt DateTime         @default(now())
+}
+
+model Recommendation {
+  id        String           @id @default(cuid())
+  planId    String
+  plan      DistributionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  channelId String
+  channel   Channel          @relation(fields: [channelId], references: [id])
+  rank      Int              @default(0) // display order, best first
+  fitScore  Int // 0..100
+  banRisk   BanRisk
+  bestTime  String?
+  whyText   String // one-line rationale, product-specific
+  ruleNote  String? // the safe way in for THIS post
+  draft     Draft?
+}
+
+model Draft {
+  id               String         @id @default(cuid())
+  recommendationId String         @unique
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  platform         Platform
+  body             String
+  safetyNote       String?
+  createdAt        DateTime       @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────
+// Attribution
+// ─────────────────────────────────────────────────────────────
+
+model Post {
+  id          String       @id @default(cuid())
+  shipId      String
+  ship        Ship         @relation(fields: [shipId], references: [id], onDelete: Cascade)
+  channelId   String
+  channel     Channel      @relation(fields: [channelId], references: [id])
+  url         String?
+  status      PostStatus   @default(LIVE)
+  trackedLink TrackedLink?
+  postedAt    DateTime     @default(now())
+}
+
+enum PostStatus {
+  LIVE
+  REMOVED
+}
+
+model TrackedLink {
+  id        String  @id @default(cuid())
+  postId    String  @unique
+  post      Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  shortCode String  @unique
+  destUrl   String
+  events    Event[]
+}
+
+model Event {
+  id            String      @id @default(cuid())
+  trackedLinkId String
+  trackedLink   TrackedLink @relation(fields: [trackedLinkId], references: [id], onDelete: Cascade)
+  type          EventType
+  meta          Json?
+  createdAt     DateTime    @default(now())
+}
+
+enum EventType {
+  CLICK
+  SIGNUP
+}
+
+// Aggregated outcome data per channel (the flywheel / moat).
+model ChannelStat {
+  id         String   @id @default(cuid())
+  channelId  String
+  channel    Channel  @relation(fields: [channelId], references: [id])
+  productTag String // profile bucket, e.g. "devtools-backend"
+  posts      Int      @default(0)
+  clicks     Int      @default(0)
+  signups    Int      @default(0)
+  removals   Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([channelId, productTag])
+}
