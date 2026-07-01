@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseRepo } from "@/lib/github";
+import { assertEntitlement, EntitlementError } from "@/lib/billing";
 
 const Schema = z.object({
   name: z.string().trim().min(1, "Product name is required").max(120),
@@ -30,6 +31,14 @@ export async function createProject(
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  // Free-plan gate: 1 project.
+  try {
+    await assertEntitlement(session.user.id, "create_project");
+  } catch (err) {
+    if (err instanceof EntitlementError) return { error: err.message };
+    throw err;
   }
 
   // Normalise a GitHub repo/URL down to "owner/repo".

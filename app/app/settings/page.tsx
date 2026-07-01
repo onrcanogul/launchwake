@@ -6,12 +6,20 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { TrackingSetup } from "@/components/settings/TrackingSetup";
+import { BillingPanel } from "@/components/settings/BillingPanel";
+import { getPlanUsage, billingConfigured } from "@/lib/billing";
 import { env } from "@/lib/env";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ upgraded?: string }>;
+}) {
   const ws = await getWorkspace();
   if (!ws.project) redirect("/onboarding");
 
+  const { upgraded } = await searchParams;
+  const usage = await getPlanUsage(ws.user.id);
   const p = ws.project;
 
   return (
@@ -74,21 +82,11 @@ export default async function SettingsPage() {
       </Panel>
 
       <Panel title="Plan">
-        <div className="setrow">
-          <div className="l">
-            <b>{ws.user.plan === "PRO" ? "Pro" : "Free"}</b>
-            <span>
-              {ws.user.plan === "PRO"
-                ? "Unlimited projects · unlimited plans"
-                : "1 project · 2 distribution plans / month"}
-            </span>
-          </div>
-          {ws.user.plan === "PRO" ? (
-            <Button variant="secondary">Manage billing</Button>
-          ) : (
-            <Button variant="primary">Upgrade to Pro — $29/mo</Button>
-          )}
-        </div>
+        <BillingPanel
+          usage={usage}
+          billingConfigured={billingConfigured()}
+          justUpgraded={upgraded === "1"}
+        />
       </Panel>
     </AppShell>
   );

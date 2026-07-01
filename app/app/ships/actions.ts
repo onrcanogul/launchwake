@@ -9,6 +9,7 @@ import { buildPlan } from "@/lib/analysis";
 import { generateDraft } from "@/lib/drafts";
 import { suggestShip, parseRepo } from "@/lib/github";
 import { recordPostForRecommendation } from "@/lib/attribution";
+import { assertEntitlement, EntitlementError } from "@/lib/billing";
 
 async function requireProject() {
   const session = await auth();
@@ -50,6 +51,14 @@ export async function createShipAndPlan(
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  // Free-plan gate: 2 distribution plans / month.
+  try {
+    await assertEntitlement(project.userId, "create_plan");
+  } catch (err) {
+    if (err instanceof EntitlementError) return { error: err.message };
+    throw err;
   }
 
   let shipId: string;
