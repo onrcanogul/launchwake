@@ -17,6 +17,10 @@ const eslintConfig = [
       "node_modules/**",
       "next-env.d.ts",
       "prisma/migrations/**",
+      // Git worktrees live under .claude/ and hold full source copies; ESLint
+      // walks the filesystem (not .gitignore), so exclude them explicitly or a
+      // repo-root `eslint .` lints every worktree's duplicate tree.
+      ".claude/**",
     ],
   },
 ];
