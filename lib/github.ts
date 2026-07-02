@@ -63,6 +63,57 @@ export async function listUserRepos(accessToken: string): Promise<GithubRepo[]> 
   }));
 }
 
+export type RepoMeta = {
+  fullName: string;
+  name: string;
+  description: string | null;
+  homepage: string | null;
+  htmlUrl: string;
+  stars: number;
+  language: string | null;
+  topics: string[];
+  private: boolean;
+};
+
+/**
+ * Fetch public metadata for a repo (name, description, homepage, topics).
+ * No auth needed for public repos — the basis for the login-less Launch Checker.
+ * Returns null for 404 (missing/private); throws on other transport errors.
+ */
+export async function getRepoMeta(
+  ref: RepoRef,
+  accessToken?: string,
+): Promise<RepoMeta | null> {
+  const res = await fetch(`${API}/repos/${ref.owner}/${ref.repo}`, {
+    headers: headers(accessToken),
+    cache: "no-store",
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub getRepoMeta failed: ${res.status}`);
+  const r = (await res.json()) as {
+    full_name: string;
+    name: string;
+    description: string | null;
+    homepage: string | null;
+    html_url: string;
+    stargazers_count?: number;
+    language: string | null;
+    topics?: string[];
+    private: boolean;
+  };
+  return {
+    fullName: r.full_name,
+    name: r.name,
+    description: r.description,
+    homepage: r.homepage && r.homepage.trim() ? r.homepage.trim() : null,
+    htmlUrl: r.html_url,
+    stars: r.stargazers_count ?? 0,
+    language: r.language,
+    topics: r.topics ?? [],
+    private: r.private,
+  };
+}
+
 export type ShipSuggestion = {
   type: ShipType;
   title: string;

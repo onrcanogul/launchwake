@@ -149,6 +149,15 @@ enum Platform {
   LOBSTERS
   X
   LINKEDIN
+  DISCORD
+  SLACK
+  NEWSLETTER
+  DIRECTORY
+  MASTODON
+  BLUESKY
+  FORUM
+  YOUTUBE
+  BLOG
   OTHER
 }
 
@@ -285,4 +294,24 @@ model ChannelStat {
   updatedAt  DateTime @updatedAt
 
   @@unique([channelId, productTag])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Lead capture (public lead-magnet tools, e.g. the Launch Checker).
+// A lead is an email + the context that produced it, captured BEFORE
+// the person has an account. Deliberately not linked to User: these are
+// top-of-funnel and may convert into a User later (matched by email).
+// ─────────────────────────────────────────────────────────────
+model Lead {
+  id          String   @id @default(cuid())
+  email       String
+  source      String // "launch-checker"
+  repo        String? // "owner/repo" the checker ran on
+  projectName String?
+  // Snapshot of the teaser plan we showed, so we can email/rebuild it later.
+  context     Json?
+  createdAt   DateTime @default(now())
+
+  @@index([email])
+  @@index([source, createdAt])
 }

@@ -34,7 +34,13 @@ export type IconName =
   | "reddit"
   | "x"
   | "linkedin"
-  | "smile";
+  | "smile"
+  | "lock"
+  | "mail"
+  | "clock"
+  | "discord"
+  | "slack"
+  | "youtube";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   grid: <path d="M4 6h16M4 12h16M4 18h16" />,
@@ -147,6 +153,43 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M8 13s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 018 0v4" />
+    </>
+  ),
+  mail: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 7l9 6 9-6" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  discord: (
+    <>
+      <path d="M8.5 6.5c2-0.8 5-0.8 7 0" />
+      <path d="M8 7c-2 3-2.4 8-1.5 11.5M16 7c2 3 2.4 8 1.5 11.5" />
+      <circle cx="9.5" cy="13" r="1" />
+      <circle cx="14.5" cy="13" r="1" />
+    </>
+  ),
+  slack: (
+    <>
+      <path d="M9 4v9M13 7.5v9M4.5 11h9M7.5 8h9" />
+    </>
+  ),
+  youtube: (
+    <>
+      <rect x="3" y="6" width="18" height="12" rx="3" />
+      <path d="M10.5 9.2l4.5 2.8-4.5 2.8z" />
     </>
   ),
 };

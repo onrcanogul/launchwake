@@ -9,6 +9,15 @@ export type PlatformValue =
   | "LOBSTERS"
   | "X"
   | "LINKEDIN"
+  | "DISCORD"
+  | "SLACK"
+  | "NEWSLETTER"
+  | "DIRECTORY"
+  | "MASTODON"
+  | "BLUESKY"
+  | "FORUM"
+  | "YOUTUBE"
+  | "BLOG"
   | "OTHER";
 
 const PLATFORM_ICON: Record<PlatformValue, IconName> = {
@@ -20,6 +29,15 @@ const PLATFORM_ICON: Record<PlatformValue, IconName> = {
   LOBSTERS: "rules",
   X: "x",
   LINKEDIN: "linkedin",
+  DISCORD: "discord",
+  SLACK: "slack",
+  NEWSLETTER: "mail",
+  DIRECTORY: "grid",
+  MASTODON: "channels",
+  BLUESKY: "channels",
+  FORUM: "rules",
+  YOUTUBE: "youtube",
+  BLOG: "rss",
   OTHER: "channels",
 };
 
