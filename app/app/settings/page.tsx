@@ -7,6 +7,8 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { TrackingSetup } from "@/components/settings/TrackingSetup";
 import { BillingPanel } from "@/components/settings/BillingPanel";
 import { TeamPanel } from "@/components/settings/TeamPanel";
+import { BrandPanel } from "@/components/settings/BrandPanel";
+import { getBrand, clientReportUrl } from "@/lib/clientReport";
 import { GithubWebhook } from "@/components/settings/GithubWebhook";
 import { ReleaseAction } from "@/components/settings/ReleaseAction";
 import { SlackConnect } from "@/components/settings/SlackConnect";
@@ -40,6 +42,7 @@ export default async function SettingsPage({
   const isOwner = ws.role === "OWNER";
   const isTeamOwner = isOwner && ws.plan === "TEAM";
   const team = isTeamOwner ? await getTeamView(ws.accountId, ws.user.id) : null;
+  const brand = isTeamOwner ? await getBrand(ws.accountId) : null;
 
   return (
     <>
@@ -121,6 +124,30 @@ export default async function SettingsPage({
         <Panel title="Team" right={<Badge accent>{team.seats.used}/{team.seats.purchased} seats</Badge>}>
           <TeamPanel team={team} />
         </Panel>
+      )}
+
+      {isTeamOwner ? (
+        <BrandPanel
+          brand={brand}
+          projectId={p.id}
+          reportEnabled={p.reportEnabled}
+          reportUrl={p.reportToken ? clientReportUrl(p.reportToken) : null}
+        />
+      ) : (
+        isOwner && (
+          <Panel title="White-label client report">
+            <div className="setrow">
+              <div className="l">
+                <b>Send clients a branded report</b>
+                <span>
+                  On Team, send your client a distribution report at a stable link —
+                  your logo, your name. LaunchWake stays the invisible engine.
+                </span>
+              </div>
+              <Badge accent>Team</Badge>
+            </div>
+          </Panel>
+        )
       )}
 
       {isOwner ? (

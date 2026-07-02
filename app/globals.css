@@ -4192,3 +4192,129 @@ tbody tr {
     max-width: 100%;
   }
 }
+
+/* ============ WHITE-LABEL CLIENT REPORT ============ */
+.wl {
+  min-height: 100vh;
+  background: var(--bg0, #0b0d11);
+  color: var(--tx);
+}
+.wl-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 22px 24px 0;
+}
+.wl-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wl-logo {
+  height: 30px;
+  max-width: 180px;
+  object-fit: contain;
+}
+.wl-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: inline-block;
+}
+.wl-agency {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.wl-wrap {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 32px 24px 40px;
+}
+.wl-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ac);
+}
+.wl-h1 {
+  font-size: 30px;
+  font-weight: 680;
+  letter-spacing: -0.025em;
+  margin: 6px 0 8px;
+}
+.wl-lede {
+  color: var(--tx2);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.wl-muted {
+  color: var(--tx3);
+}
+.wl-roi {
+  margin: 26px 0;
+}
+.wl-sec {
+  margin-top: 30px;
+}
+.wl-sec h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.wl-empty {
+  margin-top: 26px;
+  padding: 20px;
+  border: 1px dashed var(--line2);
+  border-radius: 10px;
+  color: var(--tx2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.wl-foot {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 20px 24px 40px;
+  border-top: 1px solid var(--line);
+  color: var(--tx3);
+  font-size: 12px;
+}
+
+/* BrandPanel link row */
+.wl-linkrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.wl-link {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--ac);
+  word-break: break-all;
+}
+
+@media print {
+  .wl-print {
+    display: none !important;
+  }
+  .wl {
+    background: #fff;
+    color: #111;
+  }
+  .wl-lede,
+  .wl-sec h2 {
+    color: #333;
+  }
+  .wl-foot {
+    color: #666;
+  }
+}
