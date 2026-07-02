@@ -3,6 +3,7 @@ import { getWorkspace } from "@/lib/session";
 import { getShipWithPlan } from "@/lib/plans";
 import { ChannelCard } from "@/components/channel/ChannelCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Note } from "@/components/ui/Note";
 import { Button } from "@/components/ui/Button";
 import { RerunButton } from "@/components/ship/RerunButton";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
@@ -98,7 +99,8 @@ export default async function PlanPage({
           }
         />
       ) : (
-        recs.map((rec) => {
+        <>
+          {recs.map((rec) => {
           const schedulable = nextBestTime(rec.bestTime, new Date()) !== null;
           return (
             <ChannelCard
@@ -127,7 +129,13 @@ export default async function PlanPage({
               }
             />
           );
-        })
+        })}
+          <Note icon="results">
+            This plan re-ranks itself as results come in — LaunchWake learns which
+            channels actually convert for products like yours, so every launch
+            gets smarter.
+          </Note>
+        </>
       )}
     </>
   );

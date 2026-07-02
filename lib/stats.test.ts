@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { productTagFor, outcomeEvidence, bucketLabel } from "./stats";
+import {
+  productTagFor,
+  outcomeEvidence,
+  outcomeFactLine,
+  bucketLabel,
+} from "./stats";
 
 describe("productTagFor", () => {
   it("buckets a devtools/backend product", () => {
@@ -59,5 +64,53 @@ describe("outcomeEvidence", () => {
     expect(ev.boost).toBeLessThan(0);
     expect(ev.note).toMatch(/removals?/);
     expect(ev.note).toMatch(/post carefully/);
+  });
+
+  it("downranks channels that got traffic but zero signups", () => {
+    const ev = outcomeEvidence(
+      { posts: 3, clicks: 40, signups: 0, removals: 0 },
+      "devtools",
+    );
+    expect(ev.boost).toBeLessThan(0);
+    expect(ev.note).toMatch(/40 clicks but 0 signups/);
+    expect(ev.note).toMatch(/didn't convert/);
+  });
+
+  it("does not penalise a tiny non-converting sample (below the click floor)", () => {
+    const ev = outcomeEvidence(
+      { posts: 1, clicks: 3, signups: 0, removals: 0 },
+      "devtools",
+    );
+    expect(ev.boost).toBe(0);
+    expect(ev.note).toBeNull();
+  });
+});
+
+describe("outcomeFactLine", () => {
+  it("is null without history", () => {
+    expect(outcomeFactLine(undefined, "devtools")).toBeNull();
+    expect(
+      outcomeFactLine({ posts: 0, clicks: 0, signups: 0, removals: 0 }, "devtools"),
+    ).toBeNull();
+  });
+
+  it("states raw numbers and conversion for the prompt", () => {
+    const line = outcomeFactLine(
+      { posts: 3, clicks: 40, signups: 0, removals: 0 },
+      "devtools-webdev",
+    );
+    expect(line).toContain("dev-tools");
+    expect(line).toContain("3 posts");
+    expect(line).toContain("40 clicks");
+    expect(line).toContain("0 signups");
+    expect(line).toContain("0.0% conversion");
+  });
+
+  it("includes removals when present", () => {
+    const line = outcomeFactLine(
+      { posts: 2, clicks: 20, signups: 1, removals: 1 },
+      "saas",
+    );
+    expect(line).toMatch(/1 removal\b/);
   });
 });

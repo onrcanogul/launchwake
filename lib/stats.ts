@@ -160,14 +160,21 @@ export function outcomeEvidence(
   const conv = signal.clicks > 0 ? signal.signups / signal.clicks : 0;
   // Confidence ramps from 0→1 as we accumulate up to ~5 posts of evidence.
   const confidence = Math.min(1, signal.posts / 5);
+  const postStr = `${signal.posts} post${signal.posts === 1 ? "" : "s"}`;
 
   let boost = 0;
   let note: string | null = null;
 
   if (signal.signups > 0) {
+    // Proven converter — reward it.
     boost += Math.round(Math.min(12, conv * 100 * 1.5) * confidence);
     const convStr = conv > 0 ? `${(conv * 100).toFixed(1)}% conv` : `${signal.signups} signups`;
-    note = `Proven: ${convStr} for ${label} (${signal.posts} post${signal.posts === 1 ? "" : "s"})`;
+    note = `Proven: ${convStr} for ${label} (${postStr})`;
+  } else if (signal.clicks >= 8) {
+    // Got traffic but never converted — a real negative signal. Downrank and
+    // say why, so the plan visibly learns from what didn't work.
+    boost -= Math.round(Math.min(10, 3 + signal.clicks / 8) * confidence);
+    note = `${signal.clicks} clicks but 0 signups for ${label} (${postStr}) — didn't convert`;
   }
 
   if (signal.removals > 0) {
@@ -177,4 +184,30 @@ export function outcomeEvidence(
   }
 
   return { boost, note };
+}
+
+/**
+ * A compact, factual outcome line for the analysis PROMPT (not the UI): the raw
+ * numbers so the LLM can weight a channel by how it actually performed for
+ * similar products. Returns null when there's no history yet.
+ */
+export function outcomeFactLine(
+  signal: OutcomeSignal | undefined,
+  productTag: string,
+): string | null {
+  if (!signal || signal.posts === 0) return null;
+
+  const label = bucketLabel(productTag);
+  const parts = [
+    `${signal.posts} post${signal.posts === 1 ? "" : "s"}`,
+    `${signal.clicks} click${signal.clicks === 1 ? "" : "s"}`,
+    `${signal.signups} signup${signal.signups === 1 ? "" : "s"}`,
+  ];
+  if (signal.clicks > 0) {
+    parts.push(`${((signal.signups / signal.clicks) * 100).toFixed(1)}% conversion`);
+  }
+  if (signal.removals > 0) {
+    parts.push(`${signal.removals} removal${signal.removals === 1 ? "" : "s"}`);
+  }
+  return `past results for ${label}: ${parts.join(", ")}`;
 }

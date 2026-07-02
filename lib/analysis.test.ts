@@ -57,6 +57,31 @@ describe("buildAnalysisPrompt", () => {
     expect(prompt).toContain("Hookline");
     expect(prompt).toContain("Slack alerts for failed webhooks");
   });
+
+  it("omits the outcome-weighting rule when there is no history", () => {
+    const { system, prompt } = buildAnalysisPrompt(input, candidates);
+    expect(system).not.toMatch(/past results/i);
+    expect(prompt).not.toMatch(/past results/i);
+  });
+
+  it("injects per-channel past results and the weighting rule when provided", () => {
+    const outcomes = new Map<string, string>([
+      ["r-saas", "past results for SaaS: 3 posts, 40 clicks, 0 signups, 0.0% conversion"],
+    ]);
+    const { system, prompt } = buildAnalysisPrompt(input, candidates, outcomes);
+    // The channel with history carries its line...
+    expect(prompt).toContain(
+      "past results: past results for SaaS: 3 posts, 40 clicks, 0 signups",
+    );
+    // ...the one without history does not.
+    const hnBlock = prompt.slice(
+      prompt.indexOf("slug=hn-show"),
+      prompt.indexOf("slug=r-saas"),
+    );
+    expect(hnBlock).not.toMatch(/past results/);
+    // ...and the model is told to weight it down for clicks-without-signups.
+    expect(system).toMatch(/ZERO signups.*LOWER/i);
+  });
 });
 
 describe("heuristicRank", () => {

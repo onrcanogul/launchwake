@@ -11,6 +11,7 @@ import {
   rollupAllChannelStats,
   getOutcomeSignals,
   outcomeEvidence,
+  outcomeFactLine,
 } from "./stats";
 import type { BanRisk, Channel, Project, Ship } from "@prisma/client";
 
@@ -51,11 +52,20 @@ export type PlanInput = {
   ship: Pick<Ship, "type" | "title" | "summary">;
 };
 
-/** System + user prompt for ranking. Pure → unit-testable without a network call. */
+/**
+ * System + user prompt for ranking. Pure → unit-testable without a network call.
+ *
+ * `outcomeContext` (slug → factual past-results line) is the flywheel made
+ * legible to the model: when we have real history for a channel, we hand the LLM
+ * the numbers so it can re-weight (proven converters up, traffic-with-no-signups
+ * and removals down) instead of ranking blind.
+ */
 export function buildAnalysisPrompt(
   input: PlanInput,
   candidates: ChannelLike[],
+  outcomeContext?: Map<string, string>,
 ) {
+  const hasOutcomes = Boolean(outcomeContext && outcomeContext.size > 0);
   const system = [
     "You are LaunchWake's distribution strategist for technical founders.",
     "You are given a product, one 'ship' (a release/feature/blog worth sharing), and a FIXED list of candidate channels from a curated catalog.",
@@ -65,12 +75,17 @@ export function buildAnalysisPrompt(
     "- You may ONLY use channels from the provided candidate list. NEVER invent communities, subreddits, or platforms. Refer to each by its exact slug.",
     "- Ground the 'ruleNote' in the channel's stated rules — the concrete safe way in for this post (e.g. 'lead with the build story, no marketing tone').",
     "- 'why' must be specific to this product + ship, not generic. One or two sentences.",
+    hasOutcomes
+      ? "- Some candidates include a 'past results' line — REAL outcomes from posting similar products there. Weight it heavily: a channel that produced signups should rank higher; one that got clicks but ZERO signups, or had removals, should rank LOWER even if it looks topically relevant. When past results change the call, say so in 'why' (e.g. 'drove 4% signups for similar tools last time')."
+      : "",
     "- Do NOT assign ban risk; that is computed separately.",
     "- Respond with ONLY a JSON object, no prose, no code fences.",
     "",
     'JSON shape: {"rankings":[{"slug":string,"fitScore":0-100,"why":string,"ruleNote":string,"bestTime":string?}]}',
     "Rank every candidate you are given, best fit first.",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const productBlock = [
     `Product: ${input.project.name}`,
@@ -97,6 +112,7 @@ export function buildAnalysisPrompt(
         c.bestTime ? `   best time: ${c.bestTime}` : "",
         c.rules ? `   rules: ${c.rules}` : "",
         `   tags: ${c.tags.join(", ")}`,
+        outcomeContext?.get(c.slug) ? `   past results: ${outcomeContext.get(c.slug)}` : "",
       ]
         .filter(Boolean)
         .join("\n"),
@@ -190,9 +206,26 @@ export async function buildPlan(shipId: string): Promise<string> {
     ship,
   };
 
+  // Flywheel, step 1 — refresh outcome stats for this product profile BEFORE
+  // ranking, so both the LLM (via the prompt) and the deterministic pass weight
+  // what actually happened. Channels that converted rise; traffic-with-no-signup
+  // and removals sink.
+  await rollupAllChannelStats();
+  const productTag = productTagFor(
+    `${ship.project.name} ${ship.project.description ?? ""} ${ship.project.url ?? ""}`,
+  );
+  const signals = await getOutcomeSignals(productTag);
+
+  // Per-candidate factual results line for the prompt (only where we have history).
+  const outcomeContext = new Map<string, string>();
+  for (const c of candidates) {
+    const line = outcomeFactLine(signals.get(c.id), productTag);
+    if (line) outcomeContext.set(c.slug, line);
+  }
+
   let ranking: RankingResult;
   if (llmConfigured()) {
-    const { system, prompt } = buildAnalysisPrompt(input, candidates);
+    const { system, prompt } = buildAnalysisPrompt(input, candidates, outcomeContext);
     ranking = await completeJSON({
       userId: ship.project.userId,
       system,
@@ -211,15 +244,8 @@ export async function buildPlan(shipId: string): Promise<string> {
     throw new Error("Analysis produced no valid recommendations.");
   }
 
-  // Flywheel: refresh outcome stats and re-rank by real results for this product
-  // profile. Channels that converted for similar products rise; removals raise
-  // ban risk and apply a penalty.
-  await rollupAllChannelStats();
-  const productTag = productTagFor(
-    `${ship.project.name} ${ship.project.description ?? ""} ${ship.project.url ?? ""}`,
-  );
-  const signals = await getOutcomeSignals(productTag);
-
+  // Flywheel, step 2 — apply the deterministic fit adjustment + legible evidence
+  // and re-sort. banRisk also rises with removals. Reuses the signals above.
   const enriched = grounded
     .map((r) => {
       const channel = bySlug.get(r.slug)!;
