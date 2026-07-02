@@ -24,7 +24,7 @@ export default async function AppLayout({
       </a>
       <AppShell
         project={{ name: ws.project.name, subtitle: projectSubtitle(ws.project) }}
-        user={{ name: displayName(ws.user), plan: ws.user.plan }}
+        user={{ name: displayName(ws.user), plan: ws.plan }}
         ships={ws.ships}
         activeShip={ws.activeShip}
         channelsCount={ws.channelsCount}

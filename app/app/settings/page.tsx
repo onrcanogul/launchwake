@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/Button";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { TrackingSetup } from "@/components/settings/TrackingSetup";
 import { BillingPanel } from "@/components/settings/BillingPanel";
+import { TeamPanel } from "@/components/settings/TeamPanel";
 import { GithubWebhook } from "@/components/settings/GithubWebhook";
 import { SlackConnect } from "@/components/settings/SlackConnect";
+import { LeaveTeamButton } from "@/components/settings/LeaveTeamButton";
 import {
   getPlanUsage,
   billingConfigured,
@@ -15,6 +17,7 @@ import {
   TEAM_MIN_SEATS,
   TEAM_MAX_SEATS,
 } from "@/lib/billing";
+import { getTeamView } from "@/lib/team";
 import { getTrackingStatus } from "@/lib/attribution";
 import { getGithubStatus } from "@/lib/github";
 import { env } from "@/lib/env";
@@ -28,11 +31,14 @@ export default async function SettingsPage({
   if (!ws.project) redirect("/onboarding");
 
   const { upgraded } = await searchParams;
-  const usage = await getPlanUsage(ws.user.id);
+  const usage = await getPlanUsage(ws.accountId);
   const tracking = await getTrackingStatus(ws.project.id);
   const github = await getGithubStatus(ws.project);
   const p = ws.project;
   const webhookUrl = `${env.APP_URL.replace(/\/$/, "")}/api/github/webhook`;
+  const isOwner = ws.role === "OWNER";
+  const isTeamOwner = isOwner && ws.plan === "TEAM";
+  const team = isTeamOwner ? await getTeamView(ws.accountId, ws.user.id) : null;
 
   return (
     <>
@@ -106,16 +112,37 @@ export default async function SettingsPage({
         />
       </Panel>
 
-      <Panel title="Plan">
-        <BillingPanel
-          usage={usage}
-          billingConfigured={billingConfigured()}
-          justUpgraded={upgraded === "1"}
-          teamPricePerSeatCents={TEAM_PRICE_PER_SEAT_CENTS}
-          teamMinSeats={TEAM_MIN_SEATS}
-          teamMaxSeats={TEAM_MAX_SEATS}
-        />
-      </Panel>
+      {team && (
+        <Panel title="Team" right={<Badge accent>{team.seats.used}/{team.seats.purchased} seats</Badge>}>
+          <TeamPanel team={team} />
+        </Panel>
+      )}
+
+      {isOwner ? (
+        <Panel title="Plan">
+          <BillingPanel
+            usage={usage}
+            billingConfigured={billingConfigured()}
+            justUpgraded={upgraded === "1"}
+            teamPricePerSeatCents={TEAM_PRICE_PER_SEAT_CENTS}
+            teamMinSeats={TEAM_MIN_SEATS}
+            teamMaxSeats={TEAM_MAX_SEATS}
+          />
+        </Panel>
+      ) : (
+        <Panel title="Plan">
+          <div className="setrow">
+            <div className="l">
+              <b>You&apos;re on a Team seat</b>
+              <span>
+                You share this workspace on the {ws.plan} plan. Billing is managed by
+                the team owner.
+              </span>
+            </div>
+            <LeaveTeamButton />
+          </div>
+        </Panel>
+      )}
     </>
   );
 }

@@ -10,6 +10,7 @@ import { generateDraft } from "@/lib/drafts";
 import { isDraftTone, type DraftTone } from "@/lib/tones";
 import { suggestShip, parseRepo } from "@/lib/github";
 import { recordPostForRecommendation } from "@/lib/attribution";
+import { resolveAccount } from "@/lib/team";
 import { newReportToken, reportUrl } from "@/lib/report";
 import { assertEntitlement, EntitlementError } from "@/lib/billing";
 import { nextBestTimeUTC } from "@/lib/reminders";
@@ -18,8 +19,9 @@ import { emailConfigured } from "@/lib/notify";
 async function requireProject() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+  const { accountId } = await resolveAccount(session.user.id);
   const project = await db.project.findFirst({
-    where: { userId: session.user.id },
+    where: { userId: accountId },
     orderBy: { createdAt: "asc" },
   });
   if (!project) redirect("/onboarding");
@@ -179,11 +181,12 @@ export async function scheduleReminder(
 ): Promise<ScheduleReminderState> {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+  const { accountId } = await resolveAccount(session.user.id);
 
   const rec = await db.recommendation.findFirst({
     where: {
       id: recommendationId,
-      plan: { ship: { project: { userId: session.user.id } } },
+      plan: { ship: { project: { userId: accountId } } },
     },
     include: {
       channel: true,

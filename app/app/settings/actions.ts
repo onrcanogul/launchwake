@@ -6,6 +6,13 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createCheckoutUrl, createPortalUrl, billingConfigured } from "@/lib/billing";
+import {
+  resolveAccount,
+  createInvite,
+  revokeInvite,
+  removeMember,
+  type InviteResult,
+} from "@/lib/team";
 
 export type BillingState = { error?: string };
 
@@ -13,6 +20,66 @@ async function requireUserId(): Promise<string> {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   return session.user.id;
+}
+
+/** Resolve the caller and ensure they OWN the account (not a member seat). */
+async function requireOwner(): Promise<string> {
+  const userId = await requireUserId();
+  const { accountId, role } = await resolveAccount(userId);
+  if (role !== "OWNER") {
+    throw new Error("Only the team owner can manage seats.");
+  }
+  return accountId;
+}
+
+// ── Team management (owner only) ───────────────────────────
+
+/** Invite a teammate to a Team seat → returns the invite link. */
+export async function inviteTeamMember(email: string): Promise<InviteResult> {
+  try {
+    const ownerId = await requireOwner();
+    const res = await createInvite(ownerId, email);
+    if (res.ok) revalidatePath("/app/settings");
+    return res;
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+/** Revoke a pending invite. */
+export async function revokeTeamInvite(inviteId: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const ownerId = await requireOwner();
+    await revokeInvite(ownerId, inviteId);
+    revalidatePath("/app/settings");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+/** Remove a member from the team (frees their seat). */
+export async function removeTeamMember(memberId: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const ownerId = await requireOwner();
+    await removeMember(ownerId, memberId);
+    revalidatePath("/app/settings");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+/** Leave the team you're a member of (a member action, not the owner). */
+export async function leaveTeam(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const userId = await requireUserId();
+    await db.teamMembership.deleteMany({ where: { memberId: userId } });
+    revalidatePath("/app", "layout");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
 }
 
 /** Start Pro checkout → returns the Stripe URL for the client to redirect to. */

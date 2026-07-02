@@ -21,7 +21,7 @@ export default async function PlanPage({
   const ws = await getWorkspace();
   if (!ws.project) redirect("/onboarding");
 
-  const data = await getShipWithPlan(id, ws.user.id);
+  const data = await getShipWithPlan(id, ws.accountId);
   if (!data) notFound();
 
   const { ship, recs } = data;

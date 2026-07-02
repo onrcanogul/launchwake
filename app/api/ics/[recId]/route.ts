@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { resolveAccount } from "@/lib/team";
 import { nextBestTime, buildICS } from "@/lib/reminders";
 
 /**
@@ -16,9 +17,10 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { recId } = await ctx.params;
+  const { accountId } = await resolveAccount(session.user.id);
 
   const rec = await db.recommendation.findFirst({
-    where: { id: recId, plan: { ship: { project: { userId: session.user.id } } } },
+    where: { id: recId, plan: { ship: { project: { userId: accountId } } } },
     include: {
       channel: true,
       plan: { include: { ship: { select: { title: true } } } },

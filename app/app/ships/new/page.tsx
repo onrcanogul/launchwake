@@ -8,7 +8,7 @@ export default async function NewShipPage() {
   const ws = await getWorkspace();
   if (!ws.project) redirect("/onboarding");
 
-  const usage = await getPlanUsage(ws.user.id);
+  const usage = await getPlanUsage(ws.accountId);
   const plansLeft =
     usage.planLimit === null
       ? null

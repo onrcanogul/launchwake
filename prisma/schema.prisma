@@ -28,7 +28,45 @@ model User {
   accounts         Account[]
   sessions         Session[]
   reminders        Reminder[]
+  // Team seats: memberships this user owns (they pay) vs is a member of.
+  ownedMemberships TeamMembership[] @relation("TeamOwner")
+  memberships      TeamMembership[] @relation("TeamMember")
+  sentInvites      TeamInvite[]     @relation("TeamInvites")
   createdAt        DateTime  @default(now())
+}
+
+// A member occupying one of the owner's Team seats — shares the owner's workspace.
+model TeamMembership {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  memberId  String
+  member    User     @relation("TeamMember", fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([ownerId, memberId])
+  @@index([memberId])
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+// A pending seat invitation (accept link carries the token).
+model TeamInvite {
+  id         String       @id @default(cuid())
+  ownerId    String
+  owner      User         @relation("TeamInvites", fields: [ownerId], references: [id], onDelete: Cascade)
+  email      String
+  token      String       @unique
+  status     InviteStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+  acceptedAt DateTime?
+
+  @@index([ownerId])
+  @@index([email])
 }
 
 enum Plan {

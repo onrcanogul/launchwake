@@ -4,11 +4,21 @@ import { auth } from "./auth";
 import { db } from "./db";
 import { readActiveShipId } from "./activeShip";
 import { listProjectShips, type ShipListItem } from "./ships";
-import type { Project, User } from "@prisma/client";
+import { resolveAccount, type AccountRole } from "./team";
+import type { Plan, Project, User } from "@prisma/client";
 
 export type Workspace = {
   user: Pick<User, "id" | "name" | "email" | "plan">;
-  /** The user's primary project, or null if they haven't onboarded yet. */
+  /**
+   * The account whose data this user sees. For a Team member this is the owner's
+   * id; for everyone else it's their own. ALL data queries scope to this.
+   */
+  accountId: string;
+  /** OWNER for solo users & Team owners; MEMBER for someone on a Team seat. */
+  role: AccountRole;
+  /** The account's plan (the owner's plan for members) — for gating + display. */
+  plan: Plan;
+  /** The account's primary project, or null if not onboarded yet. */
   project: Project | null;
   /** All ships (for the ship switcher). Empty when no project/ships. */
   ships: ShipListItem[];
@@ -21,6 +31,9 @@ export type Workspace = {
 /**
  * Load the signed-in user's workspace. Redirects to /login if unauthenticated.
  * Wrapped in cache() so the layout and page share one result per request.
+ *
+ * Team members share the paying owner's workspace: we resolve `accountId` once
+ * and scope project/ships/plan to it, while `user` stays the signed-in identity.
  */
 export const getWorkspace = cache(async (): Promise<Workspace> => {
   const session = await auth();
@@ -31,8 +44,15 @@ export const getWorkspace = cache(async (): Promise<Workspace> => {
   });
   if (!user) redirect("/login");
 
+  const { accountId, role } = await resolveAccount(user.id);
+  const account =
+    accountId === user.id
+      ? user
+      : await db.user.findUnique({ where: { id: accountId } });
+  const plan = account?.plan ?? user.plan;
+
   const project = await db.project.findFirst({
-    where: { userId: user.id },
+    where: { userId: accountId },
     orderBy: { createdAt: "asc" },
   });
 
@@ -44,6 +64,9 @@ export const getWorkspace = cache(async (): Promise<Workspace> => {
 
   return {
     user: { id: user.id, name: user.name, email: user.email, plan: user.plan },
+    accountId,
+    role,
+    plan,
     project,
     ships,
     activeShip,

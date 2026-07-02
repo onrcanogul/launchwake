@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { resolveAccount } from "@/lib/team";
 import { ACTIVE_SHIP_COOKIE } from "@/lib/activeShip";
 
 /**
@@ -13,9 +14,10 @@ import { ACTIVE_SHIP_COOKIE } from "@/lib/activeShip";
 export async function setActiveShip(shipId: string): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) return;
+  const { accountId } = await resolveAccount(session.user.id);
 
   const ship = await db.ship.findFirst({
-    where: { id: shipId, project: { userId: session.user.id } },
+    where: { id: shipId, project: { userId: accountId } },
     select: { id: true },
   });
   if (!ship) return;

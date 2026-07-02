@@ -23,7 +23,7 @@ export default async function LaunchPage({
   const ws = await getWorkspace();
   if (!ws.project) redirect("/onboarding");
 
-  const launch = await getLaunchDay(id, ws.user.id);
+  const launch = await getLaunchDay(id, ws.accountId);
   if (!launch) notFound();
 
   const ships = ws.ships;

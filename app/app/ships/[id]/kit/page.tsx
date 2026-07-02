@@ -19,7 +19,7 @@ export default async function KitPage({
   const ws = await getWorkspace();
   if (!ws.project) redirect("/onboarding");
 
-  const kit = await getShipKit(id, ws.user.id);
+  const kit = await getShipKit(id, ws.accountId);
   if (!kit) notFound();
 
   const ships = ws.ships;
