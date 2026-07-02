@@ -1,10 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Icon } from "@/components/Icon";
 import { useToast } from "@/components/ui/toast";
+import { saveStripeWebhookSecret } from "@/app/app/settings/actions";
 
-type Status = { signups: number; clicks: number; lastSignupAt: Date | null };
+type Status = {
+  signups: number;
+  clicks: number;
+  lastSignupAt: Date | null;
+  revenueEvents: number;
+  revenueCents: number;
+  currency: string;
+  lastRevenueAt: Date | null;
+};
 
 function ago(date: Date): string {
   const secs = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 1000));
@@ -17,16 +26,81 @@ function ago(date: Date): string {
   return "just now";
 }
 
-/** Shows the signup-tracking snippet the user drops on their product site. */
+function money(cents: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+      maximumFractionDigits: cents % 100 === 0 ? 0 : 2,
+    }).format(cents / 100);
+  } catch {
+    return `${(cents / 100).toFixed(0)} ${currency.toUpperCase()}`;
+  }
+}
+
+const preStyle: React.CSSProperties = {
+  background: "var(--bg2)",
+  border: "1px solid var(--line)",
+  borderRadius: 8,
+  padding: "12px 14px",
+  fontSize: 11.5,
+  lineHeight: 1.6,
+  color: "var(--tx2)",
+  overflowX: "auto",
+  whiteSpace: "pre",
+};
+
+function CopyBlock({ code, label }: { code: string; label: string }) {
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+      toast(`${label} copied`);
+    } catch {
+      toast("Couldn't copy to clipboard", "error");
+    }
+  };
+  return (
+    <>
+      <pre className="mono" style={preStyle}>
+        {code}
+      </pre>
+      <button className="btn btn-s" style={{ marginTop: 10 }} onClick={copy}>
+        <Icon name="copy" /> {copied ? "Copied" : `Copy ${label.toLowerCase()}`}
+      </button>
+    </>
+  );
+}
+
+const sub: React.CSSProperties = {
+  fontSize: 12.5,
+  fontWeight: 600,
+  color: "var(--tx)",
+  margin: "22px 0 8px",
+  display: "flex",
+  alignItems: "center",
+  gap: 7,
+};
+
+/** Signup + revenue attribution setup: pixel, generic revenue API, Stripe webhook. */
 export function TrackingSetup({
   appUrl,
+  projectId,
   status,
+  stripeSecretSet,
 }: {
   appUrl: string;
+  projectId: string;
   status: Status;
+  stripeSecretSet: boolean;
 }) {
   const base = appUrl.replace(/\/$/, "");
-  const snippet = `<script>
+  const { toast } = useToast();
+
+  const signupSnippet = `<script>
 (function () {
   // 1. capture lw_ref from the tracked-link click (any page)
   var p = new URLSearchParams(location.search).get('lw_ref');
@@ -42,20 +116,28 @@ export function TrackingSetup({
 })();
 </script>`;
 
-  const { toast } = useToast();
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(snippet);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-      toast("Snippet copied");
-    } catch {
-      toast("Couldn't copy to clipboard", "error");
-    }
-  };
+  const revenueSnippet = `// Server-side, after a successful payment. Pass the lw_ref you
+// stored at signup so the revenue is attributed to the channel.
+await fetch('${base}/api/track/revenue', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    ref: lwRef,          // captured from lw_ref at signup
+    amountCents: 4900,   // $49.00
+    currency: 'usd',
+    recurring: true      // subscription → counts toward MRR
+  })
+});`;
 
-  const statusBanner =
+  const stripeUrl = `${base}/api/track/stripe/${projectId}`;
+  const stripeNote = `// When you create the Stripe Checkout Session, tag it with lw_ref:
+stripe.checkout.sessions.create({
+  // …line_items, mode, success_url…
+  metadata: { lw_ref: lwRef }   // the value you captured at signup
+});`;
+
+  // ── status banners ──
+  const signupBanner =
     status.signups > 0 ? (
       <div className="track-status ok">
         <span className="dot" style={{ background: "var(--ok)" }} />
@@ -78,36 +160,100 @@ export function TrackingSetup({
       </div>
     );
 
+  // ── Stripe secret form ──
+  const [secret, setSecret] = useState("");
+  const [saving, startSave] = useTransition();
+  const save = () =>
+    startSave(async () => {
+      const res = await saveStripeWebhookSecret(secret);
+      if (res.ok) {
+        setSecret("");
+        toast(secret.trim() ? "Stripe revenue tracking connected" : "Stripe secret cleared");
+      } else {
+        toast(res.error ?? "Couldn't save", "error");
+      }
+    });
+
+  const copyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(stripeUrl);
+      toast("Webhook URL copied");
+    } catch {
+      toast("Couldn't copy", "error");
+    }
+  };
+
   return (
     <div style={{ padding: "14px 16px" }}>
-      {statusBanner}
+      {signupBanner}
+
+      {/* 1 — Signups */}
+      <div style={sub}>
+        <Icon name="results" style={{ width: 14, height: 14, stroke: "var(--ac)", strokeWidth: 1.7, fill: "none" }} />
+        1 · Attribute signups (pixel)
+      </div>
       <p style={{ color: "var(--tx2)", fontSize: 12.5, marginBottom: 10 }}>
-        Add this snippet site-wide, then call{" "}
-        <code className="mono" style={{ color: "var(--tx)" }}>
-          launchwakeSignup()
-        </code>{" "}
-        on your signup-success page. Clicks are tracked without it; signups need
-        it.
+        Add this site-wide, then call{" "}
+        <code className="mono" style={{ color: "var(--tx)" }}>launchwakeSignup()</code>{" "}
+        on your signup-success page. Clicks are tracked without it; signups need it.
       </p>
-      <pre
-        className="mono"
-        style={{
-          background: "var(--bg2)",
-          border: "1px solid var(--line)",
-          borderRadius: 8,
-          padding: "12px 14px",
-          fontSize: 11.5,
-          lineHeight: 1.6,
-          color: "var(--tx2)",
-          overflowX: "auto",
-          whiteSpace: "pre",
-        }}
-      >
-        {snippet}
-      </pre>
-      <button className="btn btn-s" style={{ marginTop: 10 }} onClick={copy}>
-        <Icon name="copy" /> {copied ? "Copied" : "Copy snippet"}
-      </button>
+      <CopyBlock code={signupSnippet} label="Snippet" />
+
+      {/* 2 — Revenue (generic) */}
+      <div style={sub}>
+        <Icon name="target" style={{ width: 14, height: 14, stroke: "var(--ac)", strokeWidth: 1.7, fill: "none" }} />
+        2 · Attribute revenue (any provider)
+      </div>
+      {status.revenueEvents > 0 && (
+        <div className="track-status ok" style={{ marginBottom: 10 }}>
+          <span className="dot" style={{ background: "var(--ok)" }} />
+          <b>{money(status.revenueCents, status.currency)}</b> in revenue attributed
+          across {status.revenueEvents} payment{status.revenueEvents === 1 ? "" : "s"}
+          {status.lastRevenueAt ? `, last ${ago(status.lastRevenueAt)}` : ""}.
+        </div>
+      )}
+      <p style={{ color: "var(--tx2)", fontSize: 12.5, marginBottom: 10 }}>
+        Forward a payment from anywhere — your backend, a PostHog action, or GA4 —
+        to the revenue endpoint with the same <code className="mono">lw_ref</code>.
+        Recurring payments count toward MRR.
+      </p>
+      <CopyBlock code={revenueSnippet} label="Revenue example" />
+
+      {/* 3 — Stripe turnkey */}
+      <div style={sub}>
+        <Icon name="target" style={{ width: 14, height: 14, stroke: "var(--ac)", strokeWidth: 1.7, fill: "none" }} />
+        3 · Stripe (turnkey) {stripeSecretSet && <span className="badge" style={{ color: "var(--ok)" }}><span className="dot" style={{ background: "var(--ok)" }} />connected</span>}
+      </div>
+      <p style={{ color: "var(--tx2)", fontSize: 12.5, marginBottom: 8 }}>
+        In Stripe → Developers → Webhooks, add this endpoint (events{" "}
+        <code className="mono">checkout.session.completed</code> and{" "}
+        <code className="mono">invoice.paid</code>), then paste its signing secret below.
+      </p>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+        <code className="mono" style={{ ...preStyle, padding: "8px 10px", flex: 1, minWidth: 220, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {stripeUrl}
+        </code>
+        <button className="btn btn-s" onClick={copyUrl}>
+          <Icon name="copy" /> Copy URL
+        </button>
+      </div>
+      <p style={{ color: "var(--tx2)", fontSize: 12.5, marginBottom: 8 }}>
+        Tag the Checkout Session with the visitor&apos;s <code className="mono">lw_ref</code> so we know which channel to credit:
+      </p>
+      <CopyBlock code={stripeNote} label="Metadata example" />
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
+        <input
+          className="inp"
+          type="password"
+          placeholder={stripeSecretSet ? "•••••••• (saved) — paste to replace" : "whsec_…"}
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          style={{ flex: 1, minWidth: 220 }}
+        />
+        <button className="btn btn-p" onClick={save} disabled={saving}>
+          <Icon name="check" /> {saving ? "Saving…" : stripeSecretSet ? "Update secret" : "Connect Stripe"}
+        </button>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,9 @@ import {
   slugifyCampaign,
   buildDestUrl,
   buildInsight,
+  estimateEffortMinutes,
+  formatEffort,
+  formatMoney,
   type ResultRow,
 } from "./attribution";
 
@@ -49,25 +52,65 @@ describe("buildDestUrl", () => {
   });
 });
 
+describe("ROI helpers", () => {
+  it("estimates ~18 min of effort per posted channel", () => {
+    expect(estimateEffortMinutes(0)).toBe(0);
+    expect(estimateEffortMinutes(7)).toBe(126); // ~2h
+  });
+  it("formats effort as minutes or hours", () => {
+    expect(formatEffort(45)).toBe("45m");
+    expect(formatEffort(126)).toBe("2.1h");
+    expect(formatEffort(600)).toBe("10h");
+  });
+  it("formats money from cents with the currency", () => {
+    expect(formatMoney(34000, "usd")).toBe("$340");
+    expect(formatMoney(4999, "usd")).toBe("$49.99");
+    expect(formatMoney(29000, "eur")).toBe("€290");
+  });
+});
+
+function row(partial: Partial<ResultRow> & { channelName: string }): ResultRow {
+  return {
+    shipTitle: "beta",
+    trackedUrl: null,
+    postUrl: null,
+    clicks: 0,
+    signups: 0,
+    conversion: 0,
+    revenueCents: 0,
+    recurringCents: 0,
+    removed: false,
+    ...partial,
+  };
+}
+
 describe("buildInsight", () => {
   it("returns null with no data", () => {
     expect(buildInsight([])).toBeNull();
   });
   it("recommends doubling down on the best converter", () => {
-    const rows: ResultRow[] = [
-      { channelName: "Hacker News", shipTitle: "beta", trackedUrl: null, postUrl: null, clicks: 100, signups: 5, conversion: 0.05, removed: false },
-      { channelName: "X", shipTitle: "beta", trackedUrl: null, postUrl: null, clicks: 100, signups: 2, conversion: 0.02, removed: false },
-    ];
-    const insight = buildInsight(rows)!;
+    const insight = buildInsight([
+      row({ channelName: "Hacker News", clicks: 100, signups: 5, conversion: 0.05 }),
+      row({ channelName: "X", clicks: 100, signups: 2, conversion: 0.02 }),
+    ])!;
     expect(insight).toMatch(/Hacker News/);
     expect(insight).toMatch(/double down/i);
   });
   it("flags a removed post when nothing converts", () => {
-    const rows: ResultRow[] = [
-      { channelName: "r/SaaS", shipTitle: "beta", trackedUrl: null, postUrl: null, clicks: 10, signups: 0, conversion: 0, removed: true },
-    ];
-    const insight = buildInsight(rows)!;
+    const insight = buildInsight([
+      row({ channelName: "r/SaaS", clicks: 10, removed: true }),
+    ])!;
     expect(insight).toMatch(/r\/SaaS/);
     expect(insight).toMatch(/skip/i);
+  });
+  it("leads with revenue when a channel earned money", () => {
+    const insight = buildInsight([
+      row({ channelName: "Hacker News", clicks: 100, signups: 8, conversion: 0.08 }),
+      row({ channelName: "Product Hunt", clicks: 40, signups: 3, revenueCents: 34000, recurringCents: 29000 }),
+    ])!;
+    // Revenue trumps raw signup conversion for the headline.
+    expect(insight).toMatch(/Product Hunt/);
+    expect(insight).toMatch(/\$340/);
+    expect(insight).toMatch(/recurring/i);
   });
 });

@@ -163,6 +163,41 @@ export async function ingestSignup(
   return true;
 }
 
+export type RevenueInput = {
+  /** Amount in the smallest currency unit (e.g. cents). */
+  amountCents: number;
+  /** ISO currency code (defaults to "usd"). */
+  currency?: string;
+  /** Subscription/recurring revenue counts toward MRR. */
+  recurring?: boolean;
+  meta?: Record<string, unknown>;
+};
+
+/**
+ * Log REVENUE for a tracked link — the strongest signal: this channel didn't
+ * just drive a signup, it drove money. Returns false if the code is unknown or
+ * the amount is non-positive.
+ */
+export async function ingestRevenue(
+  shortCode: string,
+  input: RevenueInput,
+): Promise<boolean> {
+  if (!Number.isFinite(input.amountCents) || input.amountCents <= 0) return false;
+  const link = await db.trackedLink.findUnique({ where: { shortCode } });
+  if (!link) return false;
+  await db.event.create({
+    data: {
+      trackedLinkId: link.id,
+      type: "REVENUE",
+      amountCents: Math.round(input.amountCents),
+      currency: (input.currency ?? "usd").toLowerCase(),
+      recurring: Boolean(input.recurring),
+      meta: input.meta ? (input.meta as object) : undefined,
+    },
+  });
+  return true;
+}
+
 // ── Read side ──────────────────────────────────────────────
 
 export type ResultRow = {
@@ -173,6 +208,8 @@ export type ResultRow = {
   clicks: number;
   signups: number;
   conversion: number; // 0..1
+  revenueCents: number;
+  recurringCents: number;
   removed: boolean;
 };
 
@@ -183,6 +220,20 @@ export type ChannelRollup = {
   clicks: number;
   signups: number;
   conversion: number;
+  revenueCents: number;
+  recurringCents: number;
+};
+
+/** ROI headline for a launch: effort in → clicks → signups → money out. */
+export type RoiSummary = {
+  posts: number;
+  effortMinutes: number;
+  effortLabel: string;
+  clicks: number;
+  signups: number;
+  revenueCents: number;
+  recurringCents: number;
+  currency: string;
 };
 
 export type ResultsRollup = {
@@ -191,27 +242,90 @@ export type ResultsRollup = {
   totalClicks: number;
   totalSignups: number;
   conversion: number;
+  totalRevenueCents: number;
+  mrrCents: number;
+  currency: string;
   bestChannel: string | null;
+  /** Channel that drove the most revenue (the flagship line). */
+  topRevenueChannel: { name: string; revenueCents: number } | null;
+  roi: RoiSummary;
   insight: string | null;
 };
 
+/**
+ * Rough effort estimate for a launch: ~18 min per channel to tailor the draft,
+ * post it, and engage. Deliberately conservative — the point is to contrast a
+ * couple hours of work against the outcome.
+ */
+export function estimateEffortMinutes(posts: number): number {
+  return posts * 18;
+}
+
+export function formatEffort(minutes: number): string {
+  if (minutes <= 0) return "0m";
+  if (minutes < 60) return `${minutes}m`;
+  const h = minutes / 60;
+  // one decimal below 10h, else whole hours
+  const val = h < 10 ? Math.round(h * 10) / 10 : Math.round(h);
+  return `${val}h`;
+}
+
+/** Format a smallest-unit amount as money (e.g. 34000, "usd" → "$340"). */
+export function formatMoney(cents: number, currency = "usd"): string {
+  try {
+    const fmt = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+      maximumFractionDigits: cents % 100 === 0 ? 0 : 2,
+    });
+    return fmt.format(cents / 100);
+  } catch {
+    return `${(cents / 100).toFixed(0)} ${currency.toUpperCase()}`;
+  }
+}
+
+/**
+ * Per-channel/post/total attribution rollup. Pass `shipId` to scope it to one
+ * launch (the plan-level ROI summary); omit it for the project-wide Results.
+ */
 export async function getResultsRollup(
   projectId: string,
+  opts?: { shipId?: string },
 ): Promise<ResultsRollup> {
   const posts = await db.post.findMany({
-    where: { ship: { projectId } },
+    where: {
+      ship: opts?.shipId ? { id: opts.shipId, projectId } : { projectId },
+    },
     include: {
       channel: { select: { name: true } },
       ship: { select: { title: true } },
-      trackedLink: { include: { events: { select: { type: true } } } },
+      trackedLink: {
+        include: {
+          events: { select: { type: true, amountCents: true, recurring: true, currency: true } },
+        },
+      },
     },
     orderBy: { postedAt: "desc" },
   });
 
+  let currency = "usd";
+
   const perPost: ResultRow[] = posts.map((p) => {
     const events = p.trackedLink?.events ?? [];
-    const clicks = events.filter((e) => e.type === "CLICK").length;
-    const signups = events.filter((e) => e.type === "SIGNUP").length;
+    let clicks = 0;
+    let signups = 0;
+    let revenueCents = 0;
+    let recurringCents = 0;
+    for (const e of events) {
+      if (e.type === "CLICK") clicks += 1;
+      else if (e.type === "SIGNUP") signups += 1;
+      else if (e.type === "REVENUE") {
+        const amt = e.amountCents ?? 0;
+        revenueCents += amt;
+        if (e.recurring) recurringCents += amt;
+        if (e.currency) currency = e.currency;
+      }
+    }
     return {
       channelName: p.channel.name,
       shipTitle: p.ship.title,
@@ -220,6 +334,8 @@ export async function getResultsRollup(
       clicks,
       signups,
       conversion: clicks > 0 ? signups / clicks : 0,
+      revenueCents,
+      recurringCents,
       removed: p.status === "REMOVED",
     };
   });
@@ -229,18 +345,39 @@ export async function getResultsRollup(
   for (const r of perPost) {
     const c =
       byChannel.get(r.channelName) ??
-      { channelName: r.channelName, posts: 0, clicks: 0, signups: 0, conversion: 0 };
+      {
+        channelName: r.channelName,
+        posts: 0,
+        clicks: 0,
+        signups: 0,
+        conversion: 0,
+        revenueCents: 0,
+        recurringCents: 0,
+      };
     c.posts += 1;
     c.clicks += r.clicks;
     c.signups += r.signups;
+    c.revenueCents += r.revenueCents;
+    c.recurringCents += r.recurringCents;
     byChannel.set(r.channelName, c);
   }
   const perChannel = [...byChannel.values()]
     .map((c) => ({ ...c, conversion: c.clicks > 0 ? c.signups / c.clicks : 0 }))
-    .sort((a, b) => b.signups - a.signups || b.conversion - a.conversion);
+    .sort(
+      (a, b) =>
+        b.revenueCents - a.revenueCents ||
+        b.signups - a.signups ||
+        b.conversion - a.conversion,
+    );
 
   const totalClicks = perPost.reduce((n, r) => n + r.clicks, 0);
   const totalSignups = perPost.reduce((n, r) => n + r.signups, 0);
+  const totalRevenueCents = perPost.reduce((n, r) => n + r.revenueCents, 0);
+  const mrrCents = perPost.reduce((n, r) => n + r.recurringCents, 0);
+  const postCount = perPost.length;
+  const effortMinutes = estimateEffortMinutes(postCount);
+
+  const topRev = perChannel.find((c) => c.revenueCents > 0) ?? null;
 
   return {
     perPost,
@@ -248,7 +385,23 @@ export async function getResultsRollup(
     totalClicks,
     totalSignups,
     conversion: totalClicks > 0 ? totalSignups / totalClicks : 0,
+    totalRevenueCents,
+    mrrCents,
+    currency,
     bestChannel: perChannel.find((c) => c.signups > 0)?.channelName ?? null,
+    topRevenueChannel: topRev
+      ? { name: topRev.channelName, revenueCents: topRev.revenueCents }
+      : null,
+    roi: {
+      posts: postCount,
+      effortMinutes,
+      effortLabel: formatEffort(effortMinutes),
+      clicks: totalClicks,
+      signups: totalSignups,
+      revenueCents: totalRevenueCents,
+      recurringCents: mrrCents,
+      currency,
+    },
     insight: buildInsight(perPost),
   };
 }
@@ -257,6 +410,10 @@ export type TrackingStatus = {
   signups: number;
   clicks: number;
   lastSignupAt: Date | null;
+  revenueEvents: number;
+  revenueCents: number;
+  currency: string;
+  lastRevenueAt: Date | null;
 };
 
 /** For the Settings pixel card — is data actually flowing in? */
@@ -266,7 +423,7 @@ export async function getTrackingStatus(
   const where = {
     trackedLink: { post: { ship: { projectId } } },
   } as const;
-  const [signups, clicks, last] = await Promise.all([
+  const [signups, clicks, last, revAgg, lastRev] = await Promise.all([
     db.event.count({ where: { ...where, type: "SIGNUP" } }),
     db.event.count({ where: { ...where, type: "CLICK" } }),
     db.event.findFirst({
@@ -274,8 +431,26 @@ export async function getTrackingStatus(
       orderBy: { createdAt: "desc" },
       select: { createdAt: true },
     }),
+    db.event.aggregate({
+      where: { ...where, type: "REVENUE" },
+      _sum: { amountCents: true },
+      _count: { _all: true },
+    }),
+    db.event.findFirst({
+      where: { ...where, type: "REVENUE" },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, currency: true },
+    }),
   ]);
-  return { signups, clicks, lastSignupAt: last?.createdAt ?? null };
+  return {
+    signups,
+    clicks,
+    lastSignupAt: last?.createdAt ?? null,
+    revenueEvents: revAgg._count._all,
+    revenueCents: revAgg._sum.amountCents ?? 0,
+    currency: lastRev?.currency ?? "usd",
+    lastRevenueAt: lastRev?.createdAt ?? null,
+  };
 }
 
 /**
@@ -286,6 +461,25 @@ export function buildInsight(rows: ResultRow[]): string | null {
   if (rows.length === 0) return null;
 
   const removed = rows.filter((r) => r.removed);
+
+  // Revenue is the strongest signal — lead with it when we have it.
+  const earning = rows
+    .filter((r) => r.revenueCents > 0)
+    .sort((a, b) => b.revenueCents - a.revenueCents);
+  if (earning.length > 0) {
+    const top = earning[0];
+    const parts = [
+      `${top.channelName} drove ${formatMoney(top.revenueCents)} in attributed revenue${
+        top.recurringCents > 0 ? ` (${formatMoney(top.recurringCents)} recurring)` : ""
+      } — your best channel by money, not just signups.`,
+    ];
+    if (earning[1]) {
+      parts.push(`${earning[1].channelName} is second at ${formatMoney(earning[1].revenueCents)}.`);
+    }
+    parts.push(`For the next ship, put your best effort into ${top.channelName}.`);
+    return parts.join(" ");
+  }
+
   const converting = rows
     .filter((r) => !r.removed && r.signups > 0)
     .sort((a, b) => b.conversion - a.conversion);

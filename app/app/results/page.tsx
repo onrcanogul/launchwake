@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
-import { getResultsRollup } from "@/lib/attribution";
+import { getResultsRollup, formatMoney } from "@/lib/attribution";
+import { RoiStrip } from "@/components/results/RoiStrip";
 import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { StatStrip, type Stat } from "@/components/ui/StatStrip";
@@ -41,10 +42,16 @@ export default async function ResultsPage() {
         </div>
       </div>
       {r.perPost.length > 0 && (
-        <Badge accent>{r.totalSignups} signups tracked</Badge>
+        <Badge accent>
+          {r.totalRevenueCents > 0
+            ? `${formatMoney(r.totalRevenueCents, r.currency)} attributed`
+            : `${r.totalSignups} signups tracked`}
+        </Badge>
       )}
     </div>
   );
+
+  const hasRevenue = r.totalRevenueCents > 0;
 
   if (r.perPost.length === 0) {
     return (
@@ -77,22 +84,32 @@ export default async function ResultsPage() {
       detailUp: r.totalSignups > 0,
       detail: r.totalSignups > 0 ? "attributed" : "add the pixel",
     },
+    hasRevenue
+      ? {
+          label: "Revenue attributed",
+          value: formatMoney(r.totalRevenueCents, r.currency),
+          detailUp: true,
+          detail: r.mrrCents > 0 ? `${formatMoney(r.mrrCents, r.currency)} recurring` : "one-time",
+        }
+      : {
+          label: "Conversion",
+          value: `${(r.conversion * 100).toFixed(1)}%`,
+          detail: "clicks → signups",
+        },
     {
-      label: "Conversion",
-      value: `${(r.conversion * 100).toFixed(1)}%`,
-      detail: "clicks → signups",
-    },
-    {
-      label: "Best channel",
-      value: r.bestChannel ?? "—",
+      label: hasRevenue ? "Top by revenue" : "Best channel",
+      value: (hasRevenue ? r.topRevenueChannel?.name : r.bestChannel) ?? "—",
       smallValue: true,
-      detail: r.bestChannel ? "by signups" : "post to see",
+      detail: hasRevenue ? "by money" : r.bestChannel ? "by signups" : "post to see",
     },
   ];
 
   return (
     <>
       {header}
+      {r.roi.posts > 0 && (
+        <RoiStrip roi={r.roi} topRevenueChannel={r.topRevenueChannel} />
+      )}
       <StatStrip stats={stats} />
 
       <Panel title="By channel" right="across all ships">
@@ -105,6 +122,7 @@ export default async function ResultsPage() {
                 <th style={{ textAlign: "right" }}>Clicks</th>
                 <th style={{ textAlign: "right" }}>Signups</th>
                 <th>Conversion</th>
+                {hasRevenue && <th style={{ textAlign: "right" }}>Revenue</th>}
               </tr>
             </thead>
             <tbody>
@@ -128,6 +146,14 @@ export default async function ResultsPage() {
                   <td>
                     <ConversionCell conversion={c.conversion} />
                   </td>
+                  {hasRevenue && (
+                    <td
+                      className="num"
+                      style={{ textAlign: "right", fontWeight: 600, color: c.revenueCents > 0 ? "var(--ac)" : "var(--tx3)" }}
+                    >
+                      {c.revenueCents > 0 ? formatMoney(c.revenueCents, r.currency) : "—"}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -145,6 +171,7 @@ export default async function ResultsPage() {
                 <th style={{ textAlign: "right" }}>Clicks</th>
                 <th style={{ textAlign: "right" }}>Signups</th>
                 <th>Conversion</th>
+                {hasRevenue && <th style={{ textAlign: "right" }}>Revenue</th>}
               </tr>
             </thead>
             <tbody>
@@ -169,6 +196,14 @@ export default async function ResultsPage() {
                       removed={p.removed}
                     />
                   </td>
+                  {hasRevenue && (
+                    <td
+                      className="num"
+                      style={{ textAlign: "right", fontWeight: 600, color: p.revenueCents > 0 ? "var(--ac)" : "var(--tx3)" }}
+                    >
+                      {p.revenueCents > 0 ? formatMoney(p.revenueCents, r.currency) : "—"}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
