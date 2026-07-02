@@ -36,6 +36,7 @@ function crumbFor(pathname: string): string {
   if (pathname === "/app") return "Ship feed";
   if (pathname.startsWith("/app/ships/new")) return "New ship";
   if (pathname.startsWith("/app/channels")) return "Channels";
+  if (pathname.startsWith("/app/radar")) return "Intent Radar";
   if (pathname.startsWith("/app/results")) return "Results";
   if (pathname.startsWith("/app/settings")) return "Settings";
   if (pathname === "/app/plan" || pathname.endsWith("/plan"))
@@ -74,6 +75,7 @@ export function AppShell({
       icon: "channels",
       count: channelsCount,
     },
+    { href: "/app/radar", label: "Intent Radar", icon: "target" },
     { href: "/app/results", label: "Results", icon: "results" },
   ];
 

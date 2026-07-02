@@ -17,6 +17,8 @@ const free = (over: Partial<PlanUsage> = {}): PlanUsage => ({
   projectLimit: 1,
   plansThisMonth: 0,
   planLimit: 2,
+  intentQueryCount: 0,
+  intentQueryLimit: 0,
   ...over,
 });
 
@@ -27,6 +29,8 @@ const paid = (plan: "PRO" | "TEAM", over: Partial<PlanUsage> = {}): PlanUsage =>
   projectLimit: null,
   plansThisMonth: 99,
   planLimit: null,
+  intentQueryCount: 0,
+  intentQueryLimit: plan === "TEAM" ? null : 3,
   ...over,
 });
 
@@ -50,6 +54,21 @@ describe("entitlementViolation", () => {
       expect(entitlementViolation(paid(plan), "create_project")).toBeNull();
       expect(entitlementViolation(paid(plan), "create_plan")).toBeNull();
     }
+  });
+
+  it("blocks Intent Radar on Free with an upsell", () => {
+    expect(entitlementViolation(free(), "create_intent_query")).toMatch(/Pro feature/);
+  });
+  it("allows Intent Radar queries on Pro up to the cap, then upsells Team", () => {
+    expect(entitlementViolation(paid("PRO", { intentQueryCount: 2 }), "create_intent_query")).toBeNull();
+    expect(
+      entitlementViolation(paid("PRO", { intentQueryCount: 3 }), "create_intent_query"),
+    ).toMatch(/Upgrade to Team/);
+  });
+  it("never blocks Intent Radar on Team (unlimited)", () => {
+    expect(
+      entitlementViolation(paid("TEAM", { intentQueryCount: 999 }), "create_intent_query"),
+    ).toBeNull();
   });
 });
 

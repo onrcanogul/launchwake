@@ -28,6 +28,12 @@ describe("weeklyRecommendations", () => {
     expect(recs.some((r) => /r\/SaaS drove 40 clicks but no signups/.test(r))).toBe(true);
   });
 
+  it("leads with warm Intent Radar leads when there are any", () => {
+    const recs = weeklyRecommendations(stats({ intentMatches: 3, undistributed: [{ title: "v1", channels: 2 }] }));
+    expect(recs[0]).toMatch(/3 people asked for a tool like yours/);
+    expect(recs[0]).toMatch(/Intent Radar/);
+  });
+
   it("re-engages on a quiet week", () => {
     const recs = weeklyRecommendations(stats({ postsLastWeek: 0, shipsLastWeek: 0, topChannel: "Show HN" }));
     expect(recs.some((r) => /Quiet week/.test(r) && /Show HN/.test(r))).toBe(true);
