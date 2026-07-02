@@ -28,6 +28,13 @@ describe("weeklyRecommendations", () => {
     expect(recs.some((r) => /r\/SaaS drove 40 clicks but no signups/.test(r))).toBe(true);
   });
 
+  it("nudges a newsletter follow-up when a pitch has gone quiet", () => {
+    const recs = weeklyRecommendations(
+      stats({ followUpPitches: [{ channelName: "Console.dev", shipTitle: "v1", sentAt: new Date() }] }),
+    );
+    expect(recs.some((r) => /Follow up on your Console\.dev pitch/.test(r))).toBe(true);
+  });
+
   it("leads with this week's queue tasks when any are due", () => {
     const recs = weeklyRecommendations(
       stats({

@@ -168,6 +168,7 @@ model Ship {
   plan       DistributionPlan?
   posts      Post[]
   queueTasks QueueTask[]
+  pitches    NewsletterPitch[]
   detectedAt DateTime          @default(now())
   // Public launch report (the viral loop): a shareable page at /report/{token}.
   // Null token = private. Revenue is hidden unless the owner opts in.
@@ -209,6 +210,7 @@ model Channel {
   stats          ChannelStat[]
   benchmarks     ChannelBenchmark[]
   queueTasks     QueueTask[]
+  pitches        NewsletterPitch[]
 }
 
 enum Platform {
@@ -436,6 +438,34 @@ enum QueueTaskStatus {
   PENDING
   DONE
   SKIPPED
+}
+
+// Newsletter Pitch Engine — newsletters aren't posted to, their curator is
+// pitched. For each (ship, newsletter) we generate a personalized pitch email
+// grounded in that newsletter's audience + selection criteria, then track the
+// send and nudge a follow-up if there's no reply. The human sends the email.
+model NewsletterPitch {
+  id         String      @id @default(cuid())
+  shipId     String
+  ship       Ship        @relation(fields: [shipId], references: [id], onDelete: Cascade)
+  channelId  String
+  channel    Channel     @relation(fields: [channelId], references: [id])
+  subject    String
+  body       String
+  status     PitchStatus @default(DRAFT)
+  sentAt     DateTime?
+  followUpAt DateTime? // when to nudge a follow-up (set on send)
+  createdAt  DateTime    @default(now())
+
+  @@unique([shipId, channelId])
+  @@index([status, followUpAt])
+}
+
+enum PitchStatus {
+  DRAFT // generated, not yet sent
+  SENT // emailed the curator
+  REPLIED // curator replied
+  DECLINED // passed / no fit
 }
 
 // ─────────────────────────────────────────────────────────────
