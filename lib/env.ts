@@ -69,6 +69,10 @@ const schema = z.object({
   // ── Error tracking (optional) ─────────────────────────
   // Set to forward captured errors to Sentry (needs @sentry/nextjs installed).
   SENTRY_DSN: OptionalString,
+
+  // ── SEO (optional) ────────────────────────────────────
+  // Google Search Console verification token → rendered as a <meta> tag.
+  GOOGLE_SITE_VERIFICATION: OptionalString,
 });
 
 function loadEnv() {
