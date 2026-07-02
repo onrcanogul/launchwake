@@ -1,0 +1,56 @@
+name: Scheduled jobs
+
+# External scheduler for the app's cron endpoints. Vercel crons were removed
+# from vercel.json (they need a paid plan for sub-daily schedules); GitHub
+# Actions triggers the same endpoints on any plan, for free.
+#
+# Required repo config (Settings → Secrets and variables → Actions):
+#   - Variable CRON_TARGET_URL  e.g. https://launchwake.dev  (your prod origin, no trailing slash)
+#   - Secret   CRON_SECRET      same value as the CRON_SECRET env var in Vercel
+#
+# github.event.schedule holds the cron line that fired, so each job runs only on
+# its own schedule. workflow_dispatch runs all three (handy for a manual test).
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # reminders — every 15 min
+    - cron: "0 7 * * 1" # weekly digest — Monday 07:00 UTC
+    - cron: "0 */6 * * *" # intent radar — every 6h
+  workflow_dispatch: {}
+
+jobs:
+  reminders:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/15 * * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger reminders
+        run: |
+          curl -fsS -X POST "${CRON_TARGET_URL}/api/cron/reminders" \
+            -H "Authorization: Bearer ${CRON_SECRET}"
+        env:
+          CRON_TARGET_URL: ${{ vars.CRON_TARGET_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+  digest:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 7 * * 1'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger weekly digest
+        run: |
+          curl -fsS -X POST "${CRON_TARGET_URL}/api/cron/digest" \
+            -H "Authorization: Bearer ${CRON_SECRET}"
+        env:
+          CRON_TARGET_URL: ${{ vars.CRON_TARGET_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+  intent-radar:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 */6 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger intent radar
+        run: |
+          curl -fsS -X POST "${CRON_TARGET_URL}/api/cron/intent-radar" \
+            -H "Authorization: Bearer ${CRON_SECRET}"
+        env:
+          CRON_TARGET_URL: ${{ vars.CRON_TARGET_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
