@@ -3,6 +3,7 @@ import { env } from "./env";
 import { formatMoney } from "./attribution";
 import { getLaunchRadar, buildRadarDigest } from "./radar";
 import { sendEmail, emailConfigured } from "./notify";
+import { tasksDueThisWeek, type DueTask } from "./queue";
 
 /**
  * Weekly Monday digest — the anti-churn nudge. Last week's clicks/signups, then
@@ -26,11 +27,14 @@ export type WeeklyStats = {
   undistributed: { title: string; channels: number }[];
   /** New Intent Radar matches this week (people asking for a tool like yours). */
   intentMatches?: number;
+  /** Distribution-queue tasks coming due this week. */
+  queuedTasks?: DueTask[];
 };
 
 /** Compute last-week attribution + "needs action" state for one account. */
 export async function getWeeklyStats(accountId: string, since: Date): Promise<WeeklyStats> {
-  const [posts, shipsLastWeek, postsLastWeek, undistributedShips, intentMatches] = await Promise.all([
+  const [posts, shipsLastWeek, postsLastWeek, undistributedShips, intentMatches, queuedTasks] =
+    await Promise.all([
     db.post.findMany({
       where: { ship: { project: { userId: accountId } } },
       include: {
@@ -55,6 +59,7 @@ export async function getWeeklyStats(accountId: string, since: Date): Promise<We
         status: { not: "DISMISSED" },
       },
     }),
+    tasksDueThisWeek(accountId),
   ]);
 
   let clicks = 0;
@@ -103,12 +108,22 @@ export async function getWeeklyStats(accountId: string, since: Date): Promise<We
       channels: s.plan?.recs.length ?? 0,
     })),
     intentMatches,
+    queuedTasks,
   };
 }
 
 /** "What to do this week" — grounded in the account's own state. Pure. */
 export function weeklyRecommendations(stats: WeeklyStats): string[] {
   const recs: string[] = [];
+
+  const queued = stats.queuedTasks ?? [];
+  if (queued.length > 0) {
+    const t = queued[0];
+    const more = queued.length - 1;
+    recs.push(
+      `This week's queue: ${t.phaseLabel.toLowerCase()} — start with ${t.channelName}${more > 0 ? ` (+${more} more task${more === 1 ? "" : "s"} due)` : ""}.`,
+    );
+  }
 
   const intent = stats.intentMatches ?? 0;
   if (intent > 0) {
@@ -178,6 +193,15 @@ export function buildDigest(input: {
     "WHAT TO DO THIS WEEK",
     ...recLines,
   ];
+
+  const queued = stats.queuedTasks ?? [];
+  if (queued.length > 0) {
+    lines.push("", "THIS WEEK'S QUEUE — keep the launch alive");
+    for (const t of queued) {
+      lines.push(`  • ${t.phaseLabel}: ${t.channelName}${t.url ? ` — ${t.url}` : ""}`);
+    }
+    lines.push(`  See the full cadence → ${base}/app/queue`);
+  }
 
   const intent = stats.intentMatches ?? 0;
   if (intent > 0) {
