@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { rateLimit, clientIp, __resetRateLimit } from "./ratelimit";
+import { rateLimit, clientIp, windowBounds, __resetRateLimit } from "./ratelimit";
 
 describe("rateLimit", () => {
   beforeEach(() => __resetRateLimit());
@@ -27,6 +27,16 @@ describe("rateLimit", () => {
     expect(rateLimit("a", 1, 1000, 0).ok).toBe(true);
     expect(rateLimit("b", 1, 1000, 0).ok).toBe(true);
     expect(rateLimit("a", 1, 1000, 0).ok).toBe(false);
+  });
+});
+
+describe("windowBounds (durable limiter key logic)", () => {
+  it("snaps to the window start and computes the reset", () => {
+    // 60s windows: t=1234ms and t=59999ms share the [0,60000) window.
+    expect(windowBounds(1234, 60_000)).toEqual({ startMs: 0, resetAt: 60_000 });
+    expect(windowBounds(59_999, 60_000)).toEqual({ startMs: 0, resetAt: 60_000 });
+    // t=60000ms crosses into the next window → a fresh counter row id.
+    expect(windowBounds(60_000, 60_000)).toEqual({ startMs: 60_000, resetAt: 120_000 });
   });
 });
 

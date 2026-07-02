@@ -6,8 +6,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Runtime uses the pooled connection (serverless-friendly); Prisma migrate /
+  // introspect use the direct, unpooled connection via DIRECT_URL.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -369,4 +372,41 @@ model Lead {
 
   @@index([email])
   @@index([source, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Durable counters + idempotency (security hardening)
+// The in-memory rate limiter and LLM budget reset on every cold start and
+// never held across serverless instances — worthless on Vercel. These tables
+// make them durable + shared. Stripe idempotency stops retried events from
+// double-applying a plan change.
+// ─────────────────────────────────────────────────────────────
+
+// One row per (key, fixed-window). Incremented atomically via ON CONFLICT.
+// Stale rows are harmless; a periodic sweep (by resetAt) can prune them.
+model RateWindow {
+  id      String   @id // "${bucket}:${windowStartMs}"
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
+}
+
+// Per-user daily LLM token spend — the durable budget guard.
+model LlmUsageDay {
+  id     String @id @default(cuid())
+  userId String
+  day    String // "YYYY-MM-DD" (UTC)
+  tokens Int    @default(0)
+
+  @@unique([userId, day])
+  @@index([day])
+}
+
+// Stripe delivers the same event.id on retries; claim-once so a re-delivery
+// can't double-apply. Released on handler failure so a retry can reprocess.
+model ProcessedStripeEvent {
+  eventId     String   @id
+  type        String
+  processedAt DateTime @default(now())
 }

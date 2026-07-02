@@ -2,6 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { z } from "zod";
 import { env, requireEnv } from "./env";
+import { usageForDay, recordUsage, isOverBudget } from "./usage";
+import { captureError } from "./observability";
 
 /**
  * LLM wrapper. All LLM calls go through here so we get: provider abstraction
@@ -74,32 +76,14 @@ async function callProvider(
   return { text, tokens: res.usage.input_tokens + res.usage.output_tokens };
 }
 
-// ── Budget guard (in-memory; cheap MVP guard, resets on deploy) ────────────
-type DayBucket = { day: string; tokens: number };
-const usageByUser = new Map<string, DayBucket>();
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-export function usageFor(userId: string): number {
-  const b = usageByUser.get(userId);
-  return b && b.day === today() ? b.tokens : 0;
-}
-
-function assertBudget(userId: string) {
-  if (usageFor(userId) >= env.LLM_MAX_TOKENS_PER_USER_DAY) {
+// ── Budget guard (durable, per-user per-day; see lib/usage.ts) ─────────────
+async function assertBudget(userId: string): Promise<void> {
+  const spent = await usageForDay(userId);
+  if (isOverBudget(spent, env.LLM_MAX_TOKENS_PER_USER_DAY)) {
     throw new Error(
       `Daily LLM budget reached for this user (${env.LLM_MAX_TOKENS_PER_USER_DAY} tokens). Try again tomorrow or raise LLM_MAX_TOKENS_PER_USER_DAY.`,
     );
   }
-}
-
-function recordUsage(userId: string, tokens: number) {
-  const day = today();
-  const b = usageByUser.get(userId);
-  if (b && b.day === day) b.tokens += tokens;
-  else usageByUser.set(userId, { day, tokens });
 }
 
 export class LLMError extends Error {}
@@ -134,7 +118,7 @@ export type CompleteJSONOptions<T> = {
  */
 export async function completeJSON<T>(opts: CompleteJSONOptions<T>): Promise<T> {
   const { userId, system, prompt, schema, label = "llm" } = opts;
-  assertBudget(userId);
+  await assertBudget(userId);
 
   const maxTokens = Math.min(
     opts.maxTokens ?? env.LLM_MAX_TOKENS_PER_REQUEST,
@@ -146,7 +130,7 @@ export async function completeJSON<T>(opts: CompleteJSONOptions<T>): Promise<T> 
   let lastText = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     const { text, tokens } = await callProvider(system, messages, maxTokens);
-    recordUsage(userId, tokens);
+    await recordUsage(userId, tokens);
     console.log(
       `[llm:${label}] provider=${env.LLM_PROVIDER} model=${activeModel()} tokens=${tokens} user=${userId} attempt=${attempt}`,
     );
@@ -157,6 +141,7 @@ export async function completeJSON<T>(opts: CompleteJSONOptions<T>): Promise<T> 
       return schema.parse(json);
     } catch (err) {
       if (attempt === 1) {
+        captureError(err, { at: "llm.completeJSON", label, snippet: lastText.slice(0, 500) });
         throw new LLMError(
           `Model returned invalid JSON after retry: ${(err as Error).message}`,
         );
