@@ -4026,3 +4026,62 @@ tbody tr {
     margin-left: 0;
   }
 }
+
+/* ============ CATEGORY BENCHMARKS (paywall trigger) ============ */
+.chan .bench {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 17px 13px;
+  padding: 7px 11px;
+  font-size: 12px;
+  background: var(--bg1);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.chan .bench > svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--ac);
+  stroke-width: 1.7;
+  fill: none;
+  flex-shrink: 0;
+}
+.bench-label {
+  color: var(--tx2);
+}
+.bench-val {
+  color: var(--tx);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.bench-sub {
+  color: var(--tx3);
+  font-size: 11px;
+  margin-left: auto;
+}
+.bench.locked .bench-val {
+  filter: blur(5px);
+  user-select: none;
+}
+.bench-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ac);
+  border: 1px solid var(--acb);
+  background: var(--acd);
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-decoration: none;
+}
+.bench-lock svg {
+  width: 11px;
+  height: 11px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  fill: none;
+}

@@ -17,17 +17,30 @@ export type ChannelCardData = {
 };
 
 /**
+ * Category benchmark for this channel — the paywall trigger. When `locked`, the
+ * page must pass a MASKED value (the real number never reaches a Free client).
+ */
+export type BenchmarkCardData = {
+  label: string; // "Show HN median for dev-tools"
+  value: string; // "34 signups" (or masked "•• signups" when locked)
+  sub: string | null; // supporting line, shown only when unlocked
+  locked: boolean;
+};
+
+/**
  * The hero unit: one ranked channel recommendation for a ship.
- * icon + name + audience · fit meter · why · footer(ban risk, time, rule) · action.
+ * icon + name + audience · fit meter · why · benchmark · footer · action.
  */
 export function ChannelCard({
   data,
   draftHref,
   remind,
+  benchmark,
 }: {
   data: ChannelCardData;
   draftHref: string;
   remind?: RemindProps;
+  benchmark?: BenchmarkCardData | null;
 }) {
   const risk = RISK[data.banRisk];
   const fit = Math.max(0, Math.min(100, data.fitScore));
@@ -54,6 +67,21 @@ export function ChannelCard({
       </div>
 
       <div className="why">{data.whyText}</div>
+
+      {benchmark && (
+        <div className={`bench${benchmark.locked ? " locked" : ""}`}>
+          <Icon name="results" />
+          <span className="bench-label">{benchmark.label}</span>
+          <b className="bench-val">{benchmark.value}</b>
+          {benchmark.locked ? (
+            <a className="bench-lock" href="/app/settings" title="Unlock category benchmarks with Pro">
+              <Icon name="lock" /> Pro
+            </a>
+          ) : (
+            benchmark.sub && <span className="bench-sub">{benchmark.sub}</span>
+          )}
+        </div>
+      )}
 
       {data.outcomeNote && (
         <div className="evidence">
