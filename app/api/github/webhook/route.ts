@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { verifyWebhookSignature, parseWebhookEvent } from "@/lib/github";
 import { runAnalysisJob } from "@/lib/jobs";
+import { captureError } from "@/lib/observability";
 
 /**
  * GitHub webhook → auto-detect ships (the retention engine). Matches the repo to
@@ -38,8 +39,17 @@ export async function POST(req: NextRequest) {
 
   // Verify against the project's secret (or the deployment-wide fallback).
   const secret = project.webhookSecret ?? env.GITHUB_WEBHOOK_SECRET;
-  if (secret && !verifyWebhookSignature(rawBody, signature, secret)) {
-    return NextResponse.json({ error: "Bad signature" }, { status: 401 });
+  if (secret) {
+    if (!verifyWebhookSignature(rawBody, signature, secret)) {
+      return NextResponse.json({ error: "Bad signature" }, { status: 401 });
+    }
+  } else if (env.NODE_ENV === "production") {
+    // Never accept an unsigned webhook in production — that's a forged-Ship hole.
+    // (In dev we allow it so you can curl the endpoint without a secret.)
+    return NextResponse.json(
+      { error: "Webhook signature required (configure GITHUB_WEBHOOK_SECRET)" },
+      { status: 401 },
+    );
   }
 
   if (eventType === "ping") {
@@ -67,7 +77,7 @@ export async function POST(req: NextRequest) {
     try {
       await runAnalysisJob(ship.id);
     } catch (err) {
-      console.error(`[webhook] analysis failed for ship ${ship.id}:`, err);
+      captureError(err, { at: "github.webhook.analysis", shipId: ship.id });
     }
   });
 

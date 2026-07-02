@@ -65,6 +65,10 @@ const schema = z.object({
   // ── Cron (reminder delivery) ──────────────────────────
   // Shared secret; the scheduler must send it to /api/cron/reminders.
   CRON_SECRET: OptionalString,
+
+  // ── Error tracking (optional) ─────────────────────────
+  // Set to forward captured errors to Sentry (needs @sentry/nextjs installed).
+  SENTRY_DSN: OptionalString,
 });
 
 function loadEnv() {

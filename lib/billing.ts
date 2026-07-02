@@ -267,3 +267,31 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       break;
   }
 }
+
+/**
+ * Idempotent entry point for the webhook route. Stripe retries redeliver the
+ * same `event.id`; we claim it once (unique insert) before applying, so a
+ * duplicate delivery is a no-op instead of double-applying a plan change. If the
+ * handler throws we release the claim so Stripe's retry can reprocess it.
+ * Returns false when the event was already processed (a duplicate).
+ */
+export async function processStripeEvent(event: Stripe.Event): Promise<boolean> {
+  try {
+    await db.processedStripeEvent.create({
+      data: { eventId: event.id, type: event.type },
+    });
+  } catch (err) {
+    // P2002 = unique violation → already claimed/processed → skip.
+    if ((err as { code?: string }).code === "P2002") return false;
+    throw err;
+  }
+
+  try {
+    await handleStripeEvent(event);
+  } catch (err) {
+    // Release the claim so a retry isn't permanently swallowed.
+    await db.processedStripeEvent.delete({ where: { eventId: event.id } }).catch(() => {});
+    throw err;
+  }
+  return true;
+}

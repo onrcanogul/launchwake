@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { constructWebhookEvent, handleStripeEvent } from "@/lib/billing";
+import { constructWebhookEvent, processStripeEvent } from "@/lib/billing";
+import { captureError } from "@/lib/observability";
 
 /**
  * Stripe webhook. Verifies the signature, then flips the user's plan on
@@ -23,13 +24,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await handleStripeEvent(event);
+    const applied = await processStripeEvent(event);
+    return NextResponse.json({ received: true, applied });
   } catch (err) {
+    captureError(err, { at: "stripe.webhook", eventId: event.id, type: event.type });
     return NextResponse.json(
       { error: `Handler error: ${(err as Error).message}` },
       { status: 500 },
     );
   }
-
-  return NextResponse.json({ received: true });
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { LeadInputSchema, captureLead } from "@/lib/leads";
-import { rateLimit, clientIp } from "@/lib/ratelimit";
+import { rateLimitDurable, clientIp } from "@/lib/ratelimit";
 
 /**
  * Public lead capture for the lead-magnet tools. POST { email, source, ... }.
@@ -13,7 +13,7 @@ const WINDOW_MS = 10 * 60 * 1000;
 
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
-  const rl = rateLimit(`lead:${ip}`, LIMIT, WINDOW_MS);
+  const rl = await rateLimitDurable(`lead:${ip}`, LIMIT, WINDOW_MS);
   if (!rl.ok) {
     return NextResponse.json(
       { error: "Too many submissions — try again shortly." },

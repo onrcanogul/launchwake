@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { parseRepo, getRepoMeta, suggestShip } from "@/lib/github";
 import { buildPublicPlan, type PublicPlanInput } from "@/lib/launchChecker";
-import { rateLimit, clientIp } from "@/lib/ratelimit";
+import { rateLimitDurable, clientIp } from "@/lib/ratelimit";
 
 /**
  * Public, login-less Launch Checker.
@@ -22,7 +22,7 @@ const WINDOW_MS = 10 * 60 * 1000;
 
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
-  const rl = rateLimit(`launch-checker:${ip}`, LIMIT, WINDOW_MS);
+  const rl = await rateLimitDurable(`launch-checker:${ip}`, LIMIT, WINDOW_MS);
   if (!rl.ok) {
     return NextResponse.json(
       { error: "Rate limit reached — try again in a few minutes." },

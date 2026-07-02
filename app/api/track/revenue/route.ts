@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ingestRevenue } from "@/lib/attribution";
-import { rateLimit, clientIp } from "@/lib/ratelimit";
+import { rateLimitDurable, clientIp } from "@/lib/ratelimit";
 
 /**
  * Generic revenue attribution endpoint — provider-agnostic. Forward a payment
@@ -66,7 +66,7 @@ async function handle(
 }
 
 export async function POST(req: NextRequest) {
-  const rl = rateLimit(`revenue:${clientIp(req.headers)}`, LIMIT, WINDOW_MS);
+  const rl = await rateLimitDurable(`revenue:${clientIp(req.headers)}`, LIMIT, WINDOW_MS);
   if (!rl.ok) return NextResponse.json({ ok: false, error: "Rate limited" }, { status: 429, headers: CORS });
 
   let body: { ref?: string; amount?: unknown; amountCents?: unknown; currency?: string; recurring?: unknown } = {};
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const rl = rateLimit(`revenue:${clientIp(req.headers)}`, LIMIT, WINDOW_MS);
+  const rl = await rateLimitDurable(`revenue:${clientIp(req.headers)}`, LIMIT, WINDOW_MS);
   if (!rl.ok) return NextResponse.json({ ok: false, error: "Rate limited" }, { status: 429, headers: CORS });
 
   const q = req.nextUrl.searchParams;

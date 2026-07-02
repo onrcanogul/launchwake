@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { db } from "./db";
 import { env } from "./env";
+import { isSafeHttpUrl } from "./url";
 import type { CoachResult } from "./coach";
 import type { Platform } from "@prisma/client";
 
@@ -48,7 +49,13 @@ export function buildDestUrl(
   u.searchParams.set("utm_source", platformSource(platform));
   u.searchParams.set("utm_medium", "launchwake");
   u.searchParams.set("utm_campaign", slugifyCampaign(shipTitle));
-  return u.toString();
+  const dest = u.toString();
+  // A tracked link may only ever point at a real http(s) product URL — never a
+  // javascript:/data:/etc. scheme (would make the redirector an XSS vector).
+  if (!isSafeHttpUrl(dest)) {
+    throw new Error(`Refusing to build tracked link for unsafe URL: ${productUrl}`);
+  }
+  return dest;
 }
 
 /** The public tracked link a user pastes into their post. */
@@ -136,12 +143,22 @@ export async function recordPostForRecommendation(
 }
 
 /** Log a CLICK and return the destination (with lw_ref appended). */
-export async function ingestClick(shortCode: string): Promise<string | null> {
+export async function ingestClick(
+  shortCode: string,
+  opts: { record?: boolean } = {},
+): Promise<string | null> {
   const link = await db.trackedLink.findUnique({ where: { shortCode } });
   if (!link) return null;
-  await db.event.create({
-    data: { trackedLinkId: link.id, type: "CLICK" },
-  });
+  // Read-time open-redirect guard: never 302 to a non-http(s) destination even
+  // if a bad value somehow reached the row. Caller falls back to the home page.
+  if (!isSafeHttpUrl(link.destUrl)) return null;
+  // `record: false` (rate-limited hits) still redirects the human but does not
+  // log a CLICK — so a script can't inflate a channel's click count.
+  if (opts.record !== false) {
+    await db.event.create({
+      data: { trackedLinkId: link.id, type: "CLICK" },
+    });
+  }
   const u = new URL(link.destUrl);
   u.searchParams.set("lw_ref", shortCode);
   return u.toString();

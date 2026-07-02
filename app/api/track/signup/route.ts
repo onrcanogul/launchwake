@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ingestSignup } from "@/lib/attribution";
+import { rateLimitDurable, clientIp } from "@/lib/ratelimit";
+
+// Signup ingest is open + CORS-wide, so cap it per IP to blunt fake-signup spam.
+const RL_LIMIT = 30;
+const RL_WINDOW_MS = 60 * 1000;
 
 /**
  * Signup attribution endpoint. The product's thank-you page reports the lw_ref it
@@ -29,7 +34,10 @@ export async function OPTIONS() {
 export async function GET(req: NextRequest) {
   const ref =
     req.nextUrl.searchParams.get("ref") ?? req.cookies.get("lw_ref")?.value;
-  if (ref) await ingestSignup(ref, { via: "pixel" });
+  // Over the limit we still return the pixel (never break the product page) but
+  // skip recording, so a scripted pixel-loop can't manufacture signups.
+  const rl = await rateLimitDurable(`signup:${clientIp(req.headers)}`, RL_LIMIT, RL_WINDOW_MS);
+  if (ref && rl.ok) await ingestSignup(ref, { via: "pixel" });
 
   return new NextResponse(PIXEL, {
     status: 200,
@@ -50,6 +58,11 @@ export async function POST(req: NextRequest) {
     /* no JSON body */
   }
   ref = ref ?? req.cookies.get("lw_ref")?.value ?? undefined;
+
+  const rl = await rateLimitDurable(`signup:${clientIp(req.headers)}`, RL_LIMIT, RL_WINDOW_MS);
+  if (!rl.ok) {
+    return NextResponse.json({ ok: false, error: "Rate limited" }, { status: 429, headers: CORS });
+  }
 
   const ok = ref ? await ingestSignup(ref, { via: "beacon" }) : false;
   return NextResponse.json({ ok }, { headers: CORS });
