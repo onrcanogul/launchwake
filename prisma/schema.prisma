@@ -35,8 +35,23 @@ model User {
   ownedMemberships TeamMembership[] @relation("TeamOwner")
   memberships      TeamMembership[] @relation("TeamMember")
   sentInvites      TeamInvite[]     @relation("TeamInvites")
+  brand            Brand? // agency white-label branding (Team)
   lastDigestAt     DateTime? // last weekly digest sent (guards against re-sends)
   createdAt        DateTime  @default(now())
+}
+
+// Agency white-label branding (Team tier). When set, client reports render with
+// the agency's logo/name/accent instead of LaunchWake's — the agency sends the
+// report to their client as "our report", and LaunchWake stays the invisible
+// engine behind it. One brand per account owner.
+model Brand {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agencyName  String
+  logoUrl     String? // https or data: URL
+  accentColor String? // hex "#rrggbb"
+  updatedAt   DateTime @updatedAt
 }
 
 // A member occupying one of the owner's Team seats — shares the owner's workspace.
@@ -133,6 +148,9 @@ model Project {
   slackWebhookUrl      String? // Slack incoming webhook for reminders / new-ship pings
   ships                Ship[]
   intentQueries        IntentQuery[] // Intent Radar: saved "people looking for us" watches
+  // White-label client report: a stable, branded link at /report/c/{token}.
+  reportToken          String?  @unique
+  reportEnabled        Boolean  @default(false)
   createdAt            DateTime @default(now())
 }
 

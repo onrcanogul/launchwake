@@ -13,6 +13,7 @@ import {
   removeMember,
   type InviteResult,
 } from "@/lib/team";
+import { saveBrand, setReportEnabled } from "@/lib/clientReport";
 
 export type BillingState = { error?: string };
 
@@ -30,6 +31,55 @@ async function requireOwner(): Promise<string> {
     throw new Error("Only the team owner can manage seats.");
   }
   return accountId;
+}
+
+/** Owner AND on the Team plan — the gate for white-label features. */
+async function requireTeamOwner(): Promise<string> {
+  const accountId = await requireOwner();
+  const owner = await db.user.findUniqueOrThrow({
+    where: { id: accountId },
+    select: { plan: true },
+  });
+  if (owner.plan !== "TEAM") throw new Error("White-label reports are a Team feature.");
+  return accountId;
+}
+
+export type BrandState = { ok: boolean; error?: string };
+
+/** Save the agency's white-label brand (name, logo, accent). */
+export async function saveAgencyBrand(
+  _prev: BrandState,
+  formData: FormData,
+): Promise<BrandState> {
+  try {
+    const accountId = await requireTeamOwner();
+    const agencyName = String(formData.get("agencyName") ?? "").trim();
+    if (!agencyName) return { ok: false, error: "Agency name is required." };
+    await saveBrand(accountId, {
+      agencyName,
+      logoUrl: (formData.get("logoUrl") as string) || null,
+      accentColor: (formData.get("accentColor") as string) || null,
+    });
+    revalidatePath("/app/settings");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+/** Enable/disable a project's client report link. */
+export async function toggleClientReport(
+  projectId: string,
+  enabled: boolean,
+): Promise<{ ok: boolean; token?: string | null; error?: string }> {
+  try {
+    const accountId = await requireTeamOwner();
+    const { token } = await setReportEnabled(projectId, accountId, enabled);
+    revalidatePath("/app/settings");
+    return { ok: true, token };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
 }
 
 // ── Team management (owner only) ───────────────────────────
