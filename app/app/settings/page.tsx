@@ -8,6 +8,7 @@ import { TrackingSetup } from "@/components/settings/TrackingSetup";
 import { BillingPanel } from "@/components/settings/BillingPanel";
 import { TeamPanel } from "@/components/settings/TeamPanel";
 import { GithubWebhook } from "@/components/settings/GithubWebhook";
+import { ReleaseAction } from "@/components/settings/ReleaseAction";
 import { SlackConnect } from "@/components/settings/SlackConnect";
 import { LeaveTeamButton } from "@/components/settings/LeaveTeamButton";
 import {
@@ -101,6 +102,10 @@ export default async function SettingsPage({
           initialSecret={p.webhookSecret}
           status={github}
         />
+      </Panel>
+
+      <Panel title="Comment plans on your releases" right="GitHub Action">
+        <ReleaseAction hasSecret={Boolean(p.webhookSecret)} />
       </Panel>
 
       <Panel title="Attribution — signups & revenue">

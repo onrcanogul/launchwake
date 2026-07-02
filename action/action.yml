@@ -1,0 +1,90 @@
+name: "LaunchWake Distribution Plan"
+description: "On a release or PR, comment a distribution plan — where to post it, each community's ban risk, and the safe way in."
+author: "LaunchWake"
+branding:
+  icon: "radio"
+  color: "green"
+
+inputs:
+  api-key:
+    description: "Your LaunchWake project webhook secret (Settings → GitHub auto-detect)."
+    required: true
+  api-url:
+    description: "LaunchWake base URL."
+    required: false
+    default: "https://launchwake.com"
+  github-token:
+    description: "Token used to comment. Defaults to the workflow token."
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Request plan and comment
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        API_KEY: ${{ inputs.api-key }}
+        API_URL: ${{ inputs.api-url }}
+        EVENT_NAME: ${{ github.event_name }}
+        REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+        MARKER='<!-- launchwake-distribution-plan -->'
+
+        # 1. Build the payload from the triggering event.
+        if [ "$EVENT_NAME" = "pull_request" ]; then
+          KIND=pull_request
+          TITLE=$(jq -r '.pull_request.title' "$GITHUB_EVENT_PATH")
+          SUMMARY=$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")
+          URL=$(jq -r '.pull_request.html_url' "$GITHUB_EVENT_PATH")
+          SHA=$(jq -r '.pull_request.merge_commit_sha // .pull_request.head.sha // ""' "$GITHUB_EVENT_PATH")
+        else
+          KIND=release
+          TITLE=$(jq -r '.release.name // .release.tag_name' "$GITHUB_EVENT_PATH")
+          SUMMARY=$(jq -r '.release.body // ""' "$GITHUB_EVENT_PATH")
+          URL=$(jq -r '.release.html_url' "$GITHUB_EVENT_PATH")
+          SHA=""
+          TAG=$(jq -r '.release.tag_name' "$GITHUB_EVENT_PATH")
+        fi
+
+        PAYLOAD=$(jq -n \
+          --arg repo "$REPO" --arg kind "$KIND" --arg title "$TITLE" \
+          --arg summary "$SUMMARY" --arg url "$URL" --arg sha "$SHA" \
+          '{repo:$repo, kind:$kind, title:$title,
+            summary:$summary,
+            sourceUrl:($url|select(length>0)),
+            commitSha:($sha|select(length>0))}')
+
+        # 2. Ask LaunchWake to build the plan and return the comment.
+        RESP=$(curl -sS -X POST "$API_URL/api/action/plan" \
+          -H "Authorization: Bearer $API_KEY" \
+          -H "Content-Type: application/json" \
+          -d "$PAYLOAD")
+        COMMENT=$(echo "$RESP" | jq -r '.comment // empty')
+        if [ -z "$COMMENT" ]; then
+          echo "LaunchWake: no plan returned. Response: $RESP"
+          exit 1
+        fi
+
+        # 3. Post it back (idempotent — updates our own comment / doesn't double-append).
+        if [ "$EVENT_NAME" = "pull_request" ]; then
+          PR=$(jq -r '.pull_request.number' "$GITHUB_EVENT_PATH")
+          EXISTING=$(gh api "repos/$REPO/issues/$PR/comments" \
+            --jq "map(select(.body | contains(\"$MARKER\"))) | .[0].id // empty")
+          if [ -n "$EXISTING" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$EXISTING" -f body="$COMMENT" >/dev/null
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -f body="$COMMENT" >/dev/null
+          fi
+          echo "Commented the distribution plan on PR #$PR."
+        else
+          BODY=$(gh release view "$TAG" --json body --jq '.body // ""')
+          if echo "$BODY" | grep -qF "$MARKER"; then
+            echo "Plan note already on release $TAG — skipping."
+          else
+            printf '%s\n\n---\n%s\n' "$BODY" "$COMMENT" | gh release edit "$TAG" --notes-file -
+            echo "Appended the distribution plan to release $TAG."
+          fi
+        fi
