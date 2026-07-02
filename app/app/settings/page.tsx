@@ -8,7 +8,13 @@ import { TrackingSetup } from "@/components/settings/TrackingSetup";
 import { BillingPanel } from "@/components/settings/BillingPanel";
 import { GithubWebhook } from "@/components/settings/GithubWebhook";
 import { SlackConnect } from "@/components/settings/SlackConnect";
-import { getPlanUsage, billingConfigured } from "@/lib/billing";
+import {
+  getPlanUsage,
+  billingConfigured,
+  TEAM_PRICE_PER_SEAT_CENTS,
+  TEAM_MIN_SEATS,
+  TEAM_MAX_SEATS,
+} from "@/lib/billing";
 import { getTrackingStatus } from "@/lib/attribution";
 import { getGithubStatus } from "@/lib/github";
 import { env } from "@/lib/env";
@@ -91,8 +97,13 @@ export default async function SettingsPage({
         />
       </Panel>
 
-      <Panel title="Signup tracking">
-        <TrackingSetup appUrl={env.APP_URL} status={tracking} />
+      <Panel title="Attribution — signups & revenue">
+        <TrackingSetup
+          appUrl={env.APP_URL}
+          projectId={p.id}
+          status={tracking}
+          stripeSecretSet={Boolean(p.stripeWebhookSecret)}
+        />
       </Panel>
 
       <Panel title="Plan">
@@ -100,6 +111,9 @@ export default async function SettingsPage({
           usage={usage}
           billingConfigured={billingConfigured()}
           justUpgraded={upgraded === "1"}
+          teamPricePerSeatCents={TEAM_PRICE_PER_SEAT_CENTS}
+          teamMinSeats={TEAM_MIN_SEATS}
+          teamMaxSeats={TEAM_MAX_SEATS}
         />
       </Panel>
     </>

@@ -3,22 +3,36 @@
 import { useState, useTransition } from "react";
 import { Icon } from "@/components/Icon";
 import { useToast } from "@/components/ui/toast";
-import { startCheckout, openPortal } from "@/app/app/settings/actions";
+import { startCheckout, startTeamCheckout, openPortal } from "@/app/app/settings/actions";
 import type { PlanUsage } from "@/lib/billing";
+
+const PLAN_LABEL: Record<string, string> = { FREE: "Free", PRO: "Pro", TEAM: "Team" };
+
+function dollars(cents: number): string {
+  return `$${Math.round(cents / 100)}`;
+}
 
 export function BillingPanel({
   usage,
   billingConfigured,
   justUpgraded,
+  teamPricePerSeatCents,
+  teamMinSeats,
+  teamMaxSeats,
 }: {
   usage: PlanUsage;
   billingConfigured: boolean;
   justUpgraded: boolean;
+  teamPricePerSeatCents: number;
+  teamMinSeats: number;
+  teamMaxSeats: number;
 }) {
   const { toast } = useToast();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const pro = usage.plan === "PRO";
+  const [seats, setSeats] = useState(Math.max(teamMinSeats, usage.seats));
+  const paid = usage.plan === "PRO" || usage.plan === "TEAM";
+  const isTeam = usage.plan === "TEAM";
 
   const go = (fn: () => Promise<{ url?: string; error?: string }>) => {
     setError(null);
@@ -32,21 +46,30 @@ export function BillingPanel({
     });
   };
 
+  const clampSeat = (n: number) => Math.min(teamMaxSeats, Math.max(teamMinSeats, n));
+  const teamPrice = clampSeat(seats) * teamPricePerSeatCents;
+
   const planUsage = (used: number, limit: number | null) =>
     limit === null ? `${used} · unlimited` : `${used} / ${limit}`;
 
   return (
     <>
+      {/* Current plan */}
       <div className="setrow">
         <div className="l">
-          <b>{pro ? "Pro" : "Free"}</b>
+          <b>
+            {PLAN_LABEL[usage.plan] ?? usage.plan}
+            {isTeam ? ` · ${usage.seats} seats` : ""}
+          </b>
           <span>
-            {pro
-              ? "Unlimited projects · unlimited plans"
-              : "1 project · 2 distribution plans / month"}
+            {usage.plan === "FREE"
+              ? "1 project · 2 distribution plans / month · solo"
+              : isTeam
+                ? "Unlimited projects & plans · seat-based for your team"
+                : "Unlimited projects · unlimited plans · solo"}
           </span>
         </div>
-        {pro ? (
+        {paid ? (
           <button
             className="btn btn-s"
             disabled={pending || !billingConfigured}
@@ -55,16 +78,13 @@ export function BillingPanel({
             <Icon name="external" /> Manage billing
           </button>
         ) : (
-          <button
-            className="btn btn-p"
-            disabled={pending}
-            onClick={() => go(startCheckout)}
-          >
+          <button className="btn btn-p" disabled={pending} onClick={() => go(startCheckout)}>
             {pending ? "Redirecting…" : "Upgrade to Pro — $29/mo"}
           </button>
         )}
       </div>
 
+      {/* Usage */}
       <div className="setrow">
         <div className="l">
           <b>Usage this month</b>
@@ -73,7 +93,7 @@ export function BillingPanel({
             {planUsage(usage.projectCount, usage.projectLimit)}
           </span>
         </div>
-        {!pro &&
+        {!paid &&
           usage.planLimit !== null &&
           usage.plansThisMonth >= usage.planLimit && (
             <span className="badge" style={{ color: "var(--warn)" }}>
@@ -83,13 +103,58 @@ export function BillingPanel({
           )}
       </div>
 
-      {justUpgraded && (
-        <div
-          className="setrow"
-          style={{ color: "var(--ok)", fontSize: 12.5 }}
-        >
+      {/* Team upsell / seat manager */}
+      {!isTeam && (
+        <div className="setrow" style={{ alignItems: "center" }}>
           <div className="l">
-            <b style={{ color: "var(--ok)" }}>You&apos;re on Pro 🎉</b>
+            <b>Team — for agencies &amp; DevRel</b>
+            <span>
+              Unlimited everything for your whole team. {dollars(teamPricePerSeatCents)}/seat,
+              {" "}
+              {teamMinSeats}-seat minimum. Shared workspaces &amp; member invites are coming.
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div className="seat-step">
+              <button
+                type="button"
+                onClick={() => setSeats((s) => clampSeat(s - 1))}
+                disabled={clampSeat(seats) <= teamMinSeats}
+                aria-label="Fewer seats"
+              >
+                −
+              </button>
+              <span className="num">{clampSeat(seats)}</span>
+              <button
+                type="button"
+                onClick={() => setSeats((s) => clampSeat(s + 1))}
+                disabled={clampSeat(seats) >= teamMaxSeats}
+                aria-label="More seats"
+              >
+                +
+              </button>
+            </div>
+            <button
+              className="btn btn-p"
+              disabled={pending}
+              onClick={() => go(() => startTeamCheckout(clampSeat(seats)))}
+            >
+              {pending ? "Redirecting…" : `Get Team — ${dollars(teamPrice)}/mo`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {justUpgraded && (
+        <div className="setrow" style={{ fontSize: 12.5 }}>
+          <div className="l">
+            <b style={{ color: "var(--ok)" }}>
+              <Icon
+                name="check"
+                style={{ width: 13, height: 13, stroke: "var(--ok)", strokeWidth: 2, fill: "none", verticalAlign: "-2px", marginRight: 4 }}
+              />
+              Subscription active
+            </b>
             <span>
               If the plan still shows Free, the webhook is still processing —
               refresh in a moment.
@@ -98,7 +163,7 @@ export function BillingPanel({
         </div>
       )}
 
-      {!billingConfigured && !pro && (
+      {!billingConfigured && !paid && (
         <div className="setrow">
           <span style={{ color: "var(--tx3)", fontSize: 11.5 }}>
             Billing isn&apos;t configured on this deployment (set

@@ -22,6 +22,7 @@ model User {
   image            String?
   githubId         String?   @unique
   plan             Plan      @default(FREE)
+  seats            Int       @default(1) // purchased seats (Team plan); billed per seat
   stripeCustomerId String?
   projects         Project[]
   accounts         Account[]
@@ -33,6 +34,7 @@ model User {
 enum Plan {
   FREE
   PRO
+  TEAM
 }
 
 // Auth.js (NextAuth) adapter models — keep these.
@@ -85,6 +87,7 @@ model Project {
   githubRepo           String? // "owner/repo"
   githubInstallationId String? // for webhook auto-detect
   webhookSecret        String? // per-project GitHub webhook signing secret
+  stripeWebhookSecret  String? // the user's Stripe endpoint signing secret (whsec_…) for revenue attribution
   slackWebhookUrl      String? // Slack incoming webhook for reminders / new-ship pings
   ships                Ship[]
   createdAt            DateTime @default(now())
@@ -240,6 +243,11 @@ model Event {
   trackedLinkId String
   trackedLink   TrackedLink @relation(fields: [trackedLinkId], references: [id], onDelete: Cascade)
   type          EventType
+  // Revenue events carry an amount (smallest currency unit) + currency, and
+  // whether it recurs (subscription) so we can attribute MRR to a channel.
+  amountCents   Int?
+  currency      String?
+  recurring     Boolean     @default(false)
   meta          Json?
   createdAt     DateTime    @default(now())
 }
@@ -247,6 +255,7 @@ model Event {
 enum EventType {
   CLICK
   SIGNUP
+  REVENUE
 }
 
 // Scheduled "post at the best time" reminder (email/Slack ping — never posts).

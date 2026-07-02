@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { db } from "./db";
 import { env, requireEnv } from "./env";
+import type { Plan } from "@prisma/client";
 
 /**
  * Billing + entitlements.
@@ -9,12 +10,35 @@ import { env, requireEnv } from "./env";
  * even without Stripe. Checkout/portal/webhook require STRIPE_SECRET_KEY and
  * degrade gracefully when it's absent.
  *
- * Free: 1 project, 2 distribution plans / calendar month. Pro: unlimited.
+ * Free: 1 project, 2 plans / month, solo. Pro: unlimited, solo. Team: unlimited,
+ * seat-based (agencies & DevRel) — billed per seat.
  */
 
 export const PRO_PRICE_CENTS = 2900;
 
+// Team: simple per-seat model. 3-seat minimum → from $87/mo. Change these two
+// constants to reprice; checkout, copy and ARPU all follow.
+export const TEAM_PRICE_PER_SEAT_CENTS = 2900;
+export const TEAM_MIN_SEATS = 3;
+export const TEAM_MAX_SEATS = 50;
+
 export const FREE_LIMITS = { projects: 1, plansPerMonth: 2 } as const;
+
+/** A paid plan (Pro or Team) — unlimited projects & plans. */
+export function isPaidPlan(plan: Plan | string): boolean {
+  return plan === "PRO" || plan === "TEAM";
+}
+
+/** Clamp a requested seat count to the allowed Team range. */
+export function clampSeats(seats: number): number {
+  if (!Number.isFinite(seats)) return TEAM_MIN_SEATS;
+  return Math.min(TEAM_MAX_SEATS, Math.max(TEAM_MIN_SEATS, Math.round(seats)));
+}
+
+/** Monthly Team price for a seat count (in cents). */
+export function teamPriceCents(seats: number): number {
+  return clampSeats(seats) * TEAM_PRICE_PER_SEAT_CENTS;
+}
 
 export type EntitlementAction = "create_project" | "create_plan";
 
@@ -33,7 +57,8 @@ function monthStart(now = new Date()): Date {
 }
 
 export type PlanUsage = {
-  plan: "FREE" | "PRO";
+  plan: Plan;
+  seats: number;
   projectCount: number;
   projectLimit: number | null; // null = unlimited
   plansThisMonth: number;
@@ -43,7 +68,7 @@ export type PlanUsage = {
 export async function getPlanUsage(userId: string): Promise<PlanUsage> {
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { plan: true },
+    select: { plan: true, seats: true },
   });
 
   const [projectCount, plansThisMonth] = await Promise.all([
@@ -56,13 +81,14 @@ export async function getPlanUsage(userId: string): Promise<PlanUsage> {
     }),
   ]);
 
-  const pro = user.plan === "PRO";
+  const paid = isPaidPlan(user.plan);
   return {
     plan: user.plan,
+    seats: user.seats,
     projectCount,
-    projectLimit: pro ? null : FREE_LIMITS.projects,
+    projectLimit: paid ? null : FREE_LIMITS.projects,
     plansThisMonth,
-    planLimit: pro ? null : FREE_LIMITS.plansPerMonth,
+    planLimit: paid ? null : FREE_LIMITS.plansPerMonth,
   };
 }
 
@@ -127,29 +153,48 @@ async function ensureCustomer(userId: string): Promise<string> {
   return customer.id;
 }
 
-/** Create a Checkout session for Pro; returns the redirect URL. */
-export async function createCheckoutUrl(userId: string): Promise<string> {
+export type CheckoutOptions = { plan?: "PRO" | "TEAM"; seats?: number };
+
+/** Create a Checkout session for Pro or Team; returns the redirect URL. */
+export async function createCheckoutUrl(
+  userId: string,
+  opts: CheckoutOptions = {},
+): Promise<string> {
   const customerId = await ensureCustomer(userId);
   const appUrl = env.APP_URL.replace(/\/$/, "");
+  const plan = opts.plan ?? "PRO";
+  const seats = plan === "TEAM" ? clampSeats(opts.seats ?? TEAM_MIN_SEATS) : 1;
 
+  const lineItem =
+    plan === "TEAM"
+      ? {
+          quantity: seats,
+          price_data: {
+            currency: "usd",
+            unit_amount: TEAM_PRICE_PER_SEAT_CENTS,
+            recurring: { interval: "month" as const },
+            product_data: { name: "LaunchWake Team (per seat)" },
+          },
+        }
+      : {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: PRO_PRICE_CENTS,
+            recurring: { interval: "month" as const },
+            product_data: { name: "LaunchWake Pro" },
+          },
+        };
+
+  const meta = { userId, plan, seats: String(seats) };
   const session = await getStripe().checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: "usd",
-          unit_amount: PRO_PRICE_CENTS,
-          recurring: { interval: "month" },
-          product_data: { name: "LaunchWake Pro" },
-        },
-      },
-    ],
+    line_items: [lineItem],
     success_url: `${appUrl}/app/settings?upgraded=1`,
     cancel_url: `${appUrl}/app/settings`,
-    metadata: { userId },
-    subscription_data: { metadata: { userId } },
+    metadata: meta,
+    subscription_data: { metadata: meta },
   });
 
   if (!session.url) throw new Error("Stripe did not return a checkout URL.");
@@ -187,10 +232,12 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       const userId = session.metadata?.userId;
       const customerId =
         typeof session.customer === "string" ? session.customer : undefined;
+      const plan: Plan = session.metadata?.plan === "TEAM" ? "TEAM" : "PRO";
+      const seats = plan === "TEAM" ? clampSeats(Number(session.metadata?.seats)) : 1;
       if (userId) {
         await db.user.update({
           where: { id: userId },
-          data: { plan: "PRO", stripeCustomerId: customerId },
+          data: { plan, seats, stripeCustomerId: customerId },
         });
       }
       break;
@@ -201,13 +248,17 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       const customerId =
         typeof sub.customer === "string" ? sub.customer : sub.customer.id;
       const active = sub.status === "active" || sub.status === "trialing";
+      const plan: Plan = sub.metadata?.plan === "TEAM" ? "TEAM" : "PRO";
+      // Seat count follows the subscription item quantity (per-seat Team plan).
+      const qty = sub.items?.data?.[0]?.quantity ?? 1;
+      const seats = active && plan === "TEAM" ? clampSeats(qty) : 1;
       const user = await db.user.findFirst({
         where: { stripeCustomerId: customerId },
       });
       if (user) {
         await db.user.update({
           where: { id: user.id },
-          data: { plan: active ? "PRO" : "FREE" },
+          data: { plan: active ? plan : "FREE", seats },
         });
       }
       break;

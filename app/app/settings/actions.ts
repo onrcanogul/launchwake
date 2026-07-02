@@ -32,6 +32,25 @@ export async function startCheckout(): Promise<BillingState & { url?: string }> 
   }
 }
 
+/** Start Team checkout for `seats` seats → returns the Stripe URL. */
+export async function startTeamCheckout(
+  seats: number,
+): Promise<BillingState & { url?: string }> {
+  const userId = await requireUserId();
+  if (!billingConfigured()) {
+    return {
+      error:
+        "Billing isn't configured on this deployment (set STRIPE_SECRET_KEY).",
+    };
+  }
+  try {
+    const url = await createCheckoutUrl(userId, { plan: "TEAM", seats });
+    return { url };
+  } catch (err) {
+    return { error: `Could not start checkout: ${(err as Error).message}` };
+  }
+}
+
 /** Generate (or rotate) the project's GitHub webhook signing secret. */
 export async function generateWebhookSecret(): Promise<
   { ok: true; secret: string } | { ok: false; error: string }
@@ -72,6 +91,30 @@ export async function saveSlackWebhook(
   await db.project.update({
     where: { id: project.id },
     data: { slackWebhookUrl: trimmed || null },
+  });
+  revalidatePath("/app/settings");
+  return { ok: true };
+}
+
+/** Save (or clear) the project's Stripe endpoint signing secret for revenue attribution. */
+export async function saveStripeWebhookSecret(
+  secret: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  const project = await db.project.findFirst({
+    where: { userId: session.user.id },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!project) return { ok: false, error: "No project" };
+
+  const trimmed = secret.trim();
+  if (trimmed && !/^whsec_/.test(trimmed)) {
+    return { ok: false, error: "Paste the endpoint's signing secret (starts with whsec_)." };
+  }
+  await db.project.update({
+    where: { id: project.id },
+    data: { stripeWebhookSecret: trimmed || null },
   });
   revalidatePath("/app/settings");
   return { ok: true };

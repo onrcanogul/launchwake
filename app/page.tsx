@@ -3,7 +3,11 @@ import type { Metadata } from "next";
 import { PublicShell } from "@/components/public/PublicShell";
 import { LaunchChecker } from "@/components/public/LaunchChecker";
 import { PUBLIC_FREE_RECS } from "@/lib/launchChecker";
+import { TEAM_PRICE_PER_SEAT_CENTS, TEAM_MIN_SEATS } from "@/lib/billing";
 import { Icon, type IconName } from "@/components/Icon";
+
+const TEAM_FROM = (TEAM_PRICE_PER_SEAT_CENTS * TEAM_MIN_SEATS) / 100;
+const TEAM_PER_SEAT = TEAM_PRICE_PER_SEAT_CENTS / 100;
 
 export const metadata: Metadata = {
   title: "LaunchWake — Ship it. We'll make the waves.",
@@ -231,9 +235,29 @@ export default function LandingPage() {
               Get started
             </Link>
           </div>
+          <div className="lp-pc">
+            <div className="lp-pc-name">Team</div>
+            <div className="lp-p">
+              ${TEAM_FROM} <small>/ mo</small>
+            </div>
+            <p className="lp-pc-desc">
+              For agencies &amp; DevRel teams — ${TEAM_PER_SEAT}/seat, from{" "}
+              {TEAM_MIN_SEATS} seats.
+            </p>
+            <ul>
+              <li>Everything in Pro, unlimited</li>
+              <li>Per-seat billing for your team</li>
+              <li>Multiple client products</li>
+              <li>Shared workspaces &amp; invites (soon)</li>
+            </ul>
+            <Link href="/login" className="btn btn-s btn-lg">
+              Start a team
+            </Link>
+          </div>
         </div>
         <p className="lc-hint" style={{ marginTop: 14 }}>
-          No credit card. Built for indie hackers &amp; dev-tool founders.
+          No credit card. Built for indie hackers, dev-tool founders &amp; the
+          teams that launch for them.
         </p>
       </section>
 
