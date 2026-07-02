@@ -24,6 +24,14 @@ export const TEAM_MAX_SEATS = 50;
 
 export const FREE_LIMITS = { projects: 1, plansPerMonth: 2 } as const;
 
+// Intent Radar saved-query caps per plan. Free can't use it (upsell); Pro gets a
+// handful; Team is unlimited (null). Not a simple paid→unlimited like projects.
+export const INTENT_QUERY_LIMITS: Record<Plan, number | null> = {
+  FREE: 0,
+  PRO: 3,
+  TEAM: null,
+};
+
 /** A paid plan (Pro or Team) — unlimited projects & plans. */
 export function isPaidPlan(plan: Plan | string): boolean {
   return plan === "PRO" || plan === "TEAM";
@@ -40,7 +48,7 @@ export function teamPriceCents(seats: number): number {
   return clampSeats(seats) * TEAM_PRICE_PER_SEAT_CENTS;
 }
 
-export type EntitlementAction = "create_project" | "create_plan";
+export type EntitlementAction = "create_project" | "create_plan" | "create_intent_query";
 
 export class EntitlementError extends Error {
   constructor(
@@ -63,6 +71,8 @@ export type PlanUsage = {
   projectLimit: number | null; // null = unlimited
   plansThisMonth: number;
   planLimit: number | null;
+  intentQueryCount: number;
+  intentQueryLimit: number | null; // null = unlimited
 };
 
 export async function getPlanUsage(userId: string): Promise<PlanUsage> {
@@ -71,7 +81,7 @@ export async function getPlanUsage(userId: string): Promise<PlanUsage> {
     select: { plan: true, seats: true },
   });
 
-  const [projectCount, plansThisMonth] = await Promise.all([
+  const [projectCount, plansThisMonth, intentQueryCount] = await Promise.all([
     db.project.count({ where: { userId } }),
     db.distributionPlan.count({
       where: {
@@ -79,6 +89,7 @@ export async function getPlanUsage(userId: string): Promise<PlanUsage> {
         ship: { project: { userId } },
       },
     }),
+    db.intentQuery.count({ where: { project: { userId } } }),
   ]);
 
   const paid = isPaidPlan(user.plan);
@@ -89,6 +100,8 @@ export async function getPlanUsage(userId: string): Promise<PlanUsage> {
     projectLimit: paid ? null : FREE_LIMITS.projects,
     plansThisMonth,
     planLimit: paid ? null : FREE_LIMITS.plansPerMonth,
+    intentQueryCount,
+    intentQueryLimit: INTENT_QUERY_LIMITS[user.plan],
   };
 }
 
@@ -108,6 +121,13 @@ export function entitlementViolation(
   if (action === "create_plan") {
     if (usage.planLimit !== null && usage.plansThisMonth >= usage.planLimit) {
       return `You've used ${usage.plansThisMonth}/${usage.planLimit} distribution plans on the Free plan this month. Upgrade to Pro for unlimited plans.`;
+    }
+  }
+  if (action === "create_intent_query") {
+    if (usage.intentQueryLimit !== null && usage.intentQueryCount >= usage.intentQueryLimit) {
+      return usage.intentQueryLimit === 0
+        ? "Intent Radar is a Pro feature — watch HN & Reddit for people asking for your product. Upgrade to Pro to turn it on."
+        : `Pro includes ${usage.intentQueryLimit} Intent Radar queries. Upgrade to Team for unlimited.`;
     }
   }
   return null;

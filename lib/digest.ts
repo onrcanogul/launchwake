@@ -24,11 +24,13 @@ export type WeeklyStats = {
   leaky: { channel: string; clicks: number }[];
   /** Ships with a plan but nothing posted yet. */
   undistributed: { title: string; channels: number }[];
+  /** New Intent Radar matches this week (people asking for a tool like yours). */
+  intentMatches?: number;
 };
 
 /** Compute last-week attribution + "needs action" state for one account. */
 export async function getWeeklyStats(accountId: string, since: Date): Promise<WeeklyStats> {
-  const [posts, shipsLastWeek, postsLastWeek, undistributedShips] = await Promise.all([
+  const [posts, shipsLastWeek, postsLastWeek, undistributedShips, intentMatches] = await Promise.all([
     db.post.findMany({
       where: { ship: { project: { userId: accountId } } },
       include: {
@@ -45,6 +47,13 @@ export async function getWeeklyStats(accountId: string, since: Date): Promise<We
       include: { plan: { include: { recs: { select: { id: true } } } } },
       orderBy: { detectedAt: "desc" },
       take: 3,
+    }),
+    db.intentMatch.count({
+      where: {
+        query: { project: { userId: accountId } },
+        createdAt: { gte: since },
+        status: { not: "DISMISSED" },
+      },
     }),
   ]);
 
@@ -93,12 +102,20 @@ export async function getWeeklyStats(accountId: string, since: Date): Promise<We
       title: s.title,
       channels: s.plan?.recs.length ?? 0,
     })),
+    intentMatches,
   };
 }
 
 /** "What to do this week" — grounded in the account's own state. Pure. */
 export function weeklyRecommendations(stats: WeeklyStats): string[] {
   const recs: string[] = [];
+
+  const intent = stats.intentMatches ?? 0;
+  if (intent > 0) {
+    recs.push(
+      `${intent} ${intent === 1 ? "person" : "people"} asked for a tool like yours on HN/Reddit this week. Open Intent Radar and reply while it's warm — each one is a hot lead.`,
+    );
+  }
 
   if (stats.undistributed.length > 0) {
     const s = stats.undistributed[0];
@@ -161,6 +178,16 @@ export function buildDigest(input: {
     "WHAT TO DO THIS WEEK",
     ...recLines,
   ];
+
+  const intent = stats.intentMatches ?? 0;
+  if (intent > 0) {
+    lines.push(
+      "",
+      "INTENT RADAR — people asking for your product",
+      `  ${intent} new conversation${intent === 1 ? "" : "s"} on HN/Reddit this week. Launches end; conversations don't.`,
+      `  Reply with a ready draft → ${base}/app/radar`,
+    );
+  }
 
   if (input.radar) {
     lines.push("", "LAUNCH RADAR — in your category", input.radar.text);

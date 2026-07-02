@@ -132,6 +132,7 @@ model Project {
   stripeWebhookSecret  String? // the user's Stripe endpoint signing secret (whsec_…) for revenue attribution
   slackWebhookUrl      String? // Slack incoming webhook for reminders / new-ship pings
   ships                Ship[]
+  intentQueries        IntentQuery[] // Intent Radar: saved "people looking for us" watches
   createdAt            DateTime @default(now())
 }
 
@@ -352,6 +353,71 @@ model ChannelStat {
   updatedAt  DateTime @updatedAt
 
   @@unique([channelId, productTag])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Intent Radar — "people looking for your product".
+// A saved query watches HN + Reddit for posts/comments where someone is
+// asking for a tool like yours ("is there a tool that…?", "alternative to X").
+// Each hit becomes an IntentMatch with a ban-safe, human-written draft reply
+// the founder posts themselves. Never auto-posts (product principle).
+// ─────────────────────────────────────────────────────────────
+model IntentQuery {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String // "People asking for attribution tools"
+  // Intent phrases to match against post text ("looking for a tool that",
+  // "alternative to segment"). Any hit is a candidate.
+  phrases    String[]
+  // Required topic keywords — a candidate must mention at least one so we don't
+  // surface every "looking for a tool" post in the world.
+  keywords   String[]
+  // Optional subreddit narrowing (slugs, no "r/"). Empty = broad Reddit search.
+  subreddits String[]
+  active     Boolean       @default(true)
+  matches    IntentMatch[]
+  createdAt  DateTime      @default(now())
+
+  @@index([projectId])
+}
+
+model IntentMatch {
+  id        String            @id @default(cuid())
+  queryId   String
+  query     IntentQuery       @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  source    IntentSource
+  // Stable id from the source (HN objectID / Reddit fullname) — dedupes ingest.
+  externalId String
+  title     String
+  url       String
+  author    String?
+  excerpt   String? // snippet of the matched text
+  score     Int // 0..100 relevance
+  matchReason String? // human "why this matched"
+  postedAt  DateTime // when the source post/comment was created
+  status    IntentMatchStatus @default(NEW)
+  // Ban-safe draft reply (LLM). Null until generated. Human posts it themselves.
+  draftBody  String?
+  safetyNote String?
+  notifiedAt DateTime? // when we alerted the user (guards re-notify)
+  createdAt  DateTime          @default(now())
+
+  @@unique([queryId, externalId])
+  @@index([status, postedAt])
+  @@index([queryId, status])
+}
+
+enum IntentSource {
+  HN
+  REDDIT
+}
+
+enum IntentMatchStatus {
+  NEW // caught, not yet surfaced
+  NOTIFIED // user has been alerted
+  SAVED // user starred it
+  DISMISSED // user hid it
 }
 
 // ─────────────────────────────────────────────────────────────
