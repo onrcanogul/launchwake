@@ -264,6 +264,9 @@ model Post {
   status      PostStatus   @default(LIVE)
   trackedLink TrackedLink?
   postedAt    DateTime     @default(now())
+  // Cached post-mortem coaching (LLM + outcome data). Null until diagnosed.
+  coachingJson Json?
+  coachedAt   DateTime?
 }
 
 enum PostStatus {

@@ -12,7 +12,8 @@ import { suggestShip, parseRepo } from "@/lib/github";
 import { recordPostForRecommendation } from "@/lib/attribution";
 import { resolveAccount } from "@/lib/team";
 import { newReportToken, reportUrl } from "@/lib/report";
-import { assertEntitlement, EntitlementError } from "@/lib/billing";
+import { coachPost, type CoachResult } from "@/lib/coach";
+import { assertEntitlement, EntitlementError, isPaidPlan } from "@/lib/billing";
 import { nextBestTimeUTC } from "@/lib/reminders";
 import { emailConfigured } from "@/lib/notify";
 
@@ -307,6 +308,43 @@ export async function setReportRevenue(
       url: ship.publicToken ? reportUrl(ship.publicToken) : null,
       showRevenue,
     };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+// ── Post-mortem coaching (Pro / Team) ──────────────────────
+
+export type CoachState =
+  | { ok: true; result: CoachResult }
+  | { ok: false; locked?: boolean; error: string };
+
+/** Diagnose a post from its text + rules + real outcome. Paid feature. */
+export async function coachPostAction(postId: string): Promise<CoachState> {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  const { accountId } = await resolveAccount(session.user.id);
+
+  // Ownership: the post must belong to this account's workspace.
+  const owned = await db.post.findFirst({
+    where: { id: postId, ship: { project: { userId: accountId } } },
+    select: { id: true },
+  });
+  if (!owned) return { ok: false, error: "Post not found" };
+
+  const account = await db.user.findUnique({ where: { id: accountId }, select: { plan: true } });
+  if (!account || !isPaidPlan(account.plan)) {
+    return {
+      ok: false,
+      locked: true,
+      error: "Post-mortem coaching is a Pro feature — upgrade to turn your outcomes into concrete fixes.",
+    };
+  }
+
+  try {
+    const result = await coachPost(postId);
+    revalidatePath("/app/results");
+    return { ok: true, result };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
   }

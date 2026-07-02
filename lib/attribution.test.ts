@@ -71,6 +71,7 @@ describe("ROI helpers", () => {
 
 function row(partial: Partial<ResultRow> & { channelName: string }): ResultRow {
   return {
+    postId: "p1",
     shipTitle: "beta",
     trackedUrl: null,
     postUrl: null,
@@ -80,6 +81,7 @@ function row(partial: Partial<ResultRow> & { channelName: string }): ResultRow {
     revenueCents: 0,
     recurringCents: 0,
     removed: false,
+    coaching: null,
     ...partial,
   };
 }

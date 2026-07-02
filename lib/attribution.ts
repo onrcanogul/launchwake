@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { db } from "./db";
 import { env } from "./env";
+import type { CoachResult } from "./coach";
 import type { Platform } from "@prisma/client";
 
 /**
@@ -201,6 +202,7 @@ export async function ingestRevenue(
 // ── Read side ──────────────────────────────────────────────
 
 export type ResultRow = {
+  postId: string;
   channelName: string;
   shipTitle: string;
   trackedUrl: string | null;
@@ -211,6 +213,8 @@ export type ResultRow = {
   revenueCents: number;
   recurringCents: number;
   removed: boolean;
+  /** Cached post-mortem coaching, if the founder has run it. */
+  coaching: CoachResult | null;
 };
 
 /** Aggregate across all ships — "which channel actually brings customers". */
@@ -327,6 +331,7 @@ export async function getResultsRollup(
       }
     }
     return {
+      postId: p.id,
       channelName: p.channel.name,
       shipTitle: p.ship.title,
       trackedUrl: p.trackedLink ? trackedUrl(p.trackedLink.shortCode) : null,
@@ -337,6 +342,7 @@ export async function getResultsRollup(
       revenueCents,
       recurringCents,
       removed: p.status === "REMOVED",
+      coaching: (p.coachingJson as CoachResult | null) ?? null,
     };
   });
 

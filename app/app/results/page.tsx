@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getResultsRollup, formatMoney } from "@/lib/attribution";
 import { RoiStrip } from "@/components/results/RoiStrip";
+import { PostCoachList } from "@/components/results/PostCoach";
 import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { StatStrip, type Stat } from "@/components/ui/StatStrip";
@@ -31,6 +32,7 @@ export default async function ResultsPage() {
   if (!ws.project) redirect("/onboarding");
 
   const r = await getResultsRollup(ws.project.id);
+  const canCoach = ws.plan !== "FREE";
 
   const header = (
     <div className="phead">
@@ -220,6 +222,31 @@ export default async function ResultsPage() {
           </div>
         </Panel>
       )}
+
+      <Panel
+        title="Post-mortem coaching"
+        right={<Badge accent>{canCoach ? "Pro" : "Pro — upgrade"}</Badge>}
+      >
+        <div style={{ padding: "12px 16px 4px", color: "var(--tx2)", fontSize: 12.5 }}>
+          Turn each post&apos;s outcome into concrete fixes — grounded in the
+          channel&apos;s rules, your click/signup data, and what you actually
+          wrote.
+        </div>
+        <div style={{ padding: "6px 16px 16px" }}>
+          <PostCoachList
+            canCoach={canCoach}
+            rows={r.perPost.map((p) => ({
+              postId: p.postId,
+              channelName: p.channelName,
+              shipTitle: p.shipTitle,
+              clicks: p.clicks,
+              signups: p.signups,
+              removed: p.removed,
+              coaching: p.coaching,
+            }))}
+          />
+        </div>
+      </Panel>
     </>
   );
 }
