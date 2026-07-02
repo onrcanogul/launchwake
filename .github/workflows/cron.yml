@@ -16,6 +16,7 @@ on:
     - cron: "*/15 * * * *" # reminders — every 15 min
     - cron: "0 7 * * 1" # weekly digest — Monday 07:00 UTC
     - cron: "0 */6 * * *" # intent radar — every 6h
+    - cron: "0 5 * * *" # category benchmarks — daily 05:00 UTC
   workflow_dispatch: {}
 
 jobs:
@@ -50,6 +51,18 @@ jobs:
       - name: Trigger intent radar
         run: |
           curl -fsS -X POST "${CRON_TARGET_URL}/api/cron/intent-radar" \
+            -H "Authorization: Bearer ${CRON_SECRET}"
+        env:
+          CRON_TARGET_URL: ${{ vars.CRON_TARGET_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+  benchmarks:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 5 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh category benchmarks
+        run: |
+          curl -fsS -X POST "${CRON_TARGET_URL}/api/cron/benchmarks" \
             -H "Authorization: Bearer ${CRON_SECRET}"
         env:
           CRON_TARGET_URL: ${{ vars.CRON_TARGET_URL }}

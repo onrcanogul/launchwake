@@ -13,6 +13,7 @@ import {
   outcomeEvidence,
   outcomeFactLine,
 } from "./stats";
+import { rollupBenchmarks } from "./benchmarks";
 import type { BanRisk, Channel, Project, Ship } from "@prisma/client";
 
 /**
@@ -211,6 +212,9 @@ export async function buildPlan(shipId: string): Promise<string> {
   // what actually happened. Channels that converted rise; traffic-with-no-signup
   // and removals sink.
   await rollupAllChannelStats();
+  // Refresh category benchmarks too (first-party only here — the public-engagement
+  // bootstrap runs on the daily cron to keep plan-building network-free).
+  await rollupBenchmarks().catch(() => {});
   const productTag = productTagFor(
     `${ship.project.name} ${ship.project.description ?? ""} ${ship.project.url ?? ""}`,
   );

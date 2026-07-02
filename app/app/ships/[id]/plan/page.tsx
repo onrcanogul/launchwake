@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getShipWithPlan } from "@/lib/plans";
-import { ChannelCard } from "@/components/channel/ChannelCard";
+import { ChannelCard, type BenchmarkCardData } from "@/components/channel/ChannelCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Note } from "@/components/ui/Note";
 import { Button } from "@/components/ui/Button";
@@ -11,6 +11,14 @@ import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
 import { AutoBuildPlan } from "@/components/ship/AutoBuildPlan";
 import { nextBestTime } from "@/lib/reminders";
 import { emailConfigured } from "@/lib/notify";
+import { isPaidPlan } from "@/lib/billing";
+import { productTagFor, bucketLabel } from "@/lib/stats";
+import { getBenchmarkMap, benchmarkDisplay } from "@/lib/benchmarks";
+
+/** Hide digits so a Free (locked) client never receives the real number. */
+function maskValue(value: string): string {
+  return value.replace(/\d+/g, (m) => "•".repeat(Math.max(2, m.length)));
+}
 
 export default async function PlanPage({
   params,
@@ -29,6 +37,28 @@ export default async function PlanPage({
   const emailAvailable = emailConfigured();
   const slackAvailable = Boolean(ws.project.slackWebhookUrl);
   const building = recs.length === 0 && ship.status === "NEW";
+
+  // Category benchmarks — the paywall trigger. Free sees the label + a masked,
+  // blurred number ("unlock with Pro"); paid sees the real figure.
+  const productTag = productTagFor(
+    `${ws.project.name} ${ws.project.description ?? ""} ${ws.project.url ?? ""}`,
+  );
+  const categoryLabel = bucketLabel(productTag);
+  const benchmarks = await getBenchmarkMap(productTag);
+  const locked = !isPaidPlan(ws.plan);
+
+  const benchmarkFor = (channelSlug: string): BenchmarkCardData | null => {
+    const view = benchmarks.get(channelSlug);
+    if (!view) return null;
+    const display = benchmarkDisplay(view, categoryLabel);
+    if (!display) return null;
+    return {
+      label: display.label,
+      value: locked ? maskValue(display.value) : display.value,
+      sub: locked ? null : display.sub,
+      locked,
+    };
+  };
 
   return (
     <>
@@ -117,6 +147,7 @@ export default async function PlanPage({
                 outcomeNote: rec.outcomeNote,
               }}
               draftHref={`/app/ships/${ship.id}/kit?rec=${rec.id}`}
+              benchmark={benchmarkFor(rec.channelSlug)}
               remind={
                 schedulable
                   ? {

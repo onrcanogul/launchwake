@@ -188,6 +188,7 @@ model Channel {
   recs           Recommendation[]
   posts          Post[]
   stats          ChannelStat[]
+  benchmarks     ChannelBenchmark[]
 }
 
 enum Platform {
@@ -353,6 +354,32 @@ model ChannelStat {
   updatedAt  DateTime @updatedAt
 
   @@unique([channelId, productTag])
+}
+
+// Category benchmarks — the paywall trigger. Per (product category, channel)
+// aggregate proof shown at the decision moment: "devtool products got a median
+// of 34 signups from Show HN." First-party medians (anonymous, across all
+// accounts) blended with a public-engagement bootstrap (median upvotes from
+// HN/Reddit) so there's a number even before first-party data accumulates.
+// Refreshed by rollupBenchmarks(); read-gated to Pro in the UI.
+model ChannelBenchmark {
+  id            String   @id @default(cuid())
+  productTag    String // category bucket, e.g. "devtools-backend"
+  channelId     String
+  channel       Channel  @relation(fields: [channelId], references: [id])
+  // First-party aggregate (anonymous, across all accounts).
+  sampleSize    Int      @default(0) // number of posts
+  medianSignups Int      @default(0)
+  meanSignups   Float    @default(0)
+  conversionPct Float    @default(0) // signups / clicks * 100
+  // Public-engagement bootstrap (cold start), from HN/Reddit public APIs.
+  publicSample  Int      @default(0)
+  medianUpvotes Int      @default(0)
+  source        String   @default("public") // "first-party" | "public" | "blended"
+  updatedAt     DateTime @updatedAt
+
+  @@unique([productTag, channelId])
+  @@index([productTag])
 }
 
 // ─────────────────────────────────────────────────────────────
