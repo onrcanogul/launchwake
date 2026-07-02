@@ -4,6 +4,7 @@ import { formatMoney } from "./attribution";
 import { getLaunchRadar, buildRadarDigest } from "./radar";
 import { sendEmail, emailConfigured } from "./notify";
 import { tasksDueThisWeek, type DueTask } from "./queue";
+import { pitchesToFollowUp, type FollowUpPitch } from "./pitch";
 
 /**
  * Weekly Monday digest — the anti-churn nudge. Last week's clicks/signups, then
@@ -29,12 +30,21 @@ export type WeeklyStats = {
   intentMatches?: number;
   /** Distribution-queue tasks coming due this week. */
   queuedTasks?: DueTask[];
+  /** Newsletter pitches sent but not replied to, past their follow-up window. */
+  followUpPitches?: FollowUpPitch[];
 };
 
 /** Compute last-week attribution + "needs action" state for one account. */
 export async function getWeeklyStats(accountId: string, since: Date): Promise<WeeklyStats> {
-  const [posts, shipsLastWeek, postsLastWeek, undistributedShips, intentMatches, queuedTasks] =
-    await Promise.all([
+  const [
+    posts,
+    shipsLastWeek,
+    postsLastWeek,
+    undistributedShips,
+    intentMatches,
+    queuedTasks,
+    followUpPitches,
+  ] = await Promise.all([
     db.post.findMany({
       where: { ship: { project: { userId: accountId } } },
       include: {
@@ -60,6 +70,7 @@ export async function getWeeklyStats(accountId: string, since: Date): Promise<We
       },
     }),
     tasksDueThisWeek(accountId),
+    pitchesToFollowUp(accountId),
   ]);
 
   let clicks = 0;
@@ -109,6 +120,7 @@ export async function getWeeklyStats(accountId: string, since: Date): Promise<We
     })),
     intentMatches,
     queuedTasks,
+    followUpPitches,
   };
 }
 
@@ -122,6 +134,14 @@ export function weeklyRecommendations(stats: WeeklyStats): string[] {
     const more = queued.length - 1;
     recs.push(
       `This week's queue: ${t.phaseLabel.toLowerCase()} — start with ${t.channelName}${more > 0 ? ` (+${more} more task${more === 1 ? "" : "s"} due)` : ""}.`,
+    );
+  }
+
+  const followUps = stats.followUpPitches ?? [];
+  if (followUps.length > 0) {
+    const f = followUps[0];
+    recs.push(
+      `Follow up on your ${f.channelName} pitch — sent with no reply yet. A short, polite nudge is how most newsletter features actually happen.`,
     );
   }
 
@@ -201,6 +221,15 @@ export function buildDigest(input: {
       lines.push(`  • ${t.phaseLabel}: ${t.channelName}${t.url ? ` — ${t.url}` : ""}`);
     }
     lines.push(`  See the full cadence → ${base}/app/queue`);
+  }
+
+  const followUps = stats.followUpPitches ?? [];
+  if (followUps.length > 0) {
+    lines.push("", "NEWSLETTER PITCHES — time to follow up");
+    for (const f of followUps) {
+      lines.push(`  • ${f.channelName} (for "${f.shipTitle}") — no reply yet, send a nudge`);
+    }
+    lines.push(`  Manage pitches → ${base}/app/pitches`);
   }
 
   const intent = stats.intentMatches ?? 0;
