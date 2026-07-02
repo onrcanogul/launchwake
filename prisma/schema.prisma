@@ -32,6 +32,7 @@ model User {
   ownedMemberships TeamMembership[] @relation("TeamOwner")
   memberships      TeamMembership[] @relation("TeamMember")
   sentInvites      TeamInvite[]     @relation("TeamInvites")
+  lastDigestAt     DateTime? // last weekly digest sent (guards against re-sends)
   createdAt        DateTime  @default(now())
 }
 
