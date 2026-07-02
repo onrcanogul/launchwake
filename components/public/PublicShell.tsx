@@ -24,6 +24,7 @@ export function PublicShell({
         <nav className="pub-nav">
           <Link href="/tools/launch-checker">Launch Checker</Link>
           <Link href="/channels">Channels</Link>
+          <Link href="/state-of-developer-launches">Report</Link>
           <Link href="/pricing">Pricing</Link>
           <Link href="/login" className="cta">
             Sign in
@@ -39,6 +40,8 @@ export function PublicShell({
           <Link href="/tools/launch-checker">Launch Checker</Link>
           {" · "}
           <Link href="/channels">Channels</Link>
+          {" · "}
+          <Link href="/state-of-developer-launches">State of Launches</Link>
           {" · "}
           <Link href="/pricing">Pricing</Link>
           {" · "}
