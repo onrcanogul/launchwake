@@ -10,6 +10,7 @@ import { generateDraft } from "@/lib/drafts";
 import { isDraftTone, type DraftTone } from "@/lib/tones";
 import { suggestShip, parseRepo } from "@/lib/github";
 import { recordPostForRecommendation } from "@/lib/attribution";
+import { newReportToken, reportUrl } from "@/lib/report";
 import { assertEntitlement, EntitlementError } from "@/lib/billing";
 import { nextBestTimeUTC } from "@/lib/reminders";
 import { emailConfigured } from "@/lib/notify";
@@ -239,6 +240,70 @@ export async function markPosted(
     revalidatePath("/app/results");
     revalidatePath("/app/ships");
     return { ok: true, trackedUrl: res.trackedUrl };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+// ── Public launch report (viral loop) ──────────────────────
+
+/** Load a ship owned by the current user, or throw. */
+async function requireOwnedShip(shipId: string) {
+  const project = await requireProject();
+  const ship = await db.ship.findFirst({
+    where: { id: shipId, projectId: project.id },
+    select: { id: true, publicToken: true, publicShowRevenue: true },
+  });
+  if (!ship) throw new Error("Ship not found");
+  return ship;
+}
+
+export type ReportState =
+  | { ok: true; token: string | null; url: string | null; showRevenue: boolean }
+  | { ok: false; error: string };
+
+/** Turn the public report on (minting a token if needed) or off. */
+export async function setPublicReport(
+  shipId: string,
+  makePublic: boolean,
+): Promise<ReportState> {
+  try {
+    const ship = await requireOwnedShip(shipId);
+    let token = ship.publicToken;
+    if (makePublic) {
+      token = token ?? newReportToken();
+      await db.ship.update({ where: { id: shipId }, data: { publicToken: token } });
+    } else {
+      await db.ship.update({ where: { id: shipId }, data: { publicToken: null } });
+      token = null;
+    }
+    revalidatePath(`/app/ships/${shipId}/launch`);
+    return {
+      ok: true,
+      token,
+      url: token ? reportUrl(token) : null,
+      showRevenue: ship.publicShowRevenue,
+    };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+/** Toggle whether the public report shows revenue (off by default — sensitive). */
+export async function setReportRevenue(
+  shipId: string,
+  showRevenue: boolean,
+): Promise<ReportState> {
+  try {
+    const ship = await requireOwnedShip(shipId);
+    await db.ship.update({ where: { id: shipId }, data: { publicShowRevenue: showRevenue } });
+    revalidatePath(`/app/ships/${shipId}/launch`);
+    return {
+      ok: true,
+      token: ship.publicToken,
+      url: ship.publicToken ? reportUrl(ship.publicToken) : null,
+      showRevenue,
+    };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
   }

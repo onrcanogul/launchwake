@@ -166,7 +166,13 @@ export type LaunchStep = {
 };
 
 export type ShipLaunch = {
-  ship: { id: string; title: string; status: ShipStatus };
+  ship: {
+    id: string;
+    title: string;
+    status: ShipStatus;
+    publicToken: string | null;
+    publicShowRevenue: boolean;
+  };
   steps: LaunchStep[];
 };
 
@@ -227,7 +233,13 @@ export async function getLaunchDay(
     }) ?? [];
 
   return {
-    ship: { id: ship.id, title: ship.title, status: ship.status },
+    ship: {
+      id: ship.id,
+      title: ship.title,
+      status: ship.status,
+      publicToken: ship.publicToken,
+      publicShowRevenue: ship.publicShowRevenue,
+    },
     steps,
   };
 }

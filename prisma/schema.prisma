@@ -107,6 +107,10 @@ model Ship {
   plan       DistributionPlan?
   posts      Post[]
   detectedAt DateTime          @default(now())
+  // Public launch report (the viral loop): a shareable page at /report/{token}.
+  // Null token = private. Revenue is hidden unless the owner opts in.
+  publicToken       String?  @unique
+  publicShowRevenue Boolean  @default(false)
 }
 
 enum ShipType {

@@ -5,6 +5,9 @@ import { getResultsRollup } from "@/lib/attribution";
 import { buildLaunchTimeline, groupByWindow } from "@/lib/launchday";
 import { RoiStrip } from "@/components/results/RoiStrip";
 import { LaunchDay } from "@/components/ship/LaunchDay";
+import { ShareReport } from "@/components/ship/ShareReport";
+import { reportUrl } from "@/lib/report";
+import { env } from "@/lib/env";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
 import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -71,6 +74,12 @@ export default async function LaunchPage({
             groups={groups}
             emailAvailable={emailAvailable}
             slackAvailable={slackAvailable}
+          />
+          <ShareReport
+            shipId={launch.ship.id}
+            appUrl={env.APP_URL}
+            initialUrl={launch.ship.publicToken ? reportUrl(launch.ship.publicToken) : null}
+            initialShowRevenue={launch.ship.publicShowRevenue}
           />
         </>
       )}
