@@ -2512,7 +2512,7 @@ tbody tr {
 
 .lp-price {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   margin-top: 26px;
   align-items: stretch;
@@ -2618,4 +2618,385 @@ tbody tr {
   .lp-price {
     grid-template-columns: 1fr;
   }
+}
+
+/* ============================================================
+   LAUNCH DAY — time-ordered run sheet (checklist). Same tokens.
+   ============================================================ */
+.ld-progress {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg1);
+  padding: 16px 18px;
+  margin-bottom: 22px;
+}
+.ld-progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.ld-progress-top .num {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.ld-of {
+  color: var(--tx2);
+  font-size: 13px;
+}
+.ld-remaining {
+  color: var(--tx3);
+  font-size: 12px;
+}
+.ld-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg3);
+  overflow: hidden;
+}
+.ld-bar span {
+  display: block;
+  height: 100%;
+  background: var(--ac);
+  transition: width 0.3s ease;
+}
+.ld-done-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: var(--ok);
+}
+.ld-done-note svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  fill: none;
+  flex: none;
+}
+
+.ld-group {
+  margin-bottom: 22px;
+}
+.ld-group-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 600;
+  color: var(--tx3);
+  margin-bottom: 10px;
+}
+.ld-group-hd svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--tx3);
+  stroke-width: 1.7;
+  fill: none;
+}
+.ld-group-cnt {
+  color: var(--tx3);
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  letter-spacing: 0;
+}
+
+.ld-step {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg1);
+  padding: 15px 17px;
+  margin-bottom: 10px;
+}
+.ld-step.done {
+  background: var(--bg);
+  border-color: var(--line);
+  opacity: 0.82;
+}
+.ld-time {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--tx);
+  font-variant-numeric: tabular-nums;
+  padding-top: 2px;
+  line-height: 1.35;
+}
+.ld-step.done .ld-time {
+  color: var(--tx3);
+}
+.ld-body {
+  min-width: 0;
+}
+.ld-row1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ld-check {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1.5px solid var(--line2);
+  background: var(--bg2);
+  color: var(--ac);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  transition: 0.12s;
+}
+.ld-check:hover:not(:disabled) {
+  border-color: var(--acb);
+}
+.ld-check.on {
+  background: var(--acd);
+  border-color: var(--acb);
+  cursor: default;
+}
+.ld-check svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--ac);
+  stroke-width: 2.2;
+  fill: none;
+}
+.ld-pi {
+  width: 16px;
+  height: 16px;
+  stroke: var(--tx2);
+  stroke-width: 1.6;
+  fill: none;
+  flex: none;
+}
+.ld-name {
+  font-weight: 600;
+  font-size: 13.5px;
+  min-width: 0;
+}
+.ld-name .ld-aud {
+  display: block;
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--tx3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ld-step.done .ld-name {
+  text-decoration: line-through;
+  text-decoration-color: var(--tx3);
+}
+.ld-risk {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--tx2);
+  flex: none;
+}
+.ld-rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--tx2);
+  line-height: 1.45;
+}
+.ld-rule svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--ac);
+  stroke-width: 1.7;
+  fill: none;
+  flex: none;
+  margin-top: 2px;
+}
+.ld-draft {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg2);
+  overflow: hidden;
+}
+.ld-draft-body {
+  padding: 12px 13px;
+  font-size: 12.5px;
+  color: var(--tx2);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  max-height: 118px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent);
+  mask-image: linear-gradient(180deg, #000 72%, transparent);
+}
+.ld-draft-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 13px 12px;
+}
+.ld-draft.empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 13px;
+  font-size: 12.5px;
+  color: var(--tx3);
+}
+.ld-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.ld-link {
+  font-size: 11.5px;
+  color: var(--tx2);
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  flex: 1;
+  min-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .ld-step {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .ld-time {
+    color: var(--ac);
+  }
+}
+
+/* ============================================================
+   ROI STRIP — effort → clicks → signups → revenue headline.
+   ============================================================ */
+.roi {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg1);
+  padding: 16px 18px;
+  margin-bottom: 22px;
+}
+.roi-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.roi-step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.roi-arrow {
+  width: 16px;
+  height: 16px;
+  stroke: var(--tx3);
+  stroke-width: 1.7;
+  fill: none;
+  margin: 0 6px;
+  flex: none;
+}
+.roi-cell {
+  padding: 6px 14px 6px 0;
+}
+.roi-val {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.roi-cell.ac .roi-val {
+  color: var(--ac);
+}
+.roi-lab {
+  font-size: 11px;
+  color: var(--tx3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 3px;
+}
+.roi-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--tx2);
+}
+.roi-note svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--ac);
+  stroke-width: 1.7;
+  fill: none;
+  flex: none;
+}
+
+@media (max-width: 520px) {
+  .roi-val {
+    font-size: 18px;
+  }
+  .roi-arrow {
+    margin: 0 2px;
+  }
+}
+
+/* Seat stepper (Team plan) */
+.seat-step {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line2);
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--bg1);
+}
+.seat-step button {
+  width: 30px;
+  height: 32px;
+  background: var(--bg2);
+  color: var(--tx);
+  border: 0;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.seat-step button:hover:not(:disabled) {
+  background: var(--bg3);
+}
+.seat-step button:disabled {
+  color: var(--tx3);
+  cursor: default;
+}
+.seat-step .num {
+  min-width: 34px;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
 }

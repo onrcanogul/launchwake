@@ -40,7 +40,8 @@ export type IconName =
   | "clock"
   | "discord"
   | "slack"
-  | "youtube";
+  | "youtube"
+  | "rocket";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   grid: <path d="M4 6h16M4 12h16M4 18h16" />,
@@ -190,6 +191,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <rect x="3" y="6" width="18" height="12" rx="3" />
       <path d="M10.5 9.2l4.5 2.8-4.5 2.8z" />
+    </>
+  ),
+  rocket: (
+    <>
+      <path d="M5 15c-1 1-1.5 4-1.5 4s3-.5 4-1.5" />
+      <path d="M9 15l-3-3c1-5 5-9 10-9 0 5-4 9-9 10l-3 3" />
+      <circle cx="14.5" cy="9.5" r="1.5" />
     </>
   ),
 };

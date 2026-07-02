@@ -23,7 +23,7 @@ type NavItem = {
 
 export type AppShellProps = {
   project: { name: string; subtitle?: string | null };
-  user: { name: string; plan: "FREE" | "PRO" };
+  user: { name: string; plan: "FREE" | "PRO" | "TEAM" };
   /** All ships (for the sidebar switcher). */
   ships: SwitcherShip[];
   /** The ship in context — the URL ship on ship pages, else the cookie's. */
@@ -41,6 +41,8 @@ function crumbFor(pathname: string): string {
   if (pathname === "/app/plan" || pathname.endsWith("/plan"))
     return "Where to post";
   if (pathname === "/app/kit" || pathname.endsWith("/kit")) return "Launch kit";
+  if (pathname === "/app/launch" || pathname.endsWith("/launch"))
+    return "Launch day";
   return "";
 }
 
@@ -89,6 +91,12 @@ export function AppShell({
       label: "Launch kit",
       icon: "kit",
       match: (p) => p === "/app/kit" || p.endsWith("/kit"),
+    },
+    {
+      href: "/app/launch",
+      label: "Launch day",
+      icon: "rocket",
+      match: (p) => p === "/app/launch" || p.endsWith("/launch"),
     },
   ];
 
@@ -158,9 +166,14 @@ export function AppShell({
           <div className="nm">
             <b>{user.name}</b>
             <span>
-              {user.plan === "PRO" ? "Pro plan" : "Free plan"} ·{" "}
+              {user.plan === "TEAM"
+                ? "Team plan"
+                : user.plan === "PRO"
+                  ? "Pro plan"
+                  : "Free plan"}{" "}
+              ·{" "}
               <Link href="/app/settings" style={{ color: "var(--ac)" }}>
-                {user.plan === "PRO" ? "Manage" : "Upgrade"}
+                {user.plan === "FREE" ? "Upgrade" : "Manage"}
               </Link>
             </span>
           </div>

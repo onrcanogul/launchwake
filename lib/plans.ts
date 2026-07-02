@@ -147,3 +147,87 @@ export async function getShipKit(
 
   return { ship: { id: ship.id, title: ship.title }, recs };
 }
+
+// ── Launch Day ─────────────────────────────────────────────
+
+export type LaunchStep = {
+  id: string;
+  channelSlug: string;
+  channelName: string;
+  platform: Platform;
+  audienceDesc: string | null;
+  bestTime: string | null;
+  banRisk: BanRisk;
+  ruleNote: string | null;
+  channelRules: string | null;
+  draft: { body: string; safetyNote: string | null } | null;
+  posted: boolean;
+  post: { url: string | null; trackedUrl: string | null } | null;
+};
+
+export type ShipLaunch = {
+  ship: { id: string; title: string; status: ShipStatus };
+  steps: LaunchStep[];
+};
+
+/**
+ * Load a ship's plan as launch-day steps: each recommended channel with its
+ * best time, ban risk, draft, and posted/tracked state. The route orders these
+ * by time (lib/launchday). Time-ordering is intentionally left to the pure
+ * helper so it stays testable.
+ */
+export async function getLaunchDay(
+  shipId: string,
+  ownerId: string,
+): Promise<ShipLaunch | null> {
+  const ship = await db.ship.findFirst({
+    where: { id: shipId, project: { userId: ownerId } },
+    include: {
+      posts: { include: { trackedLink: true } },
+      plan: {
+        include: {
+          recs: {
+            orderBy: [{ rank: "asc" }, { fitScore: "desc" }],
+            include: { channel: true, draft: true },
+          },
+        },
+      },
+    },
+  });
+  if (!ship) return null;
+
+  const postByChannel = new Map(ship.posts.map((p) => [p.channelId, p]));
+
+  const steps: LaunchStep[] =
+    ship.plan?.recs.map((r) => {
+      const post = postByChannel.get(r.channelId);
+      return {
+        id: r.id,
+        channelSlug: r.channel.slug,
+        channelName: r.channel.name,
+        platform: r.channel.platform,
+        audienceDesc: r.channel.audienceDesc,
+        bestTime: r.bestTime ?? r.channel.bestTime,
+        banRisk: r.banRisk,
+        ruleNote: r.ruleNote,
+        channelRules: r.channel.rules,
+        draft: r.draft
+          ? { body: r.draft.body, safetyNote: r.draft.safetyNote }
+          : null,
+        posted: Boolean(post),
+        post: post
+          ? {
+              url: post.url,
+              trackedUrl: post.trackedLink
+                ? trackedUrl(post.trackedLink.shortCode)
+                : null,
+            }
+          : null,
+      };
+    }) ?? [];
+
+  return {
+    ship: { id: ship.id, title: ship.title, status: ship.status },
+    steps,
+  };
+}
