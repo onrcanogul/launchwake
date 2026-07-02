@@ -3574,3 +3574,264 @@ tbody tr {
     display: none;
   }
 }
+
+/* ============ STATE OF DEVELOPER LAUNCHES (annual report) ============ */
+.sol-subnote {
+  color: var(--tx3);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: -4px 0 12px;
+  max-width: 560px;
+}
+
+/* Leaderboard — channel + signup bar */
+.sol-board {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sol-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 15px;
+  background: var(--bg1);
+}
+.sol-rank {
+  color: var(--tx3);
+  font-size: 13px;
+  font-weight: 600;
+  width: 18px;
+  text-align: right;
+  flex: none;
+}
+.sol-main {
+  flex: 1;
+  min-width: 0;
+}
+.sol-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.sol-name .pi {
+  width: 15px;
+  height: 15px;
+  stroke: var(--tx2);
+  stroke-width: 1.6;
+  fill: none;
+  flex: none;
+}
+.sol-risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--tx3);
+}
+.sol-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.sol-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ac);
+}
+.sol-metric {
+  flex: none;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 116px;
+}
+.sol-metric b {
+  font-size: 15px;
+  font-weight: 650;
+}
+.sol-metric span {
+  font-size: 11px;
+  color: var(--tx3);
+}
+
+/* Best converters */
+.sol-conv {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.sol-conv-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--line);
+}
+.sol-conv-row:last-child {
+  border-bottom: 0;
+}
+.sol-conv-row .pi {
+  width: 15px;
+  height: 15px;
+  stroke: var(--tx2);
+  stroke-width: 1.6;
+  fill: none;
+  flex: none;
+}
+.sol-conv-name {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.sol-conv-val {
+  margin-left: auto;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ac);
+}
+.sol-conv-detail {
+  font-size: 11.5px;
+  color: var(--tx3);
+  flex: none;
+  min-width: 168px;
+  text-align: right;
+}
+
+/* Category breakdown */
+.sol-cats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.sol-cat {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 15px 16px;
+  background: var(--bg1);
+}
+.sol-cat-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.sol-cat-name {
+  font-size: 13.5px;
+  font-weight: 650;
+  text-transform: capitalize;
+}
+.sol-cat-total {
+  font-size: 11.5px;
+  color: var(--tx3);
+}
+.sol-cat-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.sol-cat-list li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+}
+.sol-cat-rank {
+  color: var(--tx3);
+  width: 12px;
+  flex: none;
+}
+.sol-cat-list .pi {
+  width: 14px;
+  height: 14px;
+  stroke: var(--tx2);
+  stroke-width: 1.6;
+  fill: none;
+  flex: none;
+}
+.sol-cat-ch {
+  font-weight: 550;
+}
+.sol-cat-sg {
+  margin-left: auto;
+  color: var(--tx2);
+}
+
+/* Ban rates by platform */
+.sol-bans {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.sol-ban-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.sol-ban-name {
+  font-size: 13px;
+  font-weight: 550;
+  width: 118px;
+  flex: none;
+}
+.sol-ban-row .sol-track {
+  flex: 1;
+}
+.sol-ban-val {
+  font-size: 13px;
+  font-weight: 600;
+  width: 52px;
+  text-align: right;
+  flex: none;
+}
+
+/* Best times */
+.sol-times {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.sol-time {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 13px 15px;
+  background: var(--bg1);
+}
+.sol-time-win {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--ac);
+  margin-bottom: 5px;
+}
+.sol-time-ch {
+  font-size: 11.5px;
+  color: var(--tx3);
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .sol-cats,
+  .sol-times {
+    grid-template-columns: 1fr;
+  }
+  .sol-metric {
+    min-width: 92px;
+  }
+  .sol-conv-detail {
+    display: none;
+  }
+}
