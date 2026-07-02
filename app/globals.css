@@ -3196,3 +3196,112 @@ tbody tr {
   white-space: pre;
   margin-bottom: 10px;
 }
+
+/* ============================================================
+   PRICING FAQ + CHANGELOG (standalone /pricing and /changelog)
+   ============================================================ */
+.faq {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 22px;
+}
+.faq-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg1);
+  padding: 16px 18px;
+}
+.faq-q {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 7px;
+}
+.faq-a {
+  color: var(--tx2);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.clog {
+  margin-top: 26px;
+  border-left: 1px solid var(--line);
+  padding-left: 24px;
+}
+.clog-entry {
+  position: relative;
+  padding-bottom: 30px;
+}
+.clog-entry::before {
+  content: "";
+  position: absolute;
+  left: -29px;
+  top: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--ac);
+}
+.clog-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.clog-date {
+  font-size: 11.5px;
+  color: var(--tx3);
+  font-variant-numeric: tabular-nums;
+}
+.clog-tags {
+  display: flex;
+  gap: 6px;
+}
+.clog-tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 2px 8px;
+  opacity: 0.9;
+}
+.clog-title {
+  font-size: 16px;
+  font-weight: 620;
+  letter-spacing: -0.015em;
+  margin-bottom: 10px;
+}
+.clog-title a {
+  color: var(--tx);
+}
+.clog-title a:hover {
+  color: var(--ac);
+}
+.clog-items {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.clog-items li {
+  position: relative;
+  padding-left: 16px;
+  color: var(--tx2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.clog-items li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tx3);
+}

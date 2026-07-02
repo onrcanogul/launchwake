@@ -24,6 +24,7 @@ export function PublicShell({
         <nav className="pub-nav">
           <Link href="/tools/launch-checker">Launch Checker</Link>
           <Link href="/channels">Channels</Link>
+          <Link href="/pricing">Pricing</Link>
           <Link href="/login" className="cta">
             Sign in
           </Link>
@@ -37,7 +38,11 @@ export function PublicShell({
         <span>
           <Link href="/tools/launch-checker">Launch Checker</Link>
           {" · "}
-          <Link href="/channels">Channel catalog</Link>
+          <Link href="/channels">Channels</Link>
+          {" · "}
+          <Link href="/pricing">Pricing</Link>
+          {" · "}
+          <Link href="/changelog">Changelog</Link>
         </span>
       </footer>
     </div>
