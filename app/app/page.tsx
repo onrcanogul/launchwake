@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
+import { LaunchRadar } from "@/components/dashboard/LaunchRadar";
 import { getShipFeed, relativeTime } from "@/lib/ships";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
@@ -181,6 +183,20 @@ export default async function ShipFeedPage() {
           </Link>
         ))}
       </Panel>
+
+      <Suspense fallback={<RadarFallback />}>
+        <LaunchRadar project={ws.project} />
+      </Suspense>
     </>,
+  );
+}
+
+function RadarFallback() {
+  return (
+    <Panel title="Launch radar" right="your category">
+      <div style={{ padding: "16px", color: "var(--tx3)", fontSize: 12.5 }}>
+        Scanning Show HN and Reddit for launches in your space…
+      </div>
+    </Panel>
   );
 }

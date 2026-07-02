@@ -3491,3 +3491,86 @@ tbody tr {
   flex: none;
   margin-top: 2px;
 }
+
+/* ============================================================
+   LAUNCH RADAR (dashboard) — competitor/peer launches
+   ============================================================ */
+.radar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--line);
+  color: inherit;
+  transition: 0.12s;
+}
+.radar-row:first-child {
+  border-top: 0;
+}
+.radar-row:hover {
+  background: var(--hover);
+}
+.radar-src {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.radar-src svg {
+  width: 15px;
+  height: 15px;
+  stroke: var(--tx2);
+  stroke-width: 1.6;
+  fill: none;
+}
+.radar-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.radar-title {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--tx);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.radar-angle {
+  font-size: 11.5px;
+  color: var(--tx3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.radar-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: none;
+  font-size: 11.5px;
+  color: var(--tx3);
+}
+.radar-meta b {
+  color: var(--tx);
+  font-size: 13px;
+}
+.radar-when {
+  color: var(--tx3);
+  min-width: 62px;
+  text-align: right;
+}
+
+@media (max-width: 620px) {
+  .radar-angle,
+  .radar-when {
+    display: none;
+  }
+}
