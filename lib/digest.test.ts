@@ -28,6 +28,20 @@ describe("weeklyRecommendations", () => {
     expect(recs.some((r) => /r\/SaaS drove 40 clicks but no signups/.test(r))).toBe(true);
   });
 
+  it("leads with this week's queue tasks when any are due", () => {
+    const recs = weeklyRecommendations(
+      stats({
+        queuedTasks: [
+          { phase: "DIRECTORIES", phaseLabel: "Submit to directories", channelName: "AlternativeTo", shipTitle: "v1", url: "https://alternativeto.net", dueAt: new Date() },
+          { phase: "DIRECTORIES", phaseLabel: "Submit to directories", channelName: "SaaSHub", shipTitle: "v1", url: null, dueAt: new Date() },
+        ],
+      }),
+    );
+    expect(recs[0]).toMatch(/This week's queue/);
+    expect(recs[0]).toMatch(/AlternativeTo/);
+    expect(recs[0]).toMatch(/\+1 more task/);
+  });
+
   it("leads with warm Intent Radar leads when there are any", () => {
     const recs = weeklyRecommendations(stats({ intentMatches: 3, undistributed: [{ title: "v1", channels: 2 }] }));
     expect(recs[0]).toMatch(/3 people asked for a tool like yours/);

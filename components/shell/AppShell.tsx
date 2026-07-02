@@ -42,6 +42,7 @@ function crumbFor(pathname: string): string {
   if (pathname === "/app/plan" || pathname.endsWith("/plan"))
     return "Where to post";
   if (pathname === "/app/kit" || pathname.endsWith("/kit")) return "Launch kit";
+  if (pathname === "/app/queue" || pathname.endsWith("/queue")) return "Queue";
   if (pathname === "/app/launch" || pathname.endsWith("/launch"))
     return "Launch day";
   return "";
@@ -93,6 +94,12 @@ export function AppShell({
       label: "Launch kit",
       icon: "kit",
       match: (p) => p === "/app/kit" || p.endsWith("/kit"),
+    },
+    {
+      href: "/app/queue",
+      label: "Queue",
+      icon: "calendar",
+      match: (p) => p === "/app/queue" || p.endsWith("/queue"),
     },
     {
       href: "/app/launch",

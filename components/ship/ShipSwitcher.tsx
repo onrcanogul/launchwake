@@ -19,7 +19,7 @@ export function ShipSwitcher({
 }: {
   ships: SwitcherShip[];
   currentId: string;
-  mode: "plan" | "kit" | "launch";
+  mode: "plan" | "kit" | "launch" | "queue";
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);

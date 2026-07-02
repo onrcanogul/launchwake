@@ -4085,3 +4085,110 @@ tbody tr {
   stroke-width: 1.8;
   fill: none;
 }
+
+/* ============ DISTRIBUTION QUEUE (cadence) ============ */
+.qgroup {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.qgroup-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.qgroup-title {
+  flex: 1;
+  font-size: 14px;
+}
+.qgroup-title .psub {
+  margin-top: 2px;
+}
+.qgroup-prog {
+  font-size: 11.5px;
+  color: var(--tx3);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.qtasks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qtask {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg1);
+}
+.qtask.st-done {
+  opacity: 0.6;
+}
+.qtask.st-done .qtask-name {
+  text-decoration: line-through;
+}
+.qtask.st-skipped {
+  opacity: 0.45;
+}
+.qtask-ico {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.qtask-ico svg {
+  width: 15px;
+  height: 15px;
+  stroke: var(--tx2);
+  stroke-width: 1.6;
+  fill: none;
+}
+.qtask-main {
+  flex: 1;
+  min-width: 0;
+}
+.qtask-name {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--tx);
+}
+.qtask-name a {
+  color: inherit;
+  text-decoration: none;
+}
+.qtask-name a:hover {
+  color: var(--ac);
+}
+.qtask-rule {
+  font-size: 11px;
+  color: var(--tx3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 42ch;
+}
+.qtask-due {
+  font-size: 11px;
+  color: var(--tx3);
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.qtask-act {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .qtask {
+    flex-wrap: wrap;
+  }
+  .qtask-rule {
+    max-width: 100%;
+  }
+}

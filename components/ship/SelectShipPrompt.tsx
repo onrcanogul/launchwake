@@ -14,7 +14,7 @@ export function SelectShipPrompt({
   mode,
 }: {
   ships: Ship[];
-  mode: "plan" | "kit" | "launch";
+  mode: "plan" | "kit" | "launch" | "queue";
 }) {
   if (ships.length === 0) {
     return (
@@ -34,7 +34,7 @@ export function SelectShipPrompt({
   return (
     <>
       <EmptyState
-        icon={mode === "plan" ? "where" : mode === "launch" ? "rocket" : "kit"}
+        icon={mode === "plan" ? "where" : mode === "launch" ? "rocket" : mode === "queue" ? "calendar" : "kit"}
         title="Select a ship first"
         message="Pick a ship to see its distribution plan and drafts. Your choice is remembered and drives the ship menu."
       />

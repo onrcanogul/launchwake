@@ -149,6 +149,7 @@ model Ship {
   status     ShipStatus        @default(NEW)
   plan       DistributionPlan?
   posts      Post[]
+  queueTasks QueueTask[]
   detectedAt DateTime          @default(now())
   // Public launch report (the viral loop): a shareable page at /report/{token}.
   // Null token = private. Revenue is hidden unless the owner opts in.
@@ -189,6 +190,7 @@ model Channel {
   posts          Post[]
   stats          ChannelStat[]
   benchmarks     ChannelBenchmark[]
+  queueTasks     QueueTask[]
 }
 
 enum Platform {
@@ -380,6 +382,42 @@ model ChannelBenchmark {
 
   @@unique([productTag, channelId])
   @@index([productTag])
+}
+
+// Distribution queue — the anti-churn cadence. A launch isn't a day, it's a
+// sequence: week 1 directories, week 2 newsletters, week 3 niche subreddits,
+// ~month 3 a Show HN relaunch, changelog channels on the release itself. Each
+// ship gets a queue of dated tasks; the weekly digest surfaces the ones due
+// ("this week's 3 tasks"), which keeps founders coming back. Never auto-posts.
+model QueueTask {
+  id        String          @id @default(cuid())
+  shipId    String
+  ship      Ship            @relation(fields: [shipId], references: [id], onDelete: Cascade)
+  channelId String
+  channel   Channel         @relation(fields: [channelId], references: [id])
+  phase     QueuePhase
+  dueAt     DateTime // when this task should be worked (surfaced in the digest)
+  status    QueueTaskStatus @default(PENDING)
+  doneAt    DateTime?
+  createdAt DateTime        @default(now())
+
+  @@unique([shipId, channelId, phase])
+  @@index([status, dueAt])
+  @@index([shipId])
+}
+
+enum QueuePhase {
+  CHANGELOG // day 0 — announce the release (dev.to / blog)
+  DIRECTORIES // week 1 — AlternativeTo, SaaSHub, …
+  NEWSLETTERS // week 2 — pitch curated newsletters
+  SUBREDDITS // week 3 — niche communities
+  SHOW_HN_RELAUNCH // ~month 3 — relaunch on Show HN
+}
+
+enum QueueTaskStatus {
+  PENDING
+  DONE
+  SKIPPED
 }
 
 // ─────────────────────────────────────────────────────────────

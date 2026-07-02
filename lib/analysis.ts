@@ -14,6 +14,7 @@ import {
   outcomeFactLine,
 } from "./stats";
 import { rollupBenchmarks } from "./benchmarks";
+import { generateQueueForShip } from "./queue";
 import type { BanRisk, Channel, Project, Ship } from "@prisma/client";
 
 /**
@@ -296,6 +297,10 @@ export async function buildPlan(shipId: string): Promise<string> {
     where: { id: shipId },
     data: { status: "PLANNED" },
   });
+
+  // Lay down the sequenced distribution queue (week-1 directories → month-3
+  // relaunch). Best-effort: a queue hiccup must not fail the plan build.
+  await generateQueueForShip(shipId).catch(() => {});
 
   return plan.id;
 }
