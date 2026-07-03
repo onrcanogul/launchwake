@@ -143,8 +143,30 @@
     "pricingTitle": "Start free. Pay when it makes waves.",
     "pricingHint": "No credit card. Built for indie hackers, dev-tool founders & the teams that launch for them. ",
     "pricingHintLink": "See full pricing →",
+    "heroChips": [
+      "No login to start",
+      "Never posts for you",
+      "Attribution built in"
+    ],
+    "worksWithLabel": "Built for where developers actually launch",
+    "proofKicker": "Why founders trust it",
+    "proof": [
+      {
+        "n": "100+",
+        "l": "curated communities — each with its real rules, tone and ban risk"
+      },
+      {
+        "n": "0",
+        "l": "bots or auto-posts, ever. LaunchWake does the thinking; you press publish"
+      },
+      {
+        "n": "End-to-end",
+        "l": "attribution on every plan, so you finally know which channel drove signups"
+      }
+    ],
     "finalTitle": "Your next launch deserves an audience.",
-    "finalLead": "Ship it. We'll make the waves."
+    "finalLead": "Ship it. We'll make the waves.",
+    "finalNote": "Free to start · No credit card · No login for the Launch Checker"
   },
   "Pricing": {
     "metaTitle": "Pricing — LaunchWake",

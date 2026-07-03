@@ -23,6 +23,19 @@ export async function generateMetadata(props: {
 // Icons pair with the "why it's different" cards by position (copy lives in i18n).
 const WHY_ICONS: IconName[] = ["where", "shield", "results"];
 
+// The platforms the channel catalog covers — a quiet logo strip in the hero,
+// line icons only (design system: no emoji, single accent). Order = visual only.
+const WORKS_WITH: IconName[] = [
+  "reddit",
+  "hn",
+  "x",
+  "linkedin",
+  "discord",
+  "slack",
+  "youtube",
+  "github",
+];
+
 export default async function LandingPage(props: {
   params: Promise<{ locale: Locale }>;
 }) {
@@ -34,11 +47,14 @@ export default async function LandingPage(props: {
   const pains = t.raw("pains") as { q: string; p: string }[];
   const steps = t.raw("steps") as { t: string; h: string; p: string }[];
   const why = t.raw("why") as { h: string; p: string }[];
+  const chips = t.raw("heroChips") as string[];
+  const proof = t.raw("proof") as { n: string; l: string }[];
 
   return (
     <PublicShell wide locale={locale}>
       {/* ── Hero ── */}
       <section className="lp-hero">
+        <div className="lp-hero-bg" aria-hidden />
         <div className="pub-eyebrow">
           <Icon name="wave" />
           {t("heroEyebrow")}
@@ -49,12 +65,45 @@ export default async function LandingPage(props: {
         </h1>
         <p className="lp-lede">{t("heroLede")}</p>
 
+        <ul className="lp-chips">
+          {chips.map((c) => (
+            <li key={c} className="lp-chip">
+              <Icon name="check" />
+              {c}
+            </li>
+          ))}
+        </ul>
+
         <div className="lp-try">
           <div className="lp-try-hd">
             <Icon name="target" />
             {t("heroTryHeadline")}
           </div>
           <LaunchChecker freeCount={PUBLIC_FREE_RECS} />
+        </div>
+
+        <div className="lp-works">
+          <span className="lp-works-label">{t("worksWithLabel")}</span>
+          <div className="lp-works-row">
+            {WORKS_WITH.map((name) => (
+              <span key={name} className="lp-works-ic" title={name}>
+                <Icon name={name} />
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Proof strip ── */}
+      <section className="lp-proof">
+        <div className="lp-kicker">{t("proofKicker")}</div>
+        <div className="lp-proof-grid">
+          {proof.map((s) => (
+            <div key={s.n} className="lp-stat">
+              <div className="lp-stat-n num">{s.n}</div>
+              <p className="lp-stat-l">{s.l}</p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -165,6 +214,7 @@ export default async function LandingPage(props: {
             {tc("signIn")}
           </Link>
         </div>
+        <p className="lp-final-note">{t("finalNote")}</p>
       </section>
     </PublicShell>
   );

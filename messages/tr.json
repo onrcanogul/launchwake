@@ -143,8 +143,30 @@
     "pricingTitle": "Ücretsiz başla. Dalga yaratınca öde.",
     "pricingHint": "Kredi kartı yok. Indie hacker'lar, dev-tool kurucuları ve onlar için lansman yapan ekipler için yapıldı. ",
     "pricingHintLink": "Tüm fiyatlandırmayı gör →",
+    "heroChips": [
+      "Başlamak için giriş yok",
+      "Senin yerine asla paylaşmaz",
+      "Atıf en baştan gömülü"
+    ],
+    "worksWithLabel": "Geliştiricilerin gerçekten lansman yaptığı yerler için tasarlandı",
+    "proofKicker": "Kurucular neden güveniyor",
+    "proof": [
+      {
+        "n": "100+",
+        "l": "özenle seçilmiş topluluk — her biri gerçek kuralları, tonu ve ban riskiyle"
+      },
+      {
+        "n": "0",
+        "l": "bot ya da otomatik paylaşım. Düşünmeyi LaunchWake yapar; yayına sen basarsın"
+      },
+      {
+        "n": "Uçtan uca",
+        "l": "her planda atıf — hangi kanalın kayıt getirdiğini nihayet görürsün"
+      }
+    ],
     "finalTitle": "Bir sonraki lansmanın bir izleyici hak ediyor.",
-    "finalLead": "Sen çıkar. Dalgayı biz yaratırız."
+    "finalLead": "Sen çıkar. Dalgayı biz yaratırız.",
+    "finalNote": "Ücretsiz başla · Kredi kartı yok · Launch Checker için giriş gerekmez"
   },
   "Pricing": {
     "metaTitle": "Fiyatlandırma — LaunchWake",
