@@ -26,5 +26,15 @@ export default async function LocaleLayout({
 
   setRequestLocale(locale);
 
-  return <NextIntlClientProvider>{children}</NextIntlClientProvider>;
+  // The root <html> is pinned to the default locale to stay statically
+  // rendered. Re-mark this localized subtree with the active locale so Turkish
+  // pages read correctly for search engines / assistive tech. `display:contents`
+  // means the wrapper adds no box — zero layout impact.
+  return (
+    <NextIntlClientProvider>
+      <div lang={locale} style={{ display: "contents" }}>
+        {children}
+      </div>
+    </NextIntlClientProvider>
+  );
 }

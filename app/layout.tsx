@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { getLocale } from "next-intl/server";
 import { Analytics } from "@vercel/analytics/next";
+import { routing } from "@/i18n/routing";
 import { env } from "@/lib/env";
 import "./globals.css";
 
@@ -22,15 +22,16 @@ export const metadata: Metadata = {
     : undefined,
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // `getLocale()` reflects the active marketing locale (en/tr) and falls back to
-  // the default for non-localized routes (/app, reports) — so `lang` is correct
-  // everywhere without a second root layout.
-  const locale = await getLocale();
+  // The root layout sits in EVERY route's chain, so it must stay static: calling
+  // a request API here (e.g. `getLocale()`) would opt every page out of static
+  // generation and force a serverless render on each first hit. We pin `lang` to
+  // the default locale; the localized `[locale]` layout re-marks its subtree with
+  // the active locale (see its `lang` wrapper) so Turkish pages read correctly.
   return (
-    <html lang={locale} className={`${inter.variable} h-full`}>
+    <html lang={routing.defaultLocale} className={`${inter.variable} h-full`}>
       <body>
         {children}
         {/* First-party, cookieless page-view analytics — see which SEO pages land. */}
