@@ -1871,6 +1871,51 @@ tbody tr {
 .pub-nav a.cta:hover {
   background: var(--ac2);
 }
+/* EN / TR language toggle — hairline pill, single restrained accent, no glow. */
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.lang-opt {
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--tx3);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: 0.12s;
+}
+.lang-opt:hover {
+  color: var(--tx);
+  background: var(--hover);
+}
+.lang-opt.is-active {
+  color: var(--ac);
+  background: var(--bg2);
+}
+/* Longer localized nav labels (e.g. "Fiyatlandırma") + the switcher can outgrow
+   a narrow header — let it wrap below the brand instead of overflowing. Desktop
+   layout is unchanged. */
+@media (max-width: 640px) {
+  .pub-bar {
+    height: auto;
+    flex-wrap: wrap;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    row-gap: 8px;
+  }
+  .pub-nav {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
 .pub-wrap {
   width: 100%;
   max-width: 880px;

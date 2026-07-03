@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { getLocale } from "next-intl/server";
 import { Analytics } from "@vercel/analytics/next";
 import { env } from "@/lib/env";
 import "./globals.css";
@@ -21,11 +22,15 @@ export const metadata: Metadata = {
     : undefined,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // `getLocale()` reflects the active marketing locale (en/tr) and falls back to
+  // the default for non-localized routes (/app, reports) — so `lang` is correct
+  // everywhere without a second root layout.
+  const locale = await getLocale();
   return (
-    <html lang="en" className={`${inter.variable} h-full`}>
+    <html lang={locale} className={`${inter.variable} h-full`}>
       <body>
         {children}
         {/* First-party, cookieless page-view analytics — see which SEO pages land. */}

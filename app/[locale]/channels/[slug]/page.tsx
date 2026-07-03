@@ -1,13 +1,14 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import {
   getPublicChannel,
   listPublicChannelSlugs,
   explainBanRisk,
   postingChecklist,
-  seoQuestion,
 } from "@/lib/publicCatalog";
+import { Link } from "@/i18n/navigation";
+import { alternatesFor, type Locale } from "@/i18n/paths";
 import { PublicShell } from "@/components/public/PublicShell";
 import { Icon } from "@/components/Icon";
 import { platformIcon } from "@/components/ui/platform";
@@ -21,23 +22,29 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata(props: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: Locale; slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await props.params;
+  const { locale, slug } = await props.params;
+  const t = await getTranslations({ locale, namespace: "ChannelDetail" });
+  const tr = await getTranslations({ locale, namespace: "Risk" });
   const channel = await getPublicChannel(slug);
-  if (!channel) return { title: "Channel not found — LaunchWake" };
-  const risk = channel.defaultBanRisk.toLowerCase();
+  if (!channel) return { title: t("notFound") };
+  const risk = tr(channel.defaultBanRisk as BanRiskValue).toLowerCase();
   return {
-    title: `${seoQuestion(channel)} — Rules & ban risk | LaunchWake`,
-    description: `${channel.name}: ${risk} ban risk. The posting rules, what gets removed, the safe way to share your launch, and the best time to post.`,
-    alternates: { canonical: `/channels/${slug}` },
+    title: `${t("question", { name: channel.name })} — ${t("metaTitleSuffix")}`,
+    description: t("metaDescription", { name: channel.name, risk }),
+    alternates: alternatesFor(`/channels/${slug}`, locale),
   };
 }
 
 export default async function ChannelPage(props: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: Locale; slug: string }>;
 }) {
-  const { slug } = await props.params;
+  const { locale, slug } = await props.params;
+  setRequestLocale(locale);
+  const t = await getTranslations("ChannelDetail");
+  const tc = await getTranslations("Common");
+  const tr = await getTranslations("Risk");
   const channel = await getPublicChannel(slug);
   if (!channel) notFound();
 
@@ -53,15 +60,19 @@ export default async function ChannelPage(props: {
     tags: channel.tags,
   };
 
+  // Note: the risk summary/factors and posting checklist are generated from the
+  // seeded catalog rules (analysis content, not UI chrome) and stay in English.
   const risk = explainBanRisk(like);
   const checklist = postingChecklist(like);
-  const riskMeta = RISK[channel.defaultBanRisk as BanRiskValue];
+  const riskValue = channel.defaultBanRisk as BanRiskValue;
+  const riskMeta = RISK[riskValue];
+  const riskLabel = tr(riskValue);
 
   return (
-    <PublicShell>
+    <PublicShell locale={locale}>
       <div style={{ marginBottom: 18, fontSize: 12, color: "var(--tx3)" }}>
         <Link href="/channels" style={{ color: "var(--tx2)" }}>
-          Channels
+          {t("breadcrumb")}
         </Link>{" "}
         / {channel.name}
       </div>
@@ -70,23 +81,23 @@ export default async function ChannelPage(props: {
         <Icon name={platformIcon(channel.platform)} />
         {channel.platform}
       </div>
-      <h1 className="pub-h1">{seoQuestion(like)}</h1>
+      <h1 className="pub-h1">{t("question", { name: channel.name })}</h1>
       <p className="pub-lede">{risk.summary}</p>
 
       <div className="cd-facts">
         <div className="cd-fact">
-          <div className="l">Ban risk</div>
+          <div className="l">{t("factBanRisk")}</div>
           <div className="v">
             <span className="dot" style={{ background: riskMeta.color }} aria-hidden />
-            {riskMeta.label}
+            {riskLabel}
           </div>
         </div>
         <div className="cd-fact">
-          <div className="l">Best time to post</div>
+          <div className="l">{t("factBestTime")}</div>
           <div className="v">{channel.bestTime ?? "—"}</div>
         </div>
         <div className="cd-fact">
-          <div className="l">Audience</div>
+          <div className="l">{t("factAudience")}</div>
           <div className="v" style={{ fontSize: 12.5, fontWeight: 450, color: "var(--tx2)" }}>
             {channel.audienceDesc ?? "—"}
           </div>
@@ -96,7 +107,7 @@ export default async function ChannelPage(props: {
       <section className="cd-sec">
         <h2>
           <Icon name="shield" />
-          Why the ban risk is {riskMeta.label.toLowerCase()}
+          {t("whyRiskHeading", { level: riskLabel.toLowerCase() })}
         </h2>
         <ul className="cd-factors">
           {risk.factors.map((f, i) => (
@@ -109,7 +120,7 @@ export default async function ChannelPage(props: {
         <section className="cd-sec">
           <h2>
             <Icon name="rules" />
-            The rules, in plain English
+            {t("rulesHeading")}
           </h2>
           <div className="cd-rules">{channel.rules}</div>
         </section>
@@ -118,11 +129,11 @@ export default async function ChannelPage(props: {
       <section className="cd-sec">
         <h2>
           <Icon name="check" />
-          How to post here safely
+          {t("safeHeading")}
         </h2>
         <div className="cd-cols">
           <div className="cd-do">
-            <div className="hd">Do</div>
+            <div className="hd">{t("do")}</div>
             <ul>
               {checklist.dos.map((d, i) => (
                 <li key={i}>{d}</li>
@@ -130,7 +141,7 @@ export default async function ChannelPage(props: {
             </ul>
           </div>
           <div className="cd-dont">
-            <div className="hd">Don&apos;t</div>
+            <div className="hd">{t("dont")}</div>
             <ul>
               {checklist.donts.map((d, i) => (
                 <li key={i}>{d}</li>
@@ -141,16 +152,12 @@ export default async function ChannelPage(props: {
       </section>
 
       <div className="gate">
-        <h3>Is {channel.name} even the right channel for your launch?</h3>
-        <p>
-          Paste your GitHub repo into the free Launch Checker and get a ranked
-          plan — which channels fit your product, their ban risk, and how to post
-          in each. No account needed.
-        </p>
+        <h3>{t("gateTitle", { name: channel.name })}</h3>
+        <p>{t("gateBody")}</p>
         <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
           <Link href="/tools/launch-checker" className="btn btn-p">
             <Icon name="target" />
-            Check my launch
+            {tc("checkMyLaunch")}
           </Link>
           {channel.url && (
             <a
@@ -160,7 +167,7 @@ export default async function ChannelPage(props: {
               className="btn btn-s"
             >
               <Icon name="external" />
-              Visit {channel.name}
+              {t("visit", { name: channel.name })}
             </a>
           )}
         </div>

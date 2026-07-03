@@ -1,30 +1,42 @@
 import type { Metadata } from "next";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { alternatesFor, type Locale } from "@/i18n/paths";
 import { PublicShell } from "@/components/public/PublicShell";
 import { Icon } from "@/components/Icon";
 import { getChangelog, formatChangelogDate, tagColor } from "@/lib/changelog";
 
-export const metadata: Metadata = {
-  title: "Changelog — LaunchWake",
-  description:
-    "What's new in LaunchWake — public launch reports, revenue attribution, launch-day run sheet, a 100+ channel catalog, and more.",
-  alternates: {
-    canonical: "/changelog",
-    types: { "application/rss+xml": "/changelog/rss.xml" },
-  },
-};
+export async function generateMetadata(props: {
+  params: Promise<{ locale: Locale }>;
+}): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "Changelog" });
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+    alternates: {
+      ...alternatesFor("/changelog", locale),
+      types: { "application/rss+xml": "/changelog/rss.xml" },
+    },
+  };
+}
 
-export default function ChangelogPage() {
+export default async function ChangelogPage(props: {
+  params: Promise<{ locale: Locale }>;
+}) {
+  const { locale } = await props.params;
+  setRequestLocale(locale);
+  const t = await getTranslations("Changelog");
   const entries = getChangelog();
 
   return (
-    <PublicShell>
+    <PublicShell locale={locale}>
       <div className="phead" style={{ alignItems: "center" }}>
         <div>
           <div className="pub-eyebrow">
             <Icon name="rss" />
-            Changelog
+            {t("eyebrow")}
           </div>
-          <h1 className="pub-h1">What&apos;s new in LaunchWake</h1>
+          <h1 className="pub-h1">{t("title")}</h1>
         </div>
         <a
           className="btn btn-s"
@@ -44,13 +56,13 @@ export default function ChangelogPage() {
                 {formatChangelogDate(e.date)}
               </time>
               <div className="clog-tags">
-                {e.tags.map((t) => (
+                {e.tags.map((tag) => (
                   <span
                     className="clog-tag"
-                    key={t}
-                    style={{ color: tagColor(t), borderColor: tagColor(t) }}
+                    key={tag}
+                    style={{ color: tagColor(tag), borderColor: tagColor(tag) }}
                   >
-                    {t}
+                    {tag}
                   </span>
                 ))}
               </div>

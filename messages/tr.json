@@ -1,0 +1,296 @@
+{
+  "Nav": {
+    "launchChecker": "Launch Checker",
+    "channels": "Kanallar",
+    "report": "Rapor",
+    "pricing": "Fiyatlandırma",
+    "changelog": "Değişiklikler",
+    "stateOfLaunches": "Lansman Durumu",
+    "signIn": "Giriş yap",
+    "footerTagline": "© LaunchWake — teknik kurucular için dağıtım zekâsı."
+  },
+  "LocaleSwitcher": {
+    "ariaLabel": "Dili değiştir"
+  },
+  "Risk": {
+    "LOW": "Düşük",
+    "MEDIUM": "Orta",
+    "HIGH": "Yüksek"
+  },
+  "Common": {
+    "checkMyLaunch": "Lansmanımı analiz et",
+    "signIn": "Giriş yap",
+    "startFree": "Ücretsiz başla",
+    "browseChannels": "Kanallara göz at",
+    "planALaunch": "Lansman planla"
+  },
+  "PricingCards": {
+    "free": {
+      "name": "Free",
+      "price": "$0",
+      "period": "sonsuza dek",
+      "desc": "İlk lansmanlarını planlaman için gereken her şey.",
+      "features": [
+        "1 proje",
+        "Ayda 2 lansman planı",
+        "Nereye paylaşacağın zekâsı + kurallar",
+        "Platforma özgü taslaklar"
+      ],
+      "cta": "Ücretsiz başla"
+    },
+    "pro": {
+      "badge": "En popüler",
+      "name": "Pro",
+      "price": "$29",
+      "period": "/ ay",
+      "desc": "Her hafta ürün çıkaran — ve dağıtan — kurucular için.",
+      "features": [
+        "Sınırsız proje ve plan",
+        "Her kanal için ban riski kuralları",
+        "Zamanlama ve hatırlatıcılar",
+        "Kayıt ve gelir atıfı + ROI"
+      ],
+      "cta": "Hemen başla"
+    },
+    "team": {
+      "name": "Team",
+      "period": "/ ay",
+      "desc": "Ajanslar ve DevRel ekipleri için — koltuk başına ${perSeat}, {minSeats} koltuktan itibaren.",
+      "features": [
+        "Pro'daki her şey, sınırsız",
+        "Ekibin için koltuk başına faturalama",
+        "Birden fazla müşteri ürünü",
+        "Ortak çalışma alanları ve davetler (yakında)"
+      ],
+      "cta": "Ekip oluştur"
+    }
+  },
+  "Landing": {
+    "metaTitle": "LaunchWake — Sen çıkar, dalgayı biz yaratırız.",
+    "metaDescription": "Teknik kurucular için dağıtım yardımcısı. Her lansmanda LaunchWake sana nereye paylaşacağını, ban yemeden nasıl yapacağını ve kayıtları gerçekte neyin getirdiğini söyler. Ücretsiz Launch Checker'ı dene — üyelik yok.",
+    "heroEyebrow": "Kod yazmayı tercih eden kurucular için",
+    "heroTitleLead": "Sen çıkar. ",
+    "heroTitleAccent": "Dalgayı biz yaratırız.",
+    "heroLede": "LaunchWake, teknik kurucular için dağıtım yardımcısıdır. Kullanıcılarının gerçekte nerede takıldığını bulur, tam olarak ne paylaşacağını ve nereye koyacağını söyler — sonra kayıtları asıl neyin getirdiğini gösterir.",
+    "heroTryHeadline": "Ücretsiz dene — bir GitHub deposu yapıştır, dağıtım planını al. Hesap gerekmez.",
+    "problemKicker": "Sorun",
+    "problemTitle": "Her şeyi yapabilirsin. Zor olan kullanıcı bulmak.",
+    "problemLead": "Çoğu teknik kurucu harika bir ürünü sessizliğe çıkarır. Ürün kötü olduğu için değil — pazarlama, hiç öğrenmek istemediğin yabancı bir dil gibi geldiği için.",
+    "pains": [
+      {
+        "q": "“Bunu nereye paylaşacağım ki?”",
+        "p": "Reddit, HN ve X'in var olduğunu biliyorsun. Ama hangi toplulukların, hangi yaklaşımın ya da seni upvote yerine ban ettirecek kuralların hangisi olduğunu bilmiyorsun."
+      },
+      {
+        "q": "“Buna ayıracak vaktim yok.”",
+        "p": "Lansman metni yazmakla geçen her saat, ürün geliştirmediğin bir saat. Böylece pazarlama aksar — ve ürün görünmez kalır."
+      },
+      {
+        "q": "“Hangisi işe yaradı ki?”",
+        "p": "Paylaşırsın, umut edersin, ama kayıtları hangi kanalın getirdiğini asla tam bilemezsin. Bu yüzden işe yarayanı daha fazla yapamazsın."
+      }
+    ],
+    "howKicker": "Nasıl çalışır",
+    "howTitle": "Analiz ve yönlendirme — kontrol sende kalır.",
+    "howLead": "LaunchWake senin yerine asla otomatik paylaşım yapmaz (hesaplar böyle ban yer). Düşünmeyi o yapar; yayınla'ya sen basarsın.",
+    "steps": [
+      {
+        "t": "Bağla",
+        "h": "Ne geliştirdiğini göster",
+        "p": "Ürün URL'ni, GitHub deponu ya da changelog'unu bırak. LaunchWake ne çıkardığını ve kimin için olduğunu anlar."
+      },
+      {
+        "t": "Analiz et",
+        "h": "Kullanıcılarının gerçekte nerede olduğunu bul",
+        "p": "Gerçek toplulukların özenle seçilmiş kataloğunu ürününe uygunluğa göre sıralar — her birinin tonu, kuralları ve ban riskiyle birlikte."
+      },
+      {
+        "t": "Yönlendir",
+        "h": "Metni, yeri ve zamanlamayı al",
+        "p": "Platforma özgü taslaklar ile bunları nerede ve ne zaman paylaşacağın — seni uçuran spam kalıplarına düşmeden, güvenle. Yayınla'ya sen basarsın."
+      },
+      {
+        "t": "Kanıtla",
+        "h": "Kayıtları gerçekte neyin getirdiğini gör",
+        "p": "İzlenen bağlantılar döngüyü kapatır: bu paylaşım → bu tıklamalar → bu kayıtlar. Artık neye yükleneceğini biliyorsun."
+      }
+    ],
+    "whyKicker": "Farkı ne",
+    "whyTitle": "Senin yerine spam atan bir başka yapay zekâ değil.",
+    "why": [
+      {
+        "h": "Otomasyon değil, zekâ",
+        "p": "Akıllı hamleyi sana söyler; hamleyi sen yaparsın. Bot orduları yok, sahte hesaplar yok — sadece sende eksik olan analiz."
+      },
+      {
+        "h": "Tasarımı gereği ban'a karşı güvenli",
+        "p": "Her öneri gerçek bir topluluğun kurallarına dayanır; böylece paylaşımların hesabını uçurmak yerine yerini bulur."
+      },
+      {
+        "h": "Görebildiğin ROI",
+        "p": "Her öneri gerçek atıfa bağlıdır. Hangi kanalın işe yaradığını tahmin etmeyi bırak — izle."
+      }
+    ],
+    "toolsKicker": "Ücretsiz, üyelik yok",
+    "toolsTitle": "Kaydolmadan önce değer görmeye başla.",
+    "toolLaunchCheckerTitle": "Launch Checker",
+    "toolLaunchCheckerDesc": "Bir GitHub deposu yapıştır ve sıralı bir dağıtım planı al — hangi kanallar uygun, ban riskleri ne ve her birinde nasıl paylaşacağın.",
+    "toolLaunchCheckerGo": "Launch Checker'ı aç",
+    "toolBanRiskTitle": "Ban Riski Sorgulama",
+    "toolBanRiskDesc": "Kurucuların lansman yaptığı her topluluk için paylaşım rehberi — kurallar, ban riski ve güvenli giriş yolu. “Startup'ımı r/SaaS'te paylaşabilir miyim?”",
+    "toolBanRiskGo": "Kanal kataloğuna göz at",
+    "pricingKicker": "Fiyatlandırma",
+    "pricingTitle": "Ücretsiz başla. Dalga yaratınca öde.",
+    "pricingHint": "Kredi kartı yok. Indie hacker'lar, dev-tool kurucuları ve onlar için lansman yapan ekipler için yapıldı. ",
+    "pricingHintLink": "Tüm fiyatlandırmayı gör →",
+    "finalTitle": "Bir sonraki lansmanın bir izleyici hak ediyor.",
+    "finalLead": "Sen çıkar. Dalgayı biz yaratırız."
+  },
+  "Pricing": {
+    "metaTitle": "Fiyatlandırma — LaunchWake",
+    "metaDescription": "LaunchWake için sade fiyatlandırma: İlk lansmanların için sonsuza dek Free, sınırsız plan + atıf için aylık $29'a Pro ve ajanslarla DevRel için koltuk bazlı Team planı. Başlamak için kredi kartı gerekmez.",
+    "eyebrow": "Fiyatlandırma",
+    "title": "Ücretsiz başla. Dalga yaratınca öde.",
+    "lede": "Asıl ürün zekânın kendisi — nereye paylaşacağın, ban yemeden nasıl paylaşacağın ve kayıtları gerçekte neyin getirdiği. Ücretsiz dene; dağıtım her lansmanın parçası olunca yükselt.",
+    "hint": "Başlamak için kredi kartı yok · dilediğinde iptal et · senin yerine asla otomatik paylaşım yapmaz.",
+    "faqKicker": "SSS",
+    "faqTitle": "Sorular, yanıtlandı.",
+    "faq": [
+      {
+        "q": "Gerçekten ücretsiz bir plan var mı?",
+        "a": "Evet — Free sonsuza dek. 1 proje ve ayda 2 dağıtım planı alırsın; nereye paylaşacağın zekâsının tamamı, ban riski kuralları ve platforma özgü taslaklarla birlikte. Kredi kartı yok."
+      },
+      {
+        "q": "“Plan” neyi kapsıyor?",
+        "a": "Dağıtım planı, tek bir lansman (bir sürüm, özellik ya da gönderi) için oluşturduğumuz sıralı kanal setidir. Free ayda 2 içerir; Pro ve Team sınırsızdır."
+      },
+      {
+        "q": "Team faturalaması nasıl işliyor?",
+        "a": "Team koltuk bazlıdır: koltuk başına $29, en az 3 koltuk, Stripe üzerinden aylık faturalanır. Koltukları istediğin zaman faturalama panelinden ekle veya çıkar. Çok sayıda ürün yöneten ajanslar ve DevRel ekipleri için yapıldı."
+      },
+      {
+        "q": "LaunchWake benim yerime paylaşım yapar mı?",
+        "a": "Asla. LaunchWake planı ve taslakları üretir; yayınla'ya kendi hesabından sen basarsın. Otomatik paylaşım, hesapların ban yeme sebebidir — bilerek kapsam dışı."
+      },
+      {
+        "q": "İstediğim zaman iptal edebilir miyim?",
+        "a": "Evet. Aboneliğini Ayarlar'daki faturalama panelinden yönet ya da iptal et; dönem sonuna kadar erişimin sürer, sonra Free'ye düşersin."
+      }
+    ],
+    "gateTitle": "Önce kendi dağıtım planını gör",
+    "gateBody": "Emin değil misin? Ücretsiz Launch Checker'a bir GitHub deposu yapıştır ve ürünün için sıralı bir plan al — hesap gerekmez."
+  },
+  "Channels": {
+    "metaTitle": "Startup'ımı nereye paylaşabilirim? Kanal kuralları ve ban riski — LaunchWake",
+    "metaDescription": "Teknik kurucuların lansman yaptığı toplulukların dizini — Hacker News, Reddit, Product Hunt ve daha fazlası — her birinin paylaşım kuralları, ban riski ve en iyi paylaşım zamanıyla.",
+    "eyebrow": "Ban Riski Sorgulama",
+    "title": "Startup'ını nereye — güvenle — paylaşabilirsin?",
+    "lede": "Her topluluğun yazılı olmayan kuralları vardır ve bunları çiğnemek paylaşımının silinmesine ya da hesabının banlanmasına yol açar. İşte teknik kurucuların gerçekten lansman yaptığı kanalların paylaşım rehberi.",
+    "banRiskSuffix": "ban riski"
+  },
+  "ChannelDetail": {
+    "metaTitleSuffix": "Kurallar ve ban riski | LaunchWake",
+    "metaDescription": "{name}: {risk} ban riski. Paylaşım kuralları, neyin silindiği, lansmanını paylaşmanın güvenli yolu ve en iyi paylaşım zamanı.",
+    "notFound": "Kanal bulunamadı — LaunchWake",
+    "question": "Startup'ımı {name} üzerinde paylaşabilir miyim?",
+    "breadcrumb": "Kanallar",
+    "factBanRisk": "Ban riski",
+    "factBestTime": "En iyi paylaşım zamanı",
+    "factAudience": "Kitle",
+    "whyRiskHeading": "Ban riski neden {level}",
+    "rulesHeading": "Kurallar, sade bir dille",
+    "safeHeading": "Burada güvenle nasıl paylaşılır",
+    "do": "Yap",
+    "dont": "Yapma",
+    "gateTitle": "{name} lansmanın için gerçekten doğru kanal mı?",
+    "gateBody": "GitHub deponu ücretsiz Launch Checker'a yapıştır ve sıralı bir plan al — hangi kanallar ürününe uygun, ban riskleri ne ve her birinde nasıl paylaşacağın. Hesap gerekmez.",
+    "visit": "{name} adresine git"
+  },
+  "LaunchCheckerPage": {
+    "metaTitle": "Launch Checker — GitHub projeni nereye paylaşmalısın? | LaunchWake",
+    "metaDescription": "Bir GitHub deposu yapıştır ve ücretsiz, sıralı bir dağıtım planı al: hangi topluluklar ürününe uygun, her birinin ban riski ne ve orada güvenle nasıl paylaşacağın. Üyelik yok.",
+    "eyebrow": "Ücretsiz Launch Checker",
+    "title": "Bunu nereye çıkarmalısın?",
+    "lede": "GitHub deponu yapıştır. Ne geliştirdiğini okuyup teknik kurucuların lansman yaptığı toplulukları sıralayalım — uygunluğa, ban riskine ve her birinde güvenli paylaşım yoluna göre. Hesap yok, kod erişimi yok."
+  },
+  "LaunchChecker": {
+    "inputPlaceholder": "sahip/depo  ya da  https://github.com/sahip/depo",
+    "inputAria": "GitHub deposu",
+    "submit": "Lansmanımı analiz et",
+    "submitLoading": "Kontrol ediliyor…",
+    "hint": "Yalnızca herkese açık depolar. Adı, açıklamayı ve son sürümü okuruz — kodunu asla.",
+    "errorGeneric": "Bir şeyler ters gitti. Tekrar dene.",
+    "errorNetwork": "Sunucuya ulaşılamadı. Tekrar dene.",
+    "planHeading": "{name} için dağıtım planı",
+    "basedOnShip": "Son {type} temel alındı: “{title}”.",
+    "basedOnRepo": "Depo açıklaman temel alındı.",
+    "rankedFrom": "LaunchWake'in {count} topluluktan oluşan kataloğuna göre sıralandı.",
+    "banRiskSuffix": "ban riski",
+    "rulesLink": "Kurallar ve ban riski",
+    "lockedName": "Kanal #{rank} — kilitli",
+    "lockedSub": "Görmek için kaydol",
+    "locked": "Kilitli",
+    "lockedWhy": "Uygunluk puanı, ban riski ve güvenli paylaşım yoluyla sıralı bir kanal — tam planda mevcut.",
+    "gateDoneTitle": "Listedesin — şimdi tam planı aç",
+    "gateDoneBody": "{name} için sıralı {count} kanalın tamamını görmek, platforma özgü taslaklar üretmek ve hangi kanalların kayıt getirdiğini izlemek için ücretsiz bir hesap oluştur.",
+    "gateDoneCta": "Ücretsiz hesap oluştur",
+    "gateTitle": "Tam planı aç",
+    "gateTitleMore": "Tam planı aç — {count} kanal daha",
+    "gateBody": "Bu planı kaydetmek için e-postanı gir. Sonra her sıralı kanalı görmek, taslak üretmek ve elde ettiğin kayıtları atfetmek için ücretsiz bir hesap oluştur.",
+    "emailPlaceholder": "sen@sirket.com",
+    "emailAria": "E-posta adresi",
+    "emailSubmit": "Tam planı bana e-postala",
+    "emailSubmitSaving": "Kaydediliyor…",
+    "errorSaveGeneric": "Kaydedilemedi. Tekrar dene."
+  },
+  "StateOfLaunches": {
+    "metaTitle": "Geliştirici Lansmanlarının Durumu — dev ürünleri gerçekte nereden kayıt alıyor",
+    "metaDescription": "Binlerce geliştirici ürünü lansmanının anonimleştirilmiş bir toplamı: hangi kanallar en çok kaydı getiriyor, hangisi en iyi dönüşüyor, kategoriye göre nasıl değişiyor, paylaşımlar nerede siliniyor ve en iyi paylaşım zamanı.",
+    "ogTitle": "Geliştirici Lansmanlarının Durumu",
+    "ogDescription": "Geliştirici ürünleri gerçekte nereden kayıt alıyor — gerçek lansmanların kanal, kategori, ban riski ve zamanlamaya göre anonimleştirilmiş bir toplamı.",
+    "eyebrow": "Yıllık veri raporu",
+    "titleLead": "Geliştirici Lansmanlarının Durumu ",
+    "lede": "Teknik kurucuların gerçekte nereden lansman yaptığını — izlenen her lansman genelinde anonimleştirerek — bir araya getirdik ki hiçbir blog yazısının yanıtlayamadığı soruyu yanıtlayalım: hangi kanallar gerçekten kayıt getiriyor, hangisi dönüşüyor ve paylaşımlar nerede siliniyor.",
+    "compilingTitle": "{year} raporu hâlâ derleniyor",
+    "compilingBody": "Bu rapor, kurucular dağıtım planlarını LaunchWake üzerinden çalıştırdıkça gerçek lansman sonuçlarından oluşturulur. Yeterli lansman izlendiğinde (bir kanalı yalnızca en az {min} paylaşımdan sonra yayımlarız, böylece hiçbir kurucunun rakamları asla açığa çıkmaz), tüm dökümü burada görürsün — kanala, kategoriye, ban riskine ve zamanlamaya göre.",
+    "statLaunches": "İzlenen lansmanlar",
+    "statSignups": "Atfedilen kayıtlar",
+    "statConversion": "Ort. dönüşüm",
+    "statChannels": "Sıralanan kanallar",
+    "topChannelsHeading": "Kayda göre en iyi kanallar",
+    "bestConvertersHeading": "En iyi dönüştürenler (tıklama başına kayıt)",
+    "bestConvertersNote": "Arkasında gerçek trafik olan kanallar — ham erişim, dönüşmüyorsa hiçbir şey ifade etmez.",
+    "byCategoryHeading": "Her kategori nereden kayıt alıyor",
+    "banRatesHeading": "Paylaşımlar nerede siliniyor",
+    "bestTimesHeading": "En iyi paylaşım zamanı",
+    "methodologyHeading": "Bunu nasıl oluşturduk",
+    "methodologyBody": "Her rakam anonimleştirilmiş, toplu lansman sonuçlarından gelir — asla bireysel bir hesaptan değil. Bir kanal, ancak arkasında en az {min} izlenen paylaşım olduğunda görünür; böylece hiçbir kurucunun sonuçları çıkarsanamaz. Kanallar LaunchWake'in özenle seçilmiş kataloğuna dayanır; bu yüzden rapor kurucuların gerçekten paylaştığı toplulukları yansıtır — uydurma olanları değil. Dönüşüm, kayıt ÷ izlenen bağlantı tıklaması; silinme oranı, silinen paylaşım ÷ toplam paylaşım.",
+    "signups": "kayıt",
+    "conv": "dönüşüm",
+    "signupsSlashClicks": "{signups} kayıt / {clicks} tıklama",
+    "riskSuffix": "risk",
+    "ctaTitle": "Bir sonraki lansmanın için bu sinyali ister misin?",
+    "ctaBody": "LaunchWake bu toplamı senin ürününe özel bir plana dönüştürür: nereye paylaşacağın, ban yemeden nasıl paylaşacağın ve hangi kanalların gerçekten kayıt getirdiği — ücretsiz, hesap gerekmez."
+  },
+  "Changelog": {
+    "metaTitle": "Değişiklikler — LaunchWake",
+    "metaDescription": "LaunchWake'te yenilikler — herkese açık lansman raporları, gelir atıfı, lansman günü akış listesi, 100+ kanallık katalog ve daha fazlası.",
+    "eyebrow": "Değişiklikler",
+    "title": "LaunchWake'te neler yeni"
+  },
+  "Login": {
+    "metaTitle": "Giriş yap — LaunchWake",
+    "metaDescription": "LaunchWake'e giriş yap — teknik kurucular için dağıtım yardımcısı.",
+    "subtitle": "Kod yazmayı tercih eden kurucular için pazarlama zekâsı.",
+    "footer": "GitHub önerilir — ileride lansman otomatik algılamayı etkinleştirir.",
+    "continueGithub": "GitHub ile devam et",
+    "or": "veya",
+    "magicLinkSent": "Sihirli bağlantı için gelen kutunu kontrol et.",
+    "workEmail": "İş e-postası",
+    "emailPlaceholder": "sen@startup.dev",
+    "continueEmail": "E-posta ile devam et",
+    "noProviders": "Yapılandırılmış OAuth sağlayıcısı yok. Girişi etkinleştirmek için env'inde AUTH_GITHUB_ID / EMAIL_SERVER değerlerini ayarla.",
+    "demo": "demo",
+    "continueDemo": "Demo olarak devam et (Hookline)"
+  }
+}

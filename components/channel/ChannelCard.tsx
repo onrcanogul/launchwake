@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import { RISK, type BanRiskValue } from "@/components/ui/risk";
@@ -74,9 +75,9 @@ export function ChannelCard({
           <span className="bench-label">{benchmark.label}</span>
           <b className="bench-val">{benchmark.value}</b>
           {benchmark.locked ? (
-            <a className="bench-lock" href="/app/settings" title="Unlock category benchmarks with Pro">
+            <Link className="bench-lock" href="/app/settings" title="Unlock category benchmarks with Pro">
               <Icon name="lock" /> Pro
-            </a>
+            </Link>
           ) : (
             benchmark.sub && <span className="bench-sub">{benchmark.sub}</span>
           )}

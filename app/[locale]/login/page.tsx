@@ -1,13 +1,33 @@
+import type { Metadata } from "next";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { alternatesFor, type Locale } from "@/i18n/paths";
 import { Icon } from "@/components/Icon";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { env } from "@/lib/env";
 
+export async function generateMetadata(props: {
+  params: Promise<{ locale: Locale }>;
+}): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "Login" });
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+    alternates: alternatesFor("/login", locale),
+  };
+}
+
 export default async function LoginPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ locale: Locale }>;
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
+  const { locale } = await params;
+  setRequestLocale(locale);
   const { callbackUrl } = await searchParams;
+  const t = await getTranslations("Login");
 
   return (
     <section className="auth">
@@ -15,7 +35,7 @@ export default async function LoginPage({
         <div className="authlogo">
           <Icon name="wave" /> LaunchWake
         </div>
-        <p className="sub">Marketing intel for founders who&apos;d rather be coding.</p>
+        <p className="sub">{t("subtitle")}</p>
 
         <LoginForm
           githubEnabled={Boolean(env.AUTH_GITHUB_ID && env.AUTH_GITHUB_SECRET)}
@@ -24,9 +44,7 @@ export default async function LoginPage({
           callbackUrl={callbackUrl ?? "/app"}
         />
 
-        <p className="authfoot">
-          GitHub is recommended — it enables ship auto-detection later.
-        </p>
+        <p className="authfoot">{t("footer")}</p>
       </div>
 
       <svg

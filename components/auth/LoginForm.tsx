@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { signIn } from "next-auth/react";
 import { Icon } from "@/components/Icon";
 
@@ -17,6 +18,7 @@ export function LoginForm({
   demoEnabled,
   callbackUrl,
 }: Props) {
+  const t = useTranslations("Login");
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -44,23 +46,23 @@ export function LoginForm({
           disabled={pending !== null}
         >
           <Icon name="github" style={{ fill: "currentColor", stroke: "none" }} />
-          Continue with GitHub
+          {t("continueGithub")}
         </button>
       )}
 
       {emailEnabled && (
         <>
-          {githubEnabled && <div className="divider">or</div>}
+          {githubEnabled && <div className="divider">{t("or")}</div>}
           {sent ? (
             <p style={{ color: "var(--ac)", fontSize: 13, textAlign: "center" }}>
-              Check your inbox for a magic link.
+              {t("magicLinkSent")}
             </p>
           ) : (
             <>
-              <label className="fl">Work email</label>
+              <label className="fl">{t("workEmail")}</label>
               <input
                 className="inp"
-                placeholder="you@startup.dev"
+                placeholder={t("emailPlaceholder")}
                 style={{ marginBottom: 12 }}
                 type="email"
                 value={email}
@@ -71,7 +73,7 @@ export function LoginForm({
                 onClick={sendEmail}
                 disabled={pending !== null}
               >
-                Continue with email
+                {t("continueEmail")}
               </button>
             </>
           )}
@@ -80,20 +82,19 @@ export function LoginForm({
 
       {!githubEnabled && !emailEnabled && (
         <p style={{ color: "var(--tx3)", fontSize: 12, textAlign: "center" }}>
-          No OAuth providers are configured. Set AUTH_GITHUB_ID / EMAIL_SERVER in
-          your env to enable sign-in.
+          {t("noProviders")}
         </p>
       )}
 
       {demoEnabled && (
         <>
-          <div className="divider">demo</div>
+          <div className="divider">{t("demo")}</div>
           <button
             className="btn btn-s btn-lg"
             onClick={() => start("demo", { callbackUrl: "/app" })}
             disabled={pending !== null}
           >
-            <Icon name="arrowRight" /> Continue as demo (Hookline)
+            <Icon name="arrowRight" /> {t("continueDemo")}
           </button>
         </>
       )}

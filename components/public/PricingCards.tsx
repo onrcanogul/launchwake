@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { TEAM_PRICE_PER_SEAT_CENTS, TEAM_MIN_SEATS } from "@/lib/billing";
 
 const TEAM_FROM = (TEAM_PRICE_PER_SEAT_CENTS * TEAM_MIN_SEATS) / 100;
@@ -6,60 +7,63 @@ const TEAM_PER_SEAT = TEAM_PRICE_PER_SEAT_CENTS / 100;
 
 /**
  * The Free / Pro / Team cards — one source of truth, shared by the landing hero
- * and the standalone /pricing page so they never drift.
+ * and the standalone /pricing page so they never drift. Copy is localized; the
+ * prices/seat math come from `lib/billing`.
  */
-export function PricingCards({ ctaHref = "/login" }: { ctaHref?: string }) {
+export async function PricingCards({ ctaHref = "/login" }: { ctaHref?: string }) {
+  const t = await getTranslations("PricingCards");
+  const freeFeatures = t.raw("free.features") as string[];
+  const proFeatures = t.raw("pro.features") as string[];
+  const teamFeatures = t.raw("team.features") as string[];
+
   return (
     <div className="lp-price">
       <div className="lp-pc">
-        <div className="lp-pc-name">Free</div>
+        <div className="lp-pc-name">{t("free.name")}</div>
         <div className="lp-p">
-          $0 <small>forever</small>
+          {t("free.price")} <small>{t("free.period")}</small>
         </div>
-        <p className="lp-pc-desc">Everything you need to plan your first launches.</p>
+        <p className="lp-pc-desc">{t("free.desc")}</p>
         <ul>
-          <li>1 project</li>
-          <li>2 launch plans / month</li>
-          <li>Where-to-post intelligence + rules</li>
-          <li>Platform-native drafts</li>
+          {freeFeatures.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
         </ul>
         <Link href={ctaHref} className="btn btn-s btn-lg">
-          Start free
+          {t("free.cta")}
         </Link>
       </div>
       <div className="lp-pc hi">
-        <span className="lp-pc-badge">Most popular</span>
-        <div className="lp-pc-name">Pro</div>
+        <span className="lp-pc-badge">{t("pro.badge")}</span>
+        <div className="lp-pc-name">{t("pro.name")}</div>
         <div className="lp-p">
-          $29 <small>/ mo</small>
+          {t("pro.price")} <small>{t("pro.period")}</small>
         </div>
-        <p className="lp-pc-desc">For founders shipping — and distributing — every week.</p>
+        <p className="lp-pc-desc">{t("pro.desc")}</p>
         <ul>
-          <li>Unlimited projects &amp; plans</li>
-          <li>Ban-risk rules for every channel</li>
-          <li>Scheduling &amp; reminders</li>
-          <li>Signup &amp; revenue attribution + ROI</li>
+          {proFeatures.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
         </ul>
         <Link href={ctaHref} className="btn btn-p btn-lg">
-          Get started
+          {t("pro.cta")}
         </Link>
       </div>
       <div className="lp-pc">
-        <div className="lp-pc-name">Team</div>
+        <div className="lp-pc-name">{t("team.name")}</div>
         <div className="lp-p">
-          ${TEAM_FROM} <small>/ mo</small>
+          ${TEAM_FROM} <small>{t("team.period")}</small>
         </div>
         <p className="lp-pc-desc">
-          For agencies &amp; DevRel teams — ${TEAM_PER_SEAT}/seat, from {TEAM_MIN_SEATS} seats.
+          {t("team.desc", { perSeat: TEAM_PER_SEAT, minSeats: TEAM_MIN_SEATS })}
         </p>
         <ul>
-          <li>Everything in Pro, unlimited</li>
-          <li>Per-seat billing for your team</li>
-          <li>Multiple client products</li>
-          <li>Shared workspaces &amp; invites (soon)</li>
+          {teamFeatures.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
         </ul>
         <Link href={ctaHref} className="btn btn-s btn-lg">
-          Start a team
+          {t("team.cta")}
         </Link>
       </div>
     </div>

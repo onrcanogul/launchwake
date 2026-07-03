@@ -1,0 +1,296 @@
+{
+  "Nav": {
+    "launchChecker": "Launch Checker",
+    "channels": "Channels",
+    "report": "Report",
+    "pricing": "Pricing",
+    "changelog": "Changelog",
+    "stateOfLaunches": "State of Launches",
+    "signIn": "Sign in",
+    "footerTagline": "© LaunchWake — distribution intelligence for technical founders."
+  },
+  "LocaleSwitcher": {
+    "ariaLabel": "Change language"
+  },
+  "Risk": {
+    "LOW": "Low",
+    "MEDIUM": "Medium",
+    "HIGH": "High"
+  },
+  "Common": {
+    "checkMyLaunch": "Check my launch",
+    "signIn": "Sign in",
+    "startFree": "Start free",
+    "browseChannels": "Browse channels",
+    "planALaunch": "Plan a launch"
+  },
+  "PricingCards": {
+    "free": {
+      "name": "Free",
+      "price": "$0",
+      "period": "forever",
+      "desc": "Everything you need to plan your first launches.",
+      "features": [
+        "1 project",
+        "2 launch plans / month",
+        "Where-to-post intelligence + rules",
+        "Platform-native drafts"
+      ],
+      "cta": "Start free"
+    },
+    "pro": {
+      "badge": "Most popular",
+      "name": "Pro",
+      "price": "$29",
+      "period": "/ mo",
+      "desc": "For founders shipping — and distributing — every week.",
+      "features": [
+        "Unlimited projects & plans",
+        "Ban-risk rules for every channel",
+        "Scheduling & reminders",
+        "Signup & revenue attribution + ROI"
+      ],
+      "cta": "Get started"
+    },
+    "team": {
+      "name": "Team",
+      "period": "/ mo",
+      "desc": "For agencies & DevRel teams — ${perSeat}/seat, from {minSeats} seats.",
+      "features": [
+        "Everything in Pro, unlimited",
+        "Per-seat billing for your team",
+        "Multiple client products",
+        "Shared workspaces & invites (soon)"
+      ],
+      "cta": "Start a team"
+    }
+  },
+  "Landing": {
+    "metaTitle": "LaunchWake — Ship it. We'll make the waves.",
+    "metaDescription": "The distribution co-pilot for technical founders. For every ship, LaunchWake tells you where to post it, how to post without getting banned, and what actually drove signups. Try the free Launch Checker — no login.",
+    "heroEyebrow": "For founders who'd rather be coding",
+    "heroTitleLead": "Ship it. ",
+    "heroTitleAccent": "We'll make the waves.",
+    "heroLede": "LaunchWake is the distribution co-pilot for technical founders. It finds where your users actually hang out, tells you exactly what to post and where — then shows you what really drove signups.",
+    "heroTryHeadline": "Try it free — paste a GitHub repo, get a distribution plan. No account.",
+    "problemKicker": "The problem",
+    "problemTitle": "You can build anything. Getting users is the hard part.",
+    "problemLead": "Most technical founders ship a great product into silence. Not because it's bad — because marketing feels like a foreign language you never wanted to learn.",
+    "pains": [
+      {
+        "q": "“Where do I even post this?”",
+        "p": "You know Reddit, HN and X exist. You don't know which communities, which angle, or the rules that get you banned instead of upvoted."
+      },
+      {
+        "q": "“I don't have time for this.”",
+        "p": "Every hour writing a launch post is an hour not building. So marketing slips — and the product stays invisible."
+      },
+      {
+        "q": "“Did any of it even work?”",
+        "p": "You post, you hope, you never really know which channel brought the signups. So you can't do more of what works."
+      }
+    ],
+    "howKicker": "How it works",
+    "howTitle": "Analysis and guidance — you stay in control.",
+    "howLead": "LaunchWake never auto-posts for you (that's how accounts get banned). It does the thinking; you press publish.",
+    "steps": [
+      {
+        "t": "Connect",
+        "h": "Point it at what you're building",
+        "p": "Drop your product URL, GitHub repo or changelog. LaunchWake understands what you shipped and who it's for."
+      },
+      {
+        "t": "Analyze",
+        "h": "Find where your users actually are",
+        "p": "It ranks a curated catalog of real communities by fit for your product — with each one's tone, rules and ban risk."
+      },
+      {
+        "t": "Guide",
+        "h": "Get the post, the place, the timing",
+        "p": "Platform-native drafts plus where and when to post them — safely, without the spammy patterns that get you nuked. You hit publish."
+      },
+      {
+        "t": "Prove",
+        "h": "See what actually drove signups",
+        "p": "Tracked links close the loop: this post → these clicks → these signups. Now you know what to double down on."
+      }
+    ],
+    "whyKicker": "Why it's different",
+    "whyTitle": "Not another AI that posts spam for you.",
+    "why": [
+      {
+        "h": "Intelligence, not autopilot",
+        "p": "It tells you the smart move; you make it. No bot armies, no fake accounts — just the analysis you're missing."
+      },
+      {
+        "h": "Ban-safe by design",
+        "p": "Every recommendation is grounded in a real community's rules, so your posts land instead of getting your account nuked."
+      },
+      {
+        "h": "ROI you can see",
+        "p": "Every suggestion is tied to real attribution. Stop guessing which channel worked — watch it."
+      }
+    ],
+    "toolsKicker": "Free, no login",
+    "toolsTitle": "Start getting value before you sign up.",
+    "toolLaunchCheckerTitle": "Launch Checker",
+    "toolLaunchCheckerDesc": "Paste a GitHub repo and get a ranked distribution plan — which channels fit, their ban risk, and how to post in each.",
+    "toolLaunchCheckerGo": "Open Launch Checker",
+    "toolBanRiskTitle": "Ban Risk Lookup",
+    "toolBanRiskDesc": "The posting playbook for every community founders launch in — rules, ban risk, and the safe way in. “Can I post my startup on r/SaaS?”",
+    "toolBanRiskGo": "Browse the channel catalog",
+    "pricingKicker": "Pricing",
+    "pricingTitle": "Start free. Pay when it makes waves.",
+    "pricingHint": "No credit card. Built for indie hackers, dev-tool founders & the teams that launch for them. ",
+    "pricingHintLink": "See full pricing →",
+    "finalTitle": "Your next launch deserves an audience.",
+    "finalLead": "Ship it. We'll make the waves."
+  },
+  "Pricing": {
+    "metaTitle": "Pricing — LaunchWake",
+    "metaDescription": "Simple pricing for LaunchWake: Free forever for your first launches, Pro at $29/mo for unlimited plans + attribution, and a seat-based Team plan for agencies & DevRel. No credit card to start.",
+    "eyebrow": "Pricing",
+    "title": "Start free. Pay when it makes waves.",
+    "lede": "The intelligence is the product — where to post, how to post without getting banned, and what actually drove signups. Try it free; upgrade when distribution becomes part of every ship.",
+    "hint": "No credit card to start · cancel anytime · never auto-posts on your behalf.",
+    "faqKicker": "FAQ",
+    "faqTitle": "Questions, answered.",
+    "faq": [
+      {
+        "q": "Is there really a free plan?",
+        "a": "Yes — Free is forever. You get 1 project and 2 distribution plans a month, with the full where-to-post intelligence, ban-risk rules, and platform-native drafts. No credit card."
+      },
+      {
+        "q": "What counts as a “plan”?",
+        "a": "A distribution plan is the ranked set of channels we generate for one ship (a release, feature, or post). Free includes 2 per month; Pro and Team are unlimited."
+      },
+      {
+        "q": "How does Team billing work?",
+        "a": "Team is seat-based: $29 per seat with a 3-seat minimum, billed monthly through Stripe. Add or remove seats anytime from the billing portal. Built for agencies and DevRel teams running many products."
+      },
+      {
+        "q": "Does LaunchWake post for me?",
+        "a": "Never. LaunchWake generates the plan and the drafts; you press publish from your own account. Auto-posting is how accounts get banned — it's out of scope on purpose."
+      },
+      {
+        "q": "Can I cancel anytime?",
+        "a": "Yes. Manage or cancel your subscription from the billing portal in Settings; you keep access until the end of the period, then drop to Free."
+      }
+    ],
+    "gateTitle": "See your own distribution plan first",
+    "gateBody": "Not sure yet? Paste a GitHub repo into the free Launch Checker and get a ranked plan for your product — no account needed."
+  },
+  "Channels": {
+    "metaTitle": "Where can I post my startup? Channel rules & ban risk — LaunchWake",
+    "metaDescription": "A directory of the communities technical founders launch in — Hacker News, Reddit, Product Hunt and more — with each one's posting rules, ban risk and best time to post.",
+    "eyebrow": "Ban Risk Lookup",
+    "title": "Where can you post your startup — safely?",
+    "lede": "Every community has unwritten rules, and breaking them gets your post removed or your account banned. Here's the posting playbook for the channels technical founders actually launch in.",
+    "banRiskSuffix": "ban risk"
+  },
+  "ChannelDetail": {
+    "metaTitleSuffix": "Rules & ban risk | LaunchWake",
+    "metaDescription": "{name}: {risk} ban risk. The posting rules, what gets removed, the safe way to share your launch, and the best time to post.",
+    "notFound": "Channel not found — LaunchWake",
+    "question": "Can I post my startup on {name}?",
+    "breadcrumb": "Channels",
+    "factBanRisk": "Ban risk",
+    "factBestTime": "Best time to post",
+    "factAudience": "Audience",
+    "whyRiskHeading": "Why the ban risk is {level}",
+    "rulesHeading": "The rules, in plain English",
+    "safeHeading": "How to post here safely",
+    "do": "Do",
+    "dont": "Don't",
+    "gateTitle": "Is {name} even the right channel for your launch?",
+    "gateBody": "Paste your GitHub repo into the free Launch Checker and get a ranked plan — which channels fit your product, their ban risk, and how to post in each. No account needed.",
+    "visit": "Visit {name}"
+  },
+  "LaunchCheckerPage": {
+    "metaTitle": "Launch Checker — where should you post your GitHub project? | LaunchWake",
+    "metaDescription": "Paste a GitHub repo and get a free, ranked distribution plan: which communities fit your product, each one's ban risk, and how to post there safely. No login.",
+    "eyebrow": "Free Launch Checker",
+    "title": "Where should you launch this?",
+    "lede": "Paste your GitHub repo. We'll read what you built and rank the communities technical founders launch in — by fit, ban risk, and the safe way to post in each. No account, no code access."
+  },
+  "LaunchChecker": {
+    "inputPlaceholder": "owner/repo  or  https://github.com/owner/repo",
+    "inputAria": "GitHub repository",
+    "submit": "Check my launch",
+    "submitLoading": "Checking…",
+    "hint": "Public repos only. We read the name, description and latest release — never your code.",
+    "errorGeneric": "Something went wrong. Try again.",
+    "errorNetwork": "Couldn't reach the server. Try again.",
+    "planHeading": "Distribution plan for {name}",
+    "basedOnShip": "Based on your latest {type}: “{title}”.",
+    "basedOnRepo": "Based on your repo description.",
+    "rankedFrom": "Ranked from LaunchWake's catalog of {count} communities.",
+    "banRiskSuffix": "ban risk",
+    "rulesLink": "Rules & ban risk",
+    "lockedName": "Channel #{rank} — locked",
+    "lockedSub": "Sign up to reveal",
+    "locked": "Locked",
+    "lockedWhy": "A ranked channel with its fit score, ban risk and the safe way to post — available in the full plan.",
+    "gateDoneTitle": "You're on the list — now unlock the full plan",
+    "gateDoneBody": "Create a free account to see all {count} ranked channels for {name}, generate platform-native drafts, and track which channels actually drive signups.",
+    "gateDoneCta": "Create free account",
+    "gateTitle": "Unlock the full plan",
+    "gateTitleMore": "Unlock the full plan — {count} more channels",
+    "gateBody": "Enter your email to save this plan. Then create a free account to reveal every ranked channel, generate drafts, and attribute the signups you get.",
+    "emailPlaceholder": "you@company.com",
+    "emailAria": "Email address",
+    "emailSubmit": "Email me the full plan",
+    "emailSubmitSaving": "Saving…",
+    "errorSaveGeneric": "Couldn't save that. Try again."
+  },
+  "StateOfLaunches": {
+    "metaTitle": "The State of Developer Launches — where dev products actually get signups",
+    "metaDescription": "An anonymized aggregate of thousands of developer product launches: which channels drive the most signups, which convert best, how it differs by category, where posts get removed, and the best time to post.",
+    "ogTitle": "The State of Developer Launches",
+    "ogDescription": "Where developer products actually get signups — an anonymized aggregate of real launches, by channel, category, ban risk and timing.",
+    "eyebrow": "Annual data report",
+    "titleLead": "The State of Developer Launches ",
+    "lede": "We aggregated where technical founders actually launch — anonymized across every tracked launch — to answer the question no blog post can: which channels really drive signups, which convert, and where posts get removed.",
+    "compilingTitle": "The {year} report is still compiling",
+    "compilingBody": "This report is built from real launch outcomes as founders run their distribution plans through LaunchWake. Once enough launches are tracked (we only publish a channel after at least {min} posts, so no single founder's numbers are ever exposed), the full breakdown appears here — by channel, category, ban risk and timing.",
+    "statLaunches": "Launches tracked",
+    "statSignups": "Signups attributed",
+    "statConversion": "Avg. conversion",
+    "statChannels": "Channels ranked",
+    "topChannelsHeading": "Top channels by signups",
+    "bestConvertersHeading": "Best converters (signups per click)",
+    "bestConvertersNote": "Channels with at least real traffic behind them — raw reach means nothing if it doesn't convert.",
+    "byCategoryHeading": "Where each category gets signups",
+    "banRatesHeading": "Where posts get removed",
+    "bestTimesHeading": "The best time to post",
+    "methodologyHeading": "How we built this",
+    "methodologyBody": "Every number comes from anonymized, aggregate launch outcomes — never any individual account. A channel appears only once it has at least {min} tracked posts behind it, so no single founder's results can be inferred. Channels are grounded in LaunchWake's curated catalog, so the report reflects communities founders actually post in — not invented ones. Conversion is signups ÷ tracked-link clicks; removal rate is removed posts ÷ total posts.",
+    "signups": "signups",
+    "conv": "conv",
+    "signupsSlashClicks": "{signups} signups / {clicks} clicks",
+    "riskSuffix": "risk",
+    "ctaTitle": "Want this signal for your next launch?",
+    "ctaBody": "LaunchWake turns this aggregate into a plan for your specific product: where to post, how to post without getting banned, and which channels actually drive your signups — free, no account needed."
+  },
+  "Changelog": {
+    "metaTitle": "Changelog — LaunchWake",
+    "metaDescription": "What's new in LaunchWake — public launch reports, revenue attribution, launch-day run sheet, a 100+ channel catalog, and more.",
+    "eyebrow": "Changelog",
+    "title": "What's new in LaunchWake"
+  },
+  "Login": {
+    "metaTitle": "Sign in — LaunchWake",
+    "metaDescription": "Sign in to LaunchWake — the distribution co-pilot for technical founders.",
+    "subtitle": "Marketing intel for founders who'd rather be coding.",
+    "footer": "GitHub is recommended — it enables ship auto-detection later.",
+    "continueGithub": "Continue with GitHub",
+    "or": "or",
+    "magicLinkSent": "Check your inbox for a magic link.",
+    "workEmail": "Work email",
+    "emailPlaceholder": "you@startup.dev",
+    "continueEmail": "Continue with email",
+    "noProviders": "No OAuth providers are configured. Set AUTH_GITHUB_ID / EMAIL_SERVER in your env to enable sign-in.",
+    "demo": "demo",
+    "continueDemo": "Continue as demo (Hookline)"
+  }
+}

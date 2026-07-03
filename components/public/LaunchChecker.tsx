@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { Icon } from "@/components/Icon";
 import { platformIcon } from "@/components/ui/platform";
 import { RISK, type BanRiskValue } from "@/components/ui/risk";
@@ -14,6 +15,7 @@ import type { PublicPlan, PublicRec } from "@/lib/launchChecker";
  * server so this file never imports the DB-backed lib graph.
  */
 export function LaunchChecker({ freeCount }: { freeCount: number }) {
+  const t = useTranslations("LaunchChecker");
   const [repo, setRepo] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,13 +36,13 @@ export function LaunchChecker({ freeCount }: { freeCount: number }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Something went wrong. Try again.");
+        setError(data.error ?? t("errorGeneric"));
         return;
       }
       setPlan(data.plan as PublicPlan);
       setRepoName(data.repo as string);
     } catch {
-      setError("Couldn't reach the server. Try again.");
+      setError(t("errorNetwork"));
     } finally {
       setLoading(false);
     }
@@ -51,10 +53,10 @@ export function LaunchChecker({ freeCount }: { freeCount: number }) {
       <form className="lc-form" onSubmit={check}>
         <input
           className="lc-input mono"
-          placeholder="owner/repo  or  https://github.com/owner/repo"
+          placeholder={t("inputPlaceholder")}
           value={repo}
           onChange={(e) => setRepo(e.target.value)}
-          aria-label="GitHub repository"
+          aria-label={t("inputAria")}
           autoComplete="off"
           spellCheck={false}
         />
@@ -63,13 +65,10 @@ export function LaunchChecker({ freeCount }: { freeCount: number }) {
           className="btn btn-p"
           disabled={loading || !repo.trim()}
         >
-          {loading ? "Checking…" : "Check my launch"}
+          {loading ? t("submitLoading") : t("submit")}
         </button>
       </form>
-      <div className="lc-hint">
-        Public repos only. We read the name, description and latest release — never
-        your code.
-      </div>
+      <div className="lc-hint">{t("hint")}</div>
       {error && <div className="lc-error">{error}</div>}
 
       {plan && (
@@ -88,6 +87,7 @@ function Results({
   repoName: string | null;
   freeCount: number;
 }) {
+  const t = useTranslations("LaunchChecker");
   const free = plan.recs.slice(0, freeCount);
   const locked = plan.recs.slice(freeCount);
   const moreCount = Math.max(0, plan.totalChannels - free.length);
@@ -97,13 +97,16 @@ function Results({
       <div className="phead" style={{ marginBottom: 16 }}>
         <div>
           <h2 style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.02em" }}>
-            Distribution plan for {plan.project.name}
+            {t("planHeading", { name: plan.project.name })}
           </h2>
           <div className="psub" style={{ marginTop: 4 }}>
             {plan.ship
-              ? `Based on your latest ${plan.ship.type.toLowerCase()}: “${plan.ship.title}”.`
-              : "Based on your repo description."}{" "}
-            Ranked from LaunchWake&apos;s catalog of {plan.totalChannels} communities.
+              ? t("basedOnShip", {
+                  type: plan.ship.type.toLowerCase(),
+                  title: plan.ship.title,
+                })
+              : t("basedOnRepo")}{" "}
+            {t("rankedFrom", { count: plan.totalChannels })}
           </div>
         </div>
       </div>
@@ -128,7 +131,10 @@ function Results({
 }
 
 function RecCard({ rec }: { rec: PublicRec }) {
-  const riskMeta = RISK[rec.banRisk as BanRiskValue];
+  const t = useTranslations("LaunchChecker");
+  const tr = useTranslations("Risk");
+  const riskValue = rec.banRisk as BanRiskValue;
+  const riskMeta = RISK[riskValue];
   return (
     <div className="rec">
       <div className="rec-top">
@@ -148,7 +154,9 @@ function RecCard({ rec }: { rec: PublicRec }) {
       <div className="rec-meta">
         <span className="k">
           <span className="dot" style={{ background: riskMeta.color }} aria-hidden />
-          <b>{riskMeta.label} ban risk</b>
+          <b>
+            {tr(riskValue)} {t("banRiskSuffix")}
+          </b>
         </span>
         {rec.bestTime && (
           <span className="k">
@@ -157,7 +165,7 @@ function RecCard({ rec }: { rec: PublicRec }) {
           </span>
         )}
         <Link href={`/channels/${rec.slug}`} className="k" style={{ color: "var(--ac)" }}>
-          Rules & ban risk
+          {t("rulesLink")}
         </Link>
       </div>
     </div>
@@ -165,23 +173,21 @@ function RecCard({ rec }: { rec: PublicRec }) {
 }
 
 function LockedCard({ rank }: { rank: number }) {
+  const t = useTranslations("LaunchChecker");
   return (
     <div className="rec locked" aria-hidden>
       <div className="rec-top">
         <Icon name="channels" className="pi" />
         <div>
-          <div className="rec-name">Channel #{rank} — locked</div>
-          <div className="rec-aud">Sign up to reveal</div>
+          <div className="rec-name">{t("lockedName", { rank })}</div>
+          <div className="rec-aud">{t("lockedSub")}</div>
         </div>
         <span className="rec-lock">
           <Icon name="lock" />
-          Locked
+          {t("locked")}
         </span>
       </div>
-      <div className="rec-why">
-        A ranked channel with its fit score, ban risk and the safe way to post —
-        available in the full plan.
-      </div>
+      <div className="rec-why">{t("lockedWhy")}</div>
     </div>
   );
 }
@@ -197,6 +203,7 @@ function EmailGate({
   projectName: string;
   plan: PublicPlan;
 }) {
+  const t = useTranslations("LaunchChecker");
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "saving" | "done" | "error">(
     "idle",
@@ -222,13 +229,13 @@ function EmailGate({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Couldn't save that. Try again.");
+        setError(data.error ?? t("errorSaveGeneric"));
         setState("error");
         return;
       }
       setState("done");
     } catch {
-      setError("Couldn't reach the server. Try again.");
+      setError(t("errorNetwork"));
       setState("error");
     }
   }
@@ -236,19 +243,15 @@ function EmailGate({
   if (state === "done") {
     return (
       <div className="gate">
-        <h3>You&apos;re on the list — now unlock the full plan</h3>
-        <p>
-          Create a free account to see all {plan.totalChannels} ranked channels for{" "}
-          {projectName}, generate platform-native drafts, and track which channels
-          actually drive signups.
-        </p>
+        <h3>{t("gateDoneTitle")}</h3>
+        <p>{t("gateDoneBody", { count: plan.totalChannels, name: projectName })}</p>
         <div style={{ marginTop: 14 }}>
           <Link
             href={`/login?callbackUrl=${encodeURIComponent("/onboarding")}`}
             className="btn btn-p"
           >
             <Icon name="arrowRight" />
-            Create free account
+            {t("gateDoneCta")}
           </Link>
         </div>
       </div>
@@ -257,21 +260,16 @@ function EmailGate({
 
   return (
     <div className="gate">
-      <h3>
-        Unlock the full plan{moreCount > 0 ? ` — ${moreCount} more channels` : ""}
-      </h3>
-      <p>
-        Enter your email to save this plan. Then create a free account to reveal
-        every ranked channel, generate drafts, and attribute the signups you get.
-      </p>
+      <h3>{moreCount > 0 ? t("gateTitleMore", { count: moreCount }) : t("gateTitle")}</h3>
+      <p>{t("gateBody")}</p>
       <form className="lc-form" onSubmit={submit} style={{ marginTop: 14 }}>
         <input
           className="lc-input"
           type="email"
-          placeholder="you@company.com"
+          placeholder={t("emailPlaceholder")}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          aria-label="Email address"
+          aria-label={t("emailAria")}
           required
         />
         <button
@@ -280,7 +278,7 @@ function EmailGate({
           disabled={state === "saving" || !email.trim()}
         >
           <Icon name="mail" />
-          {state === "saving" ? "Saving…" : "Email me the full plan"}
+          {state === "saving" ? t("emailSubmitSaving") : t("emailSubmit")}
         </button>
       </form>
       {error && <div className="lc-error">{error}</div>}

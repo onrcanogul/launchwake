@@ -1,36 +1,45 @@
-import Link from "next/link";
 import type { Metadata } from "next";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { listPublicChannels } from "@/lib/publicCatalog";
+import { Link } from "@/i18n/navigation";
+import { alternatesFor, type Locale } from "@/i18n/paths";
 import { PublicShell } from "@/components/public/PublicShell";
 import { Icon } from "@/components/Icon";
 import { platformIcon } from "@/components/ui/platform";
-import { RISK } from "@/components/ui/risk";
+import { RISK, type BanRiskValue } from "@/components/ui/risk";
 
 // The catalog is seeded/rarely changes — cache the page and revalidate daily.
 export const revalidate = 86400;
 
-export const metadata: Metadata = {
-  title: "Where can I post my startup? Channel rules & ban risk — LaunchWake",
-  description:
-    "A directory of the communities technical founders launch in — Hacker News, Reddit, Product Hunt and more — with each one's posting rules, ban risk and best time to post.",
-  alternates: { canonical: "/channels" },
-};
+export async function generateMetadata(props: {
+  params: Promise<{ locale: Locale }>;
+}): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "Channels" });
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+    alternates: alternatesFor("/channels", locale),
+  };
+}
 
-export default async function PublicChannelsPage() {
+export default async function PublicChannelsPage(props: {
+  params: Promise<{ locale: Locale }>;
+}) {
+  const { locale } = await props.params;
+  setRequestLocale(locale);
+  const t = await getTranslations("Channels");
+  const tr = await getTranslations("Risk");
   const channels = await listPublicChannels();
 
   return (
-    <PublicShell wide>
+    <PublicShell wide locale={locale}>
       <div className="pub-eyebrow">
         <Icon name="shield" />
-        Ban Risk Lookup
+        {t("eyebrow")}
       </div>
-      <h1 className="pub-h1">Where can you post your startup — safely?</h1>
-      <p className="pub-lede">
-        Every community has unwritten rules, and breaking them gets your post
-        removed or your account banned. Here&apos;s the posting playbook for the
-        channels technical founders actually launch in.
-      </p>
+      <h1 className="pub-h1">{t("title")}</h1>
+      <p className="pub-lede">{t("lede")}</p>
 
       <div className="ch-grid">
         {channels.map((c) => (
@@ -43,10 +52,10 @@ export default async function PublicChannelsPage() {
             <div className="ft">
               <span
                 className="dot"
-                style={{ background: RISK[c.banRisk].color }}
+                style={{ background: RISK[c.banRisk as BanRiskValue].color }}
                 aria-hidden
               />
-              {RISK[c.banRisk].label} ban risk
+              {tr(c.banRisk)} {t("banRiskSuffix")}
               {c.bestTime && (
                 <>
                   <span style={{ color: "var(--tx3)" }}>·</span>

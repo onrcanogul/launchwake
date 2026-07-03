@@ -1,10 +1,13 @@
-import Link from "next/link";
 import type { Metadata } from "next";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { useTranslations } from "next-intl";
 import {
   getStateOfLaunches,
   MIN_SAMPLE_POSTS,
   type ChannelLeader,
 } from "@/lib/stateOfLaunches";
+import { Link } from "@/i18n/navigation";
+import { alternatesFor, type Locale } from "@/i18n/paths";
 import { PublicShell } from "@/components/public/PublicShell";
 import { PoweredByLaunchWake } from "@/components/public/PoweredBy";
 import { StatStrip } from "@/components/ui/StatStrip";
@@ -15,19 +18,23 @@ import { RISK, type BanRiskValue } from "@/components/ui/risk";
 // Aggregate flywheel data changes slowly — cache and revalidate hourly.
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-  title: "The State of Developer Launches — where dev products actually get signups",
-  description:
-    "An anonymized aggregate of thousands of developer product launches: which channels drive the most signups, which convert best, how it differs by category, where posts get removed, and the best time to post.",
-  alternates: { canonical: "/state-of-developer-launches" },
-  openGraph: {
-    title: "The State of Developer Launches",
-    description:
-      "Where developer products actually get signups — an anonymized aggregate of real launches, by channel, category, ban risk and timing.",
-    type: "article",
-  },
-  twitter: { card: "summary_large_image" },
-};
+export async function generateMetadata(props: {
+  params: Promise<{ locale: Locale }>;
+}): Promise<Metadata> {
+  const { locale } = await props.params;
+  const t = await getTranslations({ locale, namespace: "StateOfLaunches" });
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+    alternates: alternatesFor("/state-of-developer-launches", locale),
+    openGraph: {
+      title: t("ogTitle"),
+      description: t("ogDescription"),
+      type: "article",
+    },
+    twitter: { card: "summary_large_image" },
+  };
+}
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
@@ -41,7 +48,10 @@ function LeaderRow({
   channel: ChannelLeader;
   max: number;
 }) {
-  const risk = RISK[channel.banRisk as BanRiskValue];
+  const t = useTranslations("StateOfLaunches");
+  const tr = useTranslations("Risk");
+  const riskValue = channel.banRisk as BanRiskValue;
+  const risk = RISK[riskValue];
   const width = max > 0 ? Math.max(3, (channel.signups / max) * 100) : 0;
   return (
     <div className="sol-row">
@@ -52,7 +62,7 @@ function LeaderRow({
           <span>{channel.name}</span>
           <span className="sol-risk">
             <span className="dot" style={{ background: risk.color }} aria-hidden />
-            {risk.label} risk
+            {tr(riskValue)} {t("riskSuffix")}
           </span>
         </div>
         <div className="sol-track" aria-hidden>
@@ -61,51 +71,49 @@ function LeaderRow({
       </div>
       <div className="sol-metric">
         <b className="num">{channel.signups.toLocaleString()}</b>
-        <span>signups · {pct(channel.conversion)} conv</span>
+        <span>
+          {t("signups")} · {pct(channel.conversion)} {t("conv")}
+        </span>
       </div>
     </div>
   );
 }
 
-export default async function StateOfDeveloperLaunchesPage() {
+export default async function StateOfDeveloperLaunchesPage(props: {
+  params: Promise<{ locale: Locale }>;
+}) {
+  const { locale } = await props.params;
+  setRequestLocale(locale);
+  const t = await getTranslations("StateOfLaunches");
+  const tc = await getTranslations("Common");
   const report = await getStateOfLaunches();
   const year = new Date().getFullYear();
   const { totals } = report;
 
   return (
-    <PublicShell wide>
+    <PublicShell wide locale={locale}>
       <div className="pub-eyebrow">
         <Icon name="results" />
-        Annual data report
+        {t("eyebrow")}
       </div>
       <h1 className="pub-h1">
-        The State of Developer Launches{" "}
+        {t("titleLead")}
         <span className="ac-word">{year}</span>
       </h1>
-      <p className="pub-lede">
-        We aggregated where technical founders actually launch — anonymized across
-        every tracked launch — to answer the question no blog post can: which
-        channels really drive signups, which convert, and where posts get removed.
-      </p>
+      <p className="pub-lede">{t("lede")}</p>
 
       {!report.hasData ? (
         <div className="gate" style={{ marginTop: 28 }}>
-          <h3>The {year} report is still compiling</h3>
-          <p>
-            This report is built from real launch outcomes as founders run their
-            distribution plans through LaunchWake. Once enough launches are tracked
-            (we only publish a channel after at least {MIN_SAMPLE_POSTS} posts, so
-            no single founder&apos;s numbers are ever exposed), the full breakdown
-            appears here — by channel, category, ban risk and timing.
-          </p>
+          <h3>{t("compilingTitle", { year })}</h3>
+          <p>{t("compilingBody", { min: MIN_SAMPLE_POSTS })}</p>
           <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
             <Link href="/tools/launch-checker" className="btn btn-p">
               <Icon name="target" />
-              Plan a launch
+              {tc("planALaunch")}
             </Link>
             <Link href="/channels" className="btn btn-s">
               <Icon name="shield" />
-              Browse channels
+              {tc("browseChannels")}
             </Link>
           </div>
         </div>
@@ -114,10 +122,10 @@ export default async function StateOfDeveloperLaunchesPage() {
           <div style={{ marginTop: 24 }}>
             <StatStrip
               stats={[
-                { label: "Launches tracked", value: totals.launches.toLocaleString(), icon: "rocket" },
-                { label: "Signups attributed", value: totals.signups.toLocaleString(), icon: "results" },
-                { label: "Avg. conversion", value: pct(totals.conversion), icon: "target" },
-                { label: "Channels ranked", value: String(totals.channelsRanked), icon: "channels" },
+                { label: t("statLaunches"), value: totals.launches.toLocaleString(), icon: "rocket" },
+                { label: t("statSignups"), value: totals.signups.toLocaleString(), icon: "results" },
+                { label: t("statConversion"), value: pct(totals.conversion), icon: "target" },
+                { label: t("statChannels"), value: String(totals.channelsRanked), icon: "channels" },
               ]}
             />
           </div>
@@ -126,7 +134,7 @@ export default async function StateOfDeveloperLaunchesPage() {
           <section className="cd-sec">
             <h2>
               <Icon name="results" />
-              Top channels by signups
+              {t("topChannelsHeading")}
             </h2>
             <div className="sol-board">
               {report.topChannels.map((c, i) => (
@@ -145,12 +153,9 @@ export default async function StateOfDeveloperLaunchesPage() {
             <section className="cd-sec">
               <h2>
                 <Icon name="target" />
-                Best converters (signups per click)
+                {t("bestConvertersHeading")}
               </h2>
-              <p className="sol-subnote">
-                Channels with at least real traffic behind them — raw reach means
-                nothing if it doesn&apos;t convert.
-              </p>
+              <p className="sol-subnote">{t("bestConvertersNote")}</p>
               <div className="sol-conv">
                 {report.bestConverters.map((c) => (
                   <div className="sol-conv-row" key={c.name}>
@@ -158,7 +163,10 @@ export default async function StateOfDeveloperLaunchesPage() {
                     <span className="sol-conv-name">{c.name}</span>
                     <span className="sol-conv-val num">{pct(c.conversion)}</span>
                     <span className="sol-conv-detail">
-                      {c.signups.toLocaleString()} signups / {c.clicks.toLocaleString()} clicks
+                      {t("signupsSlashClicks", {
+                        signups: c.signups.toLocaleString(),
+                        clicks: c.clicks.toLocaleString(),
+                      })}
                     </span>
                   </div>
                 ))}
@@ -171,7 +179,7 @@ export default async function StateOfDeveloperLaunchesPage() {
             <section className="cd-sec">
               <h2>
                 <Icon name="grid" />
-                Where each category gets signups
+                {t("byCategoryHeading")}
               </h2>
               <div className="sol-cats">
                 {report.categories.map((cat) => (
@@ -179,7 +187,7 @@ export default async function StateOfDeveloperLaunchesPage() {
                     <div className="sol-cat-head">
                       <span className="sol-cat-name">{cat.label}</span>
                       <span className="sol-cat-total num">
-                        {cat.signups.toLocaleString()} signups
+                        {cat.signups.toLocaleString()} {t("signups")}
                       </span>
                     </div>
                     <ol className="sol-cat-list">
@@ -205,7 +213,7 @@ export default async function StateOfDeveloperLaunchesPage() {
             <section className="cd-sec">
               <h2>
                 <Icon name="shield" />
-                Where posts get removed
+                {t("banRatesHeading")}
               </h2>
               <div className="sol-bans">
                 {report.banRates.map((b) => {
@@ -237,13 +245,13 @@ export default async function StateOfDeveloperLaunchesPage() {
             <section className="cd-sec">
               <h2>
                 <Icon name="clock" />
-                The best time to post
+                {t("bestTimesHeading")}
               </h2>
               <div className="sol-times">
-                {report.bestTimes.map((t) => (
-                  <div className="sol-time" key={t.window}>
-                    <span className="sol-time-win">{t.window}</span>
-                    <span className="sol-time-ch">{t.channels.join(", ")}</span>
+                {report.bestTimes.map((tw) => (
+                  <div className="sol-time" key={tw.window}>
+                    <span className="sol-time-win">{tw.window}</span>
+                    <span className="sol-time-ch">{tw.channels.join(", ")}</span>
                   </div>
                 ))}
               </div>
@@ -254,37 +262,25 @@ export default async function StateOfDeveloperLaunchesPage() {
           <section className="cd-sec">
             <h2>
               <Icon name="rules" />
-              How we built this
+              {t("methodologyHeading")}
             </h2>
-            <div className="cd-rules">
-              Every number comes from anonymized, aggregate launch outcomes — never
-              any individual account. A channel appears only once it has at least{" "}
-              {MIN_SAMPLE_POSTS} tracked posts behind it, so no single founder&apos;s
-              results can be inferred. Channels are grounded in LaunchWake&apos;s
-              curated catalog, so the report reflects communities founders actually
-              post in — not invented ones. Conversion is signups ÷ tracked-link
-              clicks; removal rate is removed posts ÷ total posts.
-            </div>
+            <div className="cd-rules">{t("methodologyBody", { min: MIN_SAMPLE_POSTS })}</div>
           </section>
         </>
       )}
 
       {/* CTA — the loop */}
       <div className="gate" style={{ marginTop: 30 }}>
-        <h3>Want this signal for your next launch?</h3>
-        <p>
-          LaunchWake turns this aggregate into a plan for your specific product:
-          where to post, how to post without getting banned, and which channels
-          actually drive your signups — free, no account needed.
-        </p>
+        <h3>{t("ctaTitle")}</h3>
+        <p>{t("ctaBody")}</p>
         <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
           <Link href="/tools/launch-checker" className="btn btn-p">
             <Icon name="target" />
-            Check my launch
+            {tc("checkMyLaunch")}
           </Link>
           <Link href="/channels" className="btn btn-s">
             <Icon name="shield" />
-            Browse channels
+            {tc("browseChannels")}
           </Link>
         </div>
       </div>
