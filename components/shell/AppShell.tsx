@@ -44,6 +44,9 @@ function crumbFor(pathname: string): string {
   if (pathname === "/app/kit" || pathname.endsWith("/kit")) return "Launch kit";
   if (pathname === "/app/queue" || pathname.endsWith("/queue")) return "Queue";
   if (pathname === "/app/pitches" || pathname.endsWith("/pitches")) return "Newsletters";
+  if (pathname.endsWith("/readiness")) return "Launch readiness";
+  if (pathname.endsWith("/schedule")) return "Schedule";
+  if (pathname.endsWith("/retro")) return "Launch retro";
   if (pathname === "/app/launch" || pathname.endsWith("/launch"))
     return "Launch day";
   return "";
