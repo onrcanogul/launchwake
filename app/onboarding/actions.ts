@@ -9,10 +9,26 @@ import { parseRepo, suggestShip, type ShipSuggestion } from "@/lib/github";
 import { assertEntitlement, EntitlementError } from "@/lib/billing";
 import { buildPlan } from "@/lib/analysis";
 import { captureLead } from "@/lib/leads";
+import { normalizeHttpUrl } from "@/lib/url";
 
 const Schema = z.object({
   name: z.string().trim().min(1, "Product name is required").max(120),
-  url: z.string().trim().url("Enter a valid URL").optional().or(z.literal("")),
+  // Accept a bare domain ("myapp.com"), a full URL, or empty. A non-empty value
+  // must normalize to a canonical http(s) URL; anything else is a field error.
+  url: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .transform((v, ctx) => {
+      if (!v) return "";
+      const normalized = normalizeHttpUrl(v);
+      if (!normalized) {
+        ctx.addIssue({ code: "custom", message: "Enter a valid URL" });
+        return z.NEVER;
+      }
+      return normalized;
+    }),
   githubRepo: z.string().trim().max(200).optional().or(z.literal("")),
   description: z.string().trim().max(2000).optional().or(z.literal("")),
   // The branching question — required. Drives Launch Mode vs Growth Mode.

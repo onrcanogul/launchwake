@@ -19,3 +19,50 @@ export function isSafeHttpUrl(raw: string): boolean {
   // A scheme with no host (e.g. "http:foo") is not a real destination.
   return u.hostname.length > 0;
 }
+
+// Matches a leading "scheme:" (RFC 3986 scheme chars) so we can tell "myapp.com"
+// (no scheme → prepend https) apart from "javascript:…" / "https://…" (has one).
+const HAS_SCHEME = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
+
+/**
+ * Normalize user-entered product URLs for storage.
+ *
+ * Onboarding must not fail on a bare domain: `z.string().url()` rejects
+ * "myapp.com", which is exactly what a founder types. This accepts that, plus
+ * "www.myapp.com/x" and "https://myapp.com", and returns ONE canonical https(?)
+ * href — or `null` when the input isn't a real web address.
+ *
+ * Rules: trim; prepend "https://" when there is no scheme; parse with `new URL`;
+ * reject any non-http(s) scheme (`javascript:`, `data:`, `ftp:`, `mailto:` …);
+ * reject a hostname with no dot (single-label hosts like "localhost"); drop the
+ * implicit root "/" so we don't store a surprise trailing slash. Pure — safe to
+ * reuse in zod transforms on client or server.
+ */
+export function normalizeHttpUrl(input: string): string | null {
+  if (typeof input !== "string") return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const withScheme = HAS_SCHEME.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  let u: URL;
+  try {
+    u = new URL(withScheme);
+  } catch {
+    return null;
+  }
+
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  // A real product lives on a dotted domain; single-label hosts ("localhost",
+  // "intranet") aren't valid public destinations for our purposes.
+  if (!u.hostname.includes(".")) return null;
+
+  let href = u.href;
+  // Canonicalize the root: "https://myapp.com/" → "https://myapp.com" so we
+  // don't hand back a trailing slash the user never typed.
+  if (u.pathname === "/" && !u.search && !u.hash && href.endsWith("/")) {
+    href = href.slice(0, -1);
+  }
+
+  return href;
+}

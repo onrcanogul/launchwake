@@ -21,6 +21,7 @@ import {
 } from "@/lib/billing";
 import { nextBestTimeUTC } from "@/lib/reminders";
 import { emailConfigured } from "@/lib/notify";
+import { normalizeHttpUrl } from "@/lib/url";
 
 async function requireProject() {
   const session = await auth();
@@ -38,12 +39,22 @@ const CreateSchema = z.object({
   type: z.enum(["LAUNCH", "FEATURE", "BLOG", "OTHER"]),
   title: z.string().trim().min(3, "Give the ship a short title").max(200),
   summary: z.string().trim().max(2000).optional(),
+  // Accept a bare domain or full URL (empty is fine — it's optional). A
+  // non-empty value normalizes to a canonical http(s) URL or is a field error.
   sourceUrl: z
     .string()
     .trim()
-    .url("Enter a valid URL")
     .optional()
-    .or(z.literal("")),
+    .or(z.literal(""))
+    .transform((v, ctx) => {
+      if (!v) return "";
+      const normalized = normalizeHttpUrl(v);
+      if (!normalized) {
+        ctx.addIssue({ code: "custom", message: "Enter a valid URL" });
+        return z.NEVER;
+      }
+      return normalized;
+    }),
 });
 
 export type CreateShipState = { error?: string };
