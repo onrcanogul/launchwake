@@ -27,11 +27,35 @@ Top bar: breadcrumb, search (⌘K). Under 880px: sidebar → drawer via hamburge
 - Centered card, wave motif. "Continue with GitHub" (primary — needed for repo connect), email magic link.
 - GitHub is the recommended path (enables auto-detect later).
 
-### 1. Onboarding (`/onboarding`)
-- Step indicator. One job: connect the product.
-- Options: **Connect GitHub repo** (recommended, auto-detect ships), Add product URL, Connect changelog/blog RSS (optional).
-- Ends with **"Analyze my latest ship"** → runs analysis → lands on the first **Where to post** plan
-  (the aha). If nothing to analyze yet, land on Ship feed with the checklist.
+### 1. Onboarding (`/onboarding`) — 3-step wizard (`OnboardingWizard`)
+- **Step 1 — Connect:** a **GitHub repo picker** (searchable dropdown over the user's public
+  repos via their OAuth token), with fallbacks to manual `owner/repo` and fully-manual product
+  entry (name/URL/description) for email-auth users. Picking a repo prefills name/description/URL.
+  A "Private repo? Coming soon via GitHub App" note captures interest via the `Lead` model.
+- **Step 2 — Launch stage (required):** "Has this product had a public launch?" →
+  `Project.launchStage` (`Not live yet` = PRE_LAUNCH, `Live but never launched` = UNANNOUNCED,
+  `Already launched` = LAUNCHED).
+- **Step 3 — Review & start.** Branches on launch stage:
+  - `PRE_LAUNCH` / `UNANNOUNCED` → creates a LAUNCH ship and routes into **Launch Mode**
+    (readiness stage).
+  - `LAUNCHED` → **Growth Mode**: creates the first ship from the repo (or a synthetic launch),
+    builds its plan, and lands on **Where to post** (the aha).
+
+### 1b. Launch Mode (`/app/ships/[id]/{readiness,plan,kit,schedule,launch,retro}`)
+A guided first-launch path for PRE_LAUNCH/UNANNOUNCED products, tied together by the
+`LaunchModeRail` stepper (shown on every stage). Stages:
+1. **Readiness** — weighted setup score + `Checklist` (tracking snippet heaviest) with the
+   `TrackingSetup` card. `lib/launchReadiness.ts` + `lib/launchMode.ts`.
+2. **Where to post** — the plan page, launch-aware ranking (`launchContext` boosts PH/Show HN/
+   launch communities). Free plans launch on `FREE_LAUNCH_CHANNELS`, the rest locked (paywall).
+3. **Launch kit** — drafts per channel (through tracked links).
+4. **Schedule** — pick a launch date → D-7..D+2 timeline (`lib/launchSchedule.ts`), multi-event
+   ICS (`/api/ics/launch/[shipId]`), and a D-1 `Reminder`.
+5. **Launch day** — the cockpit (`LaunchDay`): ordered copy-and-mark-posted queue + live signup
+   strip (`RoiStrip`). Human posts; never auto-posts.
+6. **Retro** — D+1: per-channel attribution vs the category `ChannelBenchmark` median, share via
+   the white-label report + `PoweredBy`, then **Complete launch** → `launchStage = LAUNCHED`
+   (Growth Mode) with GitHub-webhook / digest loop setup.
 
 ### 2. Ship feed (`/app`) — dashboard, continuous
 - **Empty state:** "No ships yet. Connect GitHub or add your first ship — we'll show you where

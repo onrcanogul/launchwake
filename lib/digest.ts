@@ -24,8 +24,10 @@ export type WeeklyStats = {
   postsLastWeek: number;
   /** Channels with traffic but no signups (most leaky first). */
   leaky: { channel: string; clicks: number }[];
-  /** Ships with a plan but nothing posted yet. */
+  /** Ships with a plan but nothing posted yet (top few, for the body). */
   undistributed: { title: string; channels: number }[];
+  /** Total count of shipped-but-unannounced ships (drives the subject line). */
+  undistributedCount: number;
   /** New Intent Radar matches this week (people asking for a tool like yours). */
   intentMatches?: number;
   /** Distribution-queue tasks coming due this week. */
@@ -41,6 +43,7 @@ export async function getWeeklyStats(accountId: string, since: Date): Promise<We
     shipsLastWeek,
     postsLastWeek,
     undistributedShips,
+    undistributedCount,
     intentMatches,
     queuedTasks,
     followUpPitches,
@@ -61,6 +64,9 @@ export async function getWeeklyStats(accountId: string, since: Date): Promise<We
       include: { plan: { include: { recs: { select: { id: true } } } } },
       orderBy: { detectedAt: "desc" },
       take: 3,
+    }),
+    db.ship.count({
+      where: { project: { userId: accountId }, plan: { isNot: null }, posts: { none: {} } },
     }),
     db.intentMatch.count({
       where: {
@@ -118,6 +124,7 @@ export async function getWeeklyStats(accountId: string, since: Date): Promise<We
       title: s.title,
       channels: s.plan?.recs.length ?? 0,
     })),
+    undistributedCount,
     intentMatches,
     queuedTasks,
     followUpPitches,
@@ -198,7 +205,12 @@ export function buildDigest(input: {
   const revenue =
     stats.revenueCents > 0 ? ` · ${formatMoney(stats.revenueCents, stats.currency)} revenue` : "";
 
-  const subject = `Your distribution week — ${stats.signups} signup${stats.signups === 1 ? "" : "s"} from ${stats.clicks} click${stats.clicks === 1 ? "" : "s"}`;
+  // Lead with the gap when there are shipped-but-unannounced ships — that's the
+  // action that brings founders back; the signup recap is the fallback.
+  const subject =
+    stats.undistributedCount > 0
+      ? `${stats.undistributedCount} ship${stats.undistributedCount === 1 ? "" : "s"} shipped, 0 announced — here's where to take them`
+      : `Your distribution week — ${stats.signups} signup${stats.signups === 1 ? "" : "s"} from ${stats.clicks} click${stats.clicks === 1 ? "" : "s"}`;
 
   const recs = weeklyRecommendations(stats);
   const recLines = recs.map((r, i) => `${i + 1}. ${r}`);

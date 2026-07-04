@@ -12,6 +12,7 @@ function stats(over: Partial<WeeklyStats> = {}): WeeklyStats {
     postsLastWeek: 0,
     leaky: [],
     undistributed: [],
+    undistributedCount: 0,
     ...over,
   };
 }
@@ -85,6 +86,24 @@ describe("buildDigest", () => {
 
   it("headlines the week in the subject", () => {
     expect(email.subject).toMatch(/41 signups from 340 clicks/);
+  });
+
+  it("leads the subject with unannounced ships when any are shipped-but-unposted", () => {
+    const e = buildDigest({
+      projectName: "Hookline",
+      appUrl: "https://launchwake.com",
+      stats: stats({ undistributedCount: 2, undistributed: [{ title: "v1.0", channels: 8 }] }),
+    });
+    expect(e.subject).toMatch(/2 ships shipped, 0 announced/);
+  });
+
+  it("singularizes one unannounced ship", () => {
+    const e = buildDigest({
+      projectName: "Hookline",
+      appUrl: "https://launchwake.com",
+      stats: stats({ undistributedCount: 1 }),
+    });
+    expect(e.subject).toMatch(/1 ship shipped, 0 announced/);
   });
 
   it("includes the sections, the numbers, and the radar", () => {

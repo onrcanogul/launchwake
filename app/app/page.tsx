@@ -11,6 +11,7 @@ import { StatStrip, type Stat } from "@/components/ui/StatStrip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Checklist, type ChecklistItem } from "@/components/ui/Checklist";
 import { Badge } from "@/components/ui/Badge";
+import { Note } from "@/components/ui/Note";
 import { ShipTypeTag } from "@/components/ui/ShipTypeTag";
 
 export default async function ShipFeedPage() {
@@ -119,9 +120,27 @@ export default async function ShipFeedPage() {
     },
   ];
 
+  // Growth Mode, all caught up: nudge the next ship (the every-ship loop). The
+  // manual route covers "paste your changelog" (its Describe/Paste-URL inputs).
+  const caughtUp =
+    ws.project.launchStage === "LAUNCHED" &&
+    stats.shipsTotal > 0 &&
+    stats.shipsNeedingPlan === 0 &&
+    stats.shipsDistributed === stats.shipsTotal;
+
   return shell(
     <>
       {header}
+      {caughtUp && (
+        <Note icon="plus">
+          You&apos;re all caught up — every ship is distributed. Shipped something
+          new?{" "}
+          <Link href="/app/ships/new" style={{ color: "var(--ac)" }}>
+            Paste your changelog or create a ship
+          </Link>{" "}
+          to keep the momentum going.
+        </Note>
+      )}
       <StatStrip stats={statItems} />
       <Panel title="Recent ships" right={`${ships.length} total`}>
         {ships.map((s) => (

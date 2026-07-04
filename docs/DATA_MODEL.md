@@ -160,6 +160,28 @@ model ChannelStat {
 }
 ```
 
+## Launch Mode additions (acquisition & launch-flow revamp)
+
+The onboarding branch + guided first-launch flow add these fields (see the
+migrations `20260704120000_launch_stage_readiness` and `20260704130000_ship_launch_at`):
+
+- **`Project.launchStage`** — `enum LaunchStage { PRE_LAUNCH | UNANNOUNCED | LAUNCHED }`,
+  default `LAUNCHED`. Set at onboarding. `PRE_LAUNCH`/`UNANNOUNCED` route into **Launch
+  Mode** (the guided flow); `LAUNCHED` is **Growth Mode** (the every-ship loop). Completing
+  a launch flips it to `LAUNCHED`.
+- **`Project.launchReadinessJson`** (`Json?`) + **`launchReadinessAt`** (`DateTime?`) — the
+  cached readiness snapshot (`{ score, ready, items[] }`) computed by `lib/launchReadiness.ts`
+  and refreshed by `lib/launchMode.ts` (`getLaunchModeState`) each time a Launch Mode stage
+  loads. Weighted checklist; the tracking-snippet item is the single heaviest.
+- **`Ship.launchAt`** (`DateTime?`) — the chosen launch date. Anchors the D-7..D+2 schedule
+  (`lib/launchSchedule.ts`), the launch-day cockpit, and the D-1 `Reminder`. Null until the
+  schedule stage sets it.
+
+No new tables: readiness is a JSON snapshot (cheap to recompute), the launch date lives on
+the ship, and the D-1 reminder reuses the existing `Reminder` model (sentinel
+`channelName = "your launch channels"`). Private-repo interest is captured with the existing
+`Lead` model (`source = "private-repo-interest"`).
+
 ## Notes
 
 - **Channel is global and seeded** — it's the shared knowledge base. Users don't create
