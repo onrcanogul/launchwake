@@ -9,10 +9,11 @@ name: Scheduled jobs
 #   - Secret   CRON_SECRET      same value as the CRON_SECRET env var in Vercel
 #
 # github.event.schedule holds the cron line that fired, so each job runs only on
-# its own schedule. workflow_dispatch runs all three (handy for a manual test).
+# its own schedule. workflow_dispatch runs all of them (handy for a manual test).
 
 on:
   schedule:
+    - cron: "*/10 * * * *" # webhook retries — every 10 min
     - cron: "*/15 * * * *" # reminders — every 15 min
     - cron: "0 7 * * 1" # weekly digest — Monday 07:00 UTC
     - cron: "0 */6 * * *" # intent radar — every 6h
@@ -20,6 +21,18 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  retry-webhooks:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/10 * * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retry failed webhook deliveries
+        run: |
+          curl -fsS -X POST "${CRON_TARGET_URL}/api/cron/retry-webhooks" \
+            -H "Authorization: Bearer ${CRON_SECRET}"
+        env:
+          CRON_TARGET_URL: ${{ vars.CRON_TARGET_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
   reminders:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/15 * * * *'
     runs-on: ubuntu-latest

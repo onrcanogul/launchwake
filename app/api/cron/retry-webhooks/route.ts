@@ -5,8 +5,9 @@ import { runAnalysisJob } from "@/lib/jobs";
 import { captureError } from "@/lib/observability";
 
 /**
- * Webhook retry cron. Wire a scheduler (Vercel Cron — see vercel.json) to hit
- * this every few minutes with the CRON_SECRET. Reprocesses FAILED webhook
+ * Webhook retry cron. Driven by the external scheduler (GitHub Actions —
+ * see .github/workflows/cron.yml) every 10 min with the CRON_SECRET; kept off
+ * Vercel Cron since sub-daily schedules there need a paid plan. Reprocesses FAILED webhook
  * deliveries whose exponential backoff has elapsed (max 5 attempts), so a
  * transient ingestion failure never silently drops a Ship or a payment. For any
  * Ship a successful retry creates, it kicks off analysis. Never posts.
