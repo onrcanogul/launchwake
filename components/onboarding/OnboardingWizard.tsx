@@ -1,13 +1,31 @@
 "use client";
 
-import { useActionState, useMemo, useState, useTransition } from "react";
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { Icon } from "@/components/Icon";
+import { FieldError } from "@/components/ui/FieldError";
 import {
   createProject,
   registerPrivateRepoInterest,
   type OnboardingState,
 } from "@/app/onboarding/actions";
 import type { GithubRepo } from "@/lib/github";
+
+// The first invalid one (in this order) is focused after a failed submit; the
+// wizard also jumps to the step that owns it.
+const FIELD_ORDER = [
+  "name",
+  "url",
+  "githubRepo",
+  "description",
+  "launchStage",
+] as const;
 
 type LaunchStage = "PRE_LAUNCH" | "UNANNOUNCED" | "LAUNCHED";
 
@@ -60,6 +78,39 @@ export function OnboardingWizard({
     createProject,
     {},
   );
+
+  const fieldErrors = state.fieldErrors ?? {};
+  const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
+  const [focusField, setFocusField] = useState<string | null>(null);
+
+  // A failed submit → jump to the step that owns the first invalid field. url /
+  // githubRepo live on the manual-entry step (0), launchStage on step 1, and
+  // name / description are editable on the review step (2).
+  useEffect(() => {
+    const errs = state.fieldErrors;
+    if (!errs) return;
+    const first = FIELD_ORDER.find((f) => errs[f]);
+    if (!first) return;
+    if (first === "url" || first === "githubRepo") {
+      setManual(true);
+      setStep(0);
+    } else if (first === "launchStage") {
+      setStep(1);
+    } else {
+      setStep(2);
+    }
+    setFocusField(first);
+  }, [state]);
+
+  // Focus once the owning step has actually rendered the input.
+  useEffect(() => {
+    if (!focusField) return;
+    const el = fieldRefs.current[focusField];
+    if (el) {
+      el.focus();
+      setFocusField(null);
+    }
+  }, [focusField, step, manual]);
 
   const filteredRepos = useMemo(() => {
     const q = repoQuery.trim().toLowerCase();
@@ -197,10 +248,16 @@ export function OnboardingWizard({
               <label className="fl">Product name</label>
               <input
                 className="inp"
+                ref={(el) => {
+                  fieldRefs.current.name = el;
+                }}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Hookline"
+                aria-invalid={fieldErrors.name ? true : undefined}
+                aria-describedby={fieldErrors.name ? "err-manual-name" : undefined}
               />
+              <FieldError id="err-manual-name" message={fieldErrors.name} />
 
               <label className="fl" style={{ marginTop: 16 }}>
                 Product URL{" "}
@@ -210,10 +267,16 @@ export function OnboardingWizard({
               </label>
               <input
                 className="inp"
+                ref={(el) => {
+                  fieldRefs.current.url = el;
+                }}
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://hookline.dev"
+                aria-invalid={fieldErrors.url ? true : undefined}
+                aria-describedby={fieldErrors.url ? "err-manual-url" : undefined}
               />
+              <FieldError id="err-manual-url" message={fieldErrors.url} />
 
               <label className="fl" style={{ marginTop: 16 }}>
                 GitHub repo{" "}
@@ -223,9 +286,20 @@ export function OnboardingWizard({
               </label>
               <input
                 className="inp"
+                ref={(el) => {
+                  fieldRefs.current.githubRepo = el;
+                }}
                 value={githubRepo}
                 onChange={(e) => setGithubRepo(e.target.value)}
                 placeholder="owner/repo"
+                aria-invalid={fieldErrors.githubRepo ? true : undefined}
+                aria-describedby={
+                  fieldErrors.githubRepo ? "err-manual-githubRepo" : undefined
+                }
+              />
+              <FieldError
+                id="err-manual-githubRepo"
+                message={fieldErrors.githubRepo}
               />
 
               <label className="fl" style={{ marginTop: 16 }}>
@@ -239,6 +313,14 @@ export function OnboardingWizard({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="A webhook testing tool for developers — capture, inspect and replay events."
+                aria-invalid={fieldErrors.description ? true : undefined}
+                aria-describedby={
+                  fieldErrors.description ? "err-manual-description" : undefined
+                }
+              />
+              <FieldError
+                id="err-manual-description"
+                message={fieldErrors.description}
               />
 
               {hasRepos && (
@@ -335,10 +417,16 @@ export function OnboardingWizard({
           <input
             className="inp"
             name="name"
+            ref={(el) => {
+              fieldRefs.current.name = el;
+            }}
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
+            aria-invalid={fieldErrors.name ? true : undefined}
+            aria-describedby={fieldErrors.name ? "err-review-name" : undefined}
           />
+          <FieldError id="err-review-name" message={fieldErrors.name} />
 
           <label className="fl" style={{ marginTop: 16 }}>
             What does it do?{" "}
@@ -349,8 +437,19 @@ export function OnboardingWizard({
           <textarea
             className="inp"
             name="description"
+            ref={(el) => {
+              fieldRefs.current.description = el;
+            }}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            aria-invalid={fieldErrors.description ? true : undefined}
+            aria-describedby={
+              fieldErrors.description ? "err-review-description" : undefined
+            }
+          />
+          <FieldError
+            id="err-review-description"
+            message={fieldErrors.description}
           />
 
           {/* Carried from earlier steps. */}

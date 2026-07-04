@@ -10,6 +10,7 @@ import { assertEntitlement, EntitlementError } from "@/lib/billing";
 import { buildPlan } from "@/lib/analysis";
 import { captureLead } from "@/lib/leads";
 import { normalizeHttpUrl } from "@/lib/url";
+import { fieldErrorsFromZod } from "@/lib/formErrors";
 
 const Schema = z.object({
   name: z.string().trim().min(1, "Product name is required").max(120),
@@ -35,7 +36,10 @@ const Schema = z.object({
   launchStage: z.enum(["PRE_LAUNCH", "UNANNOUNCED", "LAUNCHED"]),
 });
 
-export type OnboardingState = { error?: string };
+export type OnboardingState = {
+  error?: string;
+  fieldErrors?: Record<string, string>;
+};
 
 export async function createProject(
   _prev: OnboardingState,
@@ -52,7 +56,8 @@ export async function createProject(
     launchStage: formData.get("launchStage"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    const { fieldErrors, formError } = fieldErrorsFromZod(parsed.error);
+    return { error: formError, fieldErrors };
   }
   const { launchStage } = parsed.data;
 
@@ -68,7 +73,13 @@ export async function createProject(
   let githubRepo: string | null = null;
   if (parsed.data.githubRepo) {
     const ref = parseRepo(parsed.data.githubRepo);
-    if (!ref) return { error: "GitHub repo must be owner/repo or a GitHub URL." };
+    if (!ref) {
+      return {
+        fieldErrors: {
+          githubRepo: "Enter it as owner/repo or a GitHub URL.",
+        },
+      };
+    }
     githubRepo = `${ref.owner}/${ref.repo}`;
   }
 

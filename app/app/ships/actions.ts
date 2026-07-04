@@ -22,6 +22,7 @@ import {
 import { nextBestTimeUTC } from "@/lib/reminders";
 import { emailConfigured } from "@/lib/notify";
 import { normalizeHttpUrl } from "@/lib/url";
+import { fieldErrorsFromZod } from "@/lib/formErrors";
 
 async function requireProject() {
   const session = await auth();
@@ -57,7 +58,10 @@ const CreateSchema = z.object({
     }),
 });
 
-export type CreateShipState = { error?: string };
+export type CreateShipState = {
+  error?: string;
+  fieldErrors?: Record<string, string>;
+};
 
 /** Create a ship, build its distribution plan, then land on the plan (the aha). */
 export async function createShipAndPlan(
@@ -73,7 +77,8 @@ export async function createShipAndPlan(
     sourceUrl: formData.get("sourceUrl") || undefined,
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    const { fieldErrors, formError } = fieldErrorsFromZod(parsed.error);
+    return { error: formError, fieldErrors };
   }
 
   // Free-plan gate: 2 distribution plans / month.

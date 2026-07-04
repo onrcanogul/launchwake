@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
+import { FieldError } from "@/components/ui/FieldError";
 import { useToast } from "@/components/ui/toast";
 import {
   createShipAndPlan,
@@ -14,6 +15,9 @@ import {
 type Mode = "github" | "url" | "describe";
 
 const TYPES = ["LAUNCH", "FEATURE", "BLOG", "OTHER"] as const;
+
+// The first invalid one (in this order) is focused after a failed submit.
+const FIELD_ORDER = ["title", "sourceUrl", "summary"] as const;
 
 export function NewShipForm({
   githubRepo,
@@ -34,6 +38,17 @@ export function NewShipForm({
   const [pullMsg, setPullMsg] = useState<string | null>(null);
   const [pullPending, startPull] = useTransition();
   const { toast } = useToast();
+
+  const fieldErrors = state.fieldErrors ?? {};
+  const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
+
+  // Focus the first invalid field after a failed submit.
+  useEffect(() => {
+    const errs = state.fieldErrors;
+    if (!errs) return;
+    const first = FIELD_ORDER.find((f) => errs[f]);
+    if (first) fieldRefs.current[first]?.focus();
+  }, [state]);
 
   const doPull = () => {
     setPullMsg(null);
@@ -124,10 +139,16 @@ export function NewShipForm({
       <input
         className="inp"
         name="title"
+        ref={(el) => {
+          fieldRefs.current.title = el;
+        }}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="e.g. Added Slack alerts for failed webhooks"
+        aria-invalid={fieldErrors.title ? true : undefined}
+        aria-describedby={fieldErrors.title ? "err-title" : undefined}
       />
+      <FieldError id="err-title" message={fieldErrors.title} />
 
       {(mode === "url" || mode === "github") && (
         <>
@@ -138,10 +159,16 @@ export function NewShipForm({
           <input
             className="inp"
             name="sourceUrl"
+            ref={(el) => {
+              fieldRefs.current.sourceUrl = el;
+            }}
             value={sourceUrl}
             onChange={(e) => setSourceUrl(e.target.value)}
             placeholder="https://github.com/owner/repo/releases/tag/v1.0"
+            aria-invalid={fieldErrors.sourceUrl ? true : undefined}
+            aria-describedby={fieldErrors.sourceUrl ? "err-sourceUrl" : undefined}
           />
+          <FieldError id="err-sourceUrl" message={fieldErrors.sourceUrl} />
         </>
       )}
       {mode === "describe" && (
@@ -155,10 +182,16 @@ export function NewShipForm({
       <textarea
         className="inp"
         name="summary"
+        ref={(el) => {
+          fieldRefs.current.summary = el;
+        }}
         value={summary}
         onChange={(e) => setSummary(e.target.value)}
         placeholder="Now Hookline pings your Slack the moment a webhook fails in prod — no more finding out from an angry customer."
+        aria-invalid={fieldErrors.summary ? true : undefined}
+        aria-describedby={fieldErrors.summary ? "err-summary" : undefined}
       />
+      <FieldError id="err-summary" message={fieldErrors.summary} />
 
       {pullMsg && (
         <div className="fhint" style={{ marginTop: 10, color: "var(--ac)" }}>
