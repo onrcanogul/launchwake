@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { resolveAccount } from "@/lib/team";
+import { launchChannelLimit } from "@/lib/billing";
 import { buildLaunchSchedule, launchScheduleICS } from "@/lib/launchSchedule";
 
 /**
@@ -40,11 +41,18 @@ export async function GET(
     );
   }
 
-  const channels =
+  const allChannels =
     ship.plan?.recs.map((r) => ({
       name: r.channel.name,
       bestTime: r.bestTime ?? r.channel.bestTime,
     })) ?? [];
+  // Match the on-screen schedule: Free exports its launch set (top N).
+  const account = await db.user.findUnique({
+    where: { id: accountId },
+    select: { plan: true },
+  });
+  const limit = launchChannelLimit(account?.plan ?? "FREE");
+  const channels = limit === null ? allChannels : allChannels.slice(0, limit);
   const schedule = buildLaunchSchedule(ship.launchAt, channels);
   const ics = launchScheduleICS(ship.id, ship.title, schedule);
 

@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getLaunchDay } from "@/lib/plans";
 import { getResultsRollup } from "@/lib/attribution";
 import { buildLaunchTimeline, groupByWindow } from "@/lib/launchday";
 import { isLaunchMode, getLaunchModeState } from "@/lib/launchMode";
+import { launchChannelLimit, launchChannelPaywall } from "@/lib/billing";
 import { RoiStrip } from "@/components/results/RoiStrip";
 import { LaunchDay } from "@/components/ship/LaunchDay";
 import { LaunchModeRail } from "@/components/ship/LaunchModeRail";
@@ -13,6 +15,7 @@ import { env } from "@/lib/env";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
 import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Note } from "@/components/ui/Note";
 import { Button } from "@/components/ui/Button";
 import { emailConfigured } from "@/lib/notify";
 
@@ -29,13 +32,23 @@ export default async function LaunchPage({
   if (!launch) notFound();
 
   const ships = ws.ships;
-  const groups = groupByWindow(buildLaunchTimeline(launch.steps));
   const emailAvailable = emailConfigured();
   const slackAvailable = Boolean(ws.project.slackWebhookUrl);
 
   const inLaunchMode = isLaunchMode(ws.project.launchStage);
   const lm = inLaunchMode
     ? await getLaunchModeState(id, ws.accountId, "launch")
+    : null;
+
+  // Free plans launch on their top N channels (the launch set); the rest are a
+  // paywall. Attribution across every posted channel is unaffected (the ROI strip
+  // still reflects all posts for this ship).
+  const channelLimit = inLaunchMode ? launchChannelLimit(ws.plan) : null;
+  const steps =
+    channelLimit === null ? launch.steps : launch.steps.slice(0, channelLimit);
+  const groups = groupByWindow(buildLaunchTimeline(steps));
+  const paywall = inLaunchMode
+    ? launchChannelPaywall(ws.plan, launch.steps.length)
     : null;
 
   // Per-launch ROI — fills in as clicks/signups/revenue arrive for this ship.
@@ -84,6 +97,14 @@ export default async function LaunchPage({
             emailAvailable={emailAvailable}
             slackAvailable={slackAvailable}
           />
+          {paywall && (
+            <Note icon="lock">
+              {paywall}{" "}
+              <Link href="/app/settings" style={{ color: "var(--ac)" }}>
+                Upgrade to Pro
+              </Link>
+            </Note>
+          )}
           <ShareReport
             shipId={launch.ship.id}
             appUrl={env.APP_URL}

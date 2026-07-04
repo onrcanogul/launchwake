@@ -1,12 +1,15 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getShipKit } from "@/lib/plans";
 import { isLaunchMode, getLaunchModeState } from "@/lib/launchMode";
+import { launchChannelLimit, launchChannelPaywall } from "@/lib/billing";
 import { LaunchKit } from "@/components/ship/LaunchKit";
 import { LaunchModeRail } from "@/components/ship/LaunchModeRail";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
 import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Note } from "@/components/ui/Note";
 import { Button } from "@/components/ui/Button";
 
 export default async function KitPage({
@@ -28,6 +31,15 @@ export default async function KitPage({
   const inLaunchMode = isLaunchMode(ws.project.launchStage);
   const lm = inLaunchMode
     ? await getLaunchModeState(id, ws.accountId, "kit")
+    : null;
+
+  // Free plans draft only their launch set (top N) — keeps the cap consistent
+  // with the plan page. The rest are surfaced as a paywall, not drafted.
+  const channelLimit = inLaunchMode ? launchChannelLimit(ws.plan) : null;
+  const visibleRecs =
+    channelLimit === null ? kit.recs : kit.recs.slice(0, channelLimit);
+  const paywall = inLaunchMode
+    ? launchChannelPaywall(ws.plan, kit.recs.length)
     : null;
 
   return (
@@ -61,7 +73,15 @@ export default async function KitPage({
         />
       ) : (
         <>
-          <LaunchKit recs={kit.recs} initialRecId={rec} />
+          <LaunchKit recs={visibleRecs} initialRecId={rec} />
+          {paywall && (
+            <Note icon="lock">
+              {paywall}{" "}
+              <Link href="/app/settings" style={{ color: "var(--ac)" }}>
+                Upgrade to Pro
+              </Link>
+            </Note>
+          )}
           {inLaunchMode && (
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
               <Button

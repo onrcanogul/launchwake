@@ -13,7 +13,12 @@ import { recordPostForRecommendation } from "@/lib/attribution";
 import { resolveAccount } from "@/lib/team";
 import { newReportToken, reportUrl } from "@/lib/report";
 import { coachPost, type CoachResult } from "@/lib/coach";
-import { assertEntitlement, EntitlementError, isPaidPlan } from "@/lib/billing";
+import {
+  assertEntitlement,
+  EntitlementError,
+  isPaidPlan,
+  isLaunchChannelLocked,
+} from "@/lib/billing";
 import { nextBestTimeUTC } from "@/lib/reminders";
 import { emailConfigured } from "@/lib/notify";
 
@@ -165,7 +170,10 @@ export async function ensureDraft(
   recommendationId: string,
   tone?: string,
 ): Promise<void> {
-  await requireProject();
+  const project = await requireProject();
+  // Drafting is the Pro-gated action in Launch Mode — a locked channel (past the
+  // Free cap) is skipped even if called directly. project.userId is the accountId.
+  if (await isLaunchChannelLocked(recommendationId, project.userId)) return;
   const t: DraftTone = isDraftTone(tone) ? tone : "founder";
   await generateDraft(recommendationId, t);
   revalidatePath("/app/ships");

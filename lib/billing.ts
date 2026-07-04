@@ -48,6 +48,41 @@ export function launchChannelPaywall(
   return `Your plan ranks all ${totalChannels} channels, but Free launches on ${limit}. Upgrade to Pro to launch on all ${totalChannels} — including the ${locked} locked below.`;
 }
 
+/**
+ * Whether a recommendation is a locked launch channel — i.e. its rank sits past
+ * the Free launch cap in a Launch-Mode project. Growth Mode (LAUNCHED) and paid
+ * plans are never gated. Server-side guard so drafting a locked channel can't be
+ * triggered by a crafted request (drafting is the Pro-gated action; attribution
+ * is deliberately NOT gated — the human may post anywhere).
+ */
+export async function isLaunchChannelLocked(
+  recommendationId: string,
+  accountId: string,
+): Promise<boolean> {
+  const rec = await db.recommendation.findFirst({
+    where: {
+      id: recommendationId,
+      plan: { ship: { project: { userId: accountId } } },
+    },
+    select: {
+      rank: true,
+      plan: {
+        select: {
+          ship: { select: { project: { select: { launchStage: true } } } },
+        },
+      },
+    },
+  });
+  if (!rec) return false;
+  if (rec.plan.ship.project.launchStage === "LAUNCHED") return false; // Growth Mode
+  const account = await db.user.findUnique({
+    where: { id: accountId },
+    select: { plan: true },
+  });
+  const limit = launchChannelLimit(account?.plan ?? "FREE");
+  return limit !== null && rec.rank >= limit;
+}
+
 // Intent Radar saved-query caps per plan. Free can't use it (upsell); Pro gets a
 // handful; Team is unlimited (null). Not a simple paid→unlimited like projects.
 export const INTENT_QUERY_LIMITS: Record<Plan, number | null> = {

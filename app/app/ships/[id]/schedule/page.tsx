@@ -3,6 +3,7 @@ import { getWorkspace } from "@/lib/session";
 import { getLaunchModeState } from "@/lib/launchMode";
 import { getShipWithPlan } from "@/lib/plans";
 import { buildLaunchSchedule } from "@/lib/launchSchedule";
+import { launchChannelLimit } from "@/lib/billing";
 import { emailConfigured } from "@/lib/notify";
 import { LaunchModeRail } from "@/components/ship/LaunchModeRail";
 import { LaunchScheduleForm } from "@/components/ship/LaunchScheduleForm";
@@ -41,9 +42,13 @@ export default async function SchedulePage({
   }
 
   const plan = await getShipWithPlan(id, ws.accountId);
-  const channels =
+  const allChannels =
     plan?.recs.map((r) => ({ name: r.channelName, bestTime: r.bestTime })) ?? [];
-  const hasPlan = channels.length > 0;
+  const hasPlan = allChannels.length > 0;
+  // Free plans schedule their launch set (top N) — consistent with kit/launch.
+  const channelLimit = launchChannelLimit(ws.plan);
+  const channels =
+    channelLimit === null ? allChannels : allChannels.slice(0, channelLimit);
 
   const launchAt = state.ship.launchAt;
   const dateStr = launchAt ? launchAt.toISOString().slice(0, 10) : null;

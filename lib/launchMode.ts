@@ -137,20 +137,22 @@ export async function getLaunchModeState(
     scheduled,
   });
 
-  // Persist the snapshot (best-effort — a write hiccup must not break the page).
-  await db.project
-    .update({
-      where: { id: ship.project.id },
-      data: {
-        launchReadinessJson: {
-          score: readiness.score,
-          ready: readiness.ready,
-          items: readiness.items,
-        },
-        launchReadinessAt: new Date(),
-      },
-    })
-    .catch(() => {});
+  // Persist the snapshot only when it actually changed — avoids a write on every
+  // page render (and the race between concurrent loads). Best-effort: a write
+  // hiccup must not break the page.
+  const snapshot = {
+    score: readiness.score,
+    ready: readiness.ready,
+    items: readiness.items,
+  };
+  if (JSON.stringify(ship.project.launchReadinessJson) !== JSON.stringify(snapshot)) {
+    await db.project
+      .update({
+        where: { id: ship.project.id },
+        data: { launchReadinessJson: snapshot, launchReadinessAt: new Date() },
+      })
+      .catch(() => {});
+  }
 
   const done: Record<LaunchStageKey, boolean> = {
     readiness: readiness.ready,
