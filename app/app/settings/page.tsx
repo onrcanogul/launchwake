@@ -1,10 +1,15 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { getWorkspace } from "@/lib/session";
 import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { TrackingSetup } from "@/components/settings/TrackingSetup";
+import {
+  TrackingHealthSection,
+  TrackingHealthLoading,
+} from "@/components/settings/TrackingHealth";
 import { BillingPanel } from "@/components/settings/BillingPanel";
 import { TeamPanel } from "@/components/settings/TeamPanel";
 import { BrandPanel } from "@/components/settings/BrandPanel";
@@ -53,6 +58,10 @@ export default async function SettingsPage({
         </div>
         <SignOutButton />
       </div>
+
+      <Suspense fallback={<TrackingHealthLoading />}>
+        <TrackingHealthSection projectId={p.id} />
+      </Suspense>
 
       <Panel title="Connections">
         <div className="setrow">

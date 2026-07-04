@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getResultsRollup, formatMoney } from "@/lib/attribution";
+import { getTrackingHealth } from "@/lib/trackingHealth";
 import { RoiStrip } from "@/components/results/RoiStrip";
+import { TrackingHealthBanner } from "@/components/results/TrackingHealthBanner";
 import { PostCoachList } from "@/components/results/PostCoach";
 import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
@@ -34,6 +36,15 @@ export default async function ResultsPage() {
   const r = await getResultsRollup(ws.project.id);
   const canCoach = ws.plan !== "FREE";
 
+  // Ingestion health — surface active webhook failures so a data gap here isn't
+  // misread as a channel that didn't work. Never let it break Results.
+  let failedDeliveries = 0;
+  try {
+    failedDeliveries = (await getTrackingHealth(ws.project.id)).recentFailedDeliveries;
+  } catch {
+    failedDeliveries = 0;
+  }
+
   const header = (
     <div className="phead">
       <div>
@@ -59,6 +70,7 @@ export default async function ResultsPage() {
     return (
       <>
         {header}
+        <TrackingHealthBanner failedCount={failedDeliveries} />
         <EmptyState
           icon="results"
           title="No data yet"
@@ -109,6 +121,7 @@ export default async function ResultsPage() {
   return (
     <>
       {header}
+      <TrackingHealthBanner failedCount={failedDeliveries} />
       {r.roi.posts > 0 && (
         <RoiStrip roi={r.roi} topRevenueChannel={r.topRevenueChannel} />
       )}
