@@ -186,6 +186,10 @@ svg {
   width: 26px;
   height: 26px;
 }
+.authlogo-logo {
+  border-radius: 7px;
+  display: block;
+}
 .auth h1 {
   font-size: 20px;
   font-weight: 600;
@@ -568,6 +572,10 @@ svg {
 .brand svg {
   width: 20px;
   height: 20px;
+}
+.brand-logo {
+  border-radius: 6px;
+  display: block;
 }
 .ws {
   display: flex;
@@ -2325,6 +2333,10 @@ tbody tr {
   stroke-width: 1.7;
   fill: none;
 }
+.pub-brand-logo {
+  border-radius: 6px;
+  display: block;
+}
 .pub-nav {
   display: flex;
   align-items: center;
@@ -3793,6 +3805,10 @@ tbody tr {
   stroke: var(--ac);
   stroke-width: 1.8;
   fill: none;
+}
+.pb-logo {
+  border-radius: 5px;
+  display: block;
 }
 .pb-lab {
   display: flex;

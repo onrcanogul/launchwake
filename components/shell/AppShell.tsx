@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
 import { NavProgress } from "@/components/shell/NavProgress";
@@ -158,7 +159,15 @@ export function AppShell({
         style={drawerOpen ? { transform: "translateX(0)" } : undefined}
       >
         <div className="brand">
-          <Icon name="wave" /> LaunchWake
+          <Image
+            src="/logo.png"
+            alt="LaunchWake"
+            width={24}
+            height={24}
+            className="brand-logo"
+            priority
+          />
+          LaunchWake
         </div>
 
         <div className="ws">

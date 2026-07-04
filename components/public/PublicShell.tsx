@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
-import { Icon } from "@/components/Icon";
 import { LocaleSwitcher } from "@/components/public/LocaleSwitcher";
 
 /**
@@ -32,7 +32,14 @@ export async function PublicShell({
     <div className="pub">
       <header className="pub-bar">
         <Link href="/" className="pub-brand">
-          <Icon name="wave" />
+          <Image
+            src="/logo.png"
+            alt="LaunchWake"
+            width={22}
+            height={22}
+            className="pub-brand-logo"
+            priority
+          />
           LaunchWake
         </Link>
         <nav className="pub-nav">

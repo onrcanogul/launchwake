@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import Image from "next/image";
 import { alternatesFor, type Locale } from "@/i18n/paths";
-import { Icon } from "@/components/Icon";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { env } from "@/lib/env";
 
@@ -33,7 +33,15 @@ export default async function LoginPage({
     <section className="auth">
       <div className="authcard">
         <div className="authlogo">
-          <Icon name="wave" /> LaunchWake
+          <Image
+            src="/logo.png"
+            alt="LaunchWake"
+            width={26}
+            height={26}
+            className="authlogo-logo"
+            priority
+          />
+          LaunchWake
         </div>
         <p className="sub">{t("subtitle")}</p>
 
