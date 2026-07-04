@@ -141,6 +141,14 @@ model Project {
   name                 String
   description          String? // used as LLM context for fit scoring
   url                  String?
+  // Where this product is in its launch lifecycle. Set at onboarding; branches
+  // the journey into Launch Mode (PRE_LAUNCH/UNANNOUNCED) vs Growth Mode
+  // (LAUNCHED). Existing projects default to LAUNCHED (already in growth use).
+  launchStage          LaunchStage @default(LAUNCHED)
+  // Cached launch-readiness snapshot (score + weighted checklist) computed by
+  // lib/launchReadiness.ts. Null until the readiness stage runs.
+  launchReadinessJson  Json?
+  launchReadinessAt    DateTime?
   githubRepo           String? // "owner/repo"
   githubInstallationId String? // for webhook auto-detect
   webhookSecret        String? // per-project GitHub webhook signing secret
@@ -174,6 +182,16 @@ model Ship {
   // Null token = private. Revenue is hidden unless the owner opts in.
   publicToken       String?  @unique
   publicShowRevenue Boolean  @default(false)
+}
+
+// Where a product sits in its launch lifecycle (set at onboarding).
+//  PRE_LAUNCH  — not live yet (building toward a first public launch)
+//  UNANNOUNCED — live but never formally launched (the "ships in silence" case)
+//  LAUNCHED    — already had a public launch → Growth Mode (every-ship cadence)
+enum LaunchStage {
+  PRE_LAUNCH
+  UNANNOUNCED
+  LAUNCHED
 }
 
 enum ShipType {
