@@ -384,6 +384,157 @@ svg {
   margin-left: auto;
   color: var(--ac);
 }
+/* Selected state for choice cards (launch-stage picker). */
+.connrow.sel {
+  border-color: var(--acb);
+  background: var(--acd);
+}
+
+/* Inline text button used across onboarding (manual toggle, notify me). */
+.linklike {
+  background: none;
+  border: 0;
+  color: var(--ac);
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 12px;
+  font-family: inherit;
+}
+.linklike:hover {
+  color: var(--ac2);
+}
+.linklike:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Repo picker (searchable dropdown). */
+.repo-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.repo-search svg {
+  position: absolute;
+  left: 11px;
+  width: 15px;
+  height: 15px;
+  stroke: var(--tx3);
+  stroke-width: 1.6;
+  fill: none;
+  pointer-events: none;
+}
+.repo-search .inp {
+  padding-left: 32px;
+}
+.repo-menu {
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden auto;
+  max-height: 320px;
+  background: var(--bg1);
+}
+.repo-opt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--tx);
+  font-family: inherit;
+  cursor: pointer;
+}
+.repo-opt:last-child {
+  border-bottom: 0;
+}
+.repo-opt:hover {
+  background: var(--hover);
+}
+.repo-opt svg {
+  width: 15px;
+  height: 15px;
+  stroke: var(--tx2);
+  stroke-width: 1.6;
+  fill: none;
+  flex: none;
+}
+.repo-opt-name {
+  font-size: 12.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  flex: none;
+}
+.repo-opt-desc {
+  font-size: 11.5px;
+  color: var(--tx3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.repo-empty {
+  padding: 14px 12px;
+  color: var(--tx3);
+  font-size: 12px;
+}
+
+/* Private-repo interest note. */
+.ob-private {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg1);
+  color: var(--tx2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ob-private > svg {
+  width: 15px;
+  height: 15px;
+  stroke: var(--tx3);
+  stroke-width: 1.6;
+  fill: none;
+  flex: none;
+  margin-top: 1px;
+}
+.ob-private .linklike {
+  margin-top: 0;
+}
+
+/* Review-step summary chips. */
+.ob-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.ob-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--tx2);
+}
+.ob-chip svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  fill: none;
+}
 
 /* ============ APP SHELL ============ */
 .app {

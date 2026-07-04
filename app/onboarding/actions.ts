@@ -8,12 +8,15 @@ import { db } from "@/lib/db";
 import { parseRepo, suggestShip, type ShipSuggestion } from "@/lib/github";
 import { assertEntitlement, EntitlementError } from "@/lib/billing";
 import { buildPlan } from "@/lib/analysis";
+import { captureLead } from "@/lib/leads";
 
 const Schema = z.object({
   name: z.string().trim().min(1, "Product name is required").max(120),
   url: z.string().trim().url("Enter a valid URL").optional().or(z.literal("")),
   githubRepo: z.string().trim().max(200).optional().or(z.literal("")),
   description: z.string().trim().max(2000).optional().or(z.literal("")),
+  // The branching question — required. Drives Launch Mode vs Growth Mode.
+  launchStage: z.enum(["PRE_LAUNCH", "UNANNOUNCED", "LAUNCHED"]),
 });
 
 export type OnboardingState = { error?: string };
@@ -30,10 +33,12 @@ export async function createProject(
     url: formData.get("url") || undefined,
     githubRepo: formData.get("githubRepo") || undefined,
     description: formData.get("description") || undefined,
+    launchStage: formData.get("launchStage"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
+  const { launchStage } = parsed.data;
 
   // Free-plan gate: 1 project.
   try {
@@ -58,14 +63,32 @@ export async function createProject(
       url: parsed.data.url || null,
       githubRepo,
       description: parsed.data.description || null,
+      launchStage,
     },
   });
 
-  // First-run aha: create the first ship (from the repo's latest release/commit,
-  // or a synthetic launch) AND build its plan now, at creation time — so the plan
-  // page just renders the finished plan and never triggers analysis on open.
-  // (Consistent with New ship and the GitHub webhook.) If the build fails, the
-  // ship stays NEW and the plan page's AutoBuildPlan is the fallback.
+  // ── Branch on launch stage ────────────────────────────────
+  // PRE_LAUNCH / UNANNOUNCED → Launch Mode: create the LAUNCH ship the whole
+  // guided flow orbits, then land on the readiness stage (no plan yet — the
+  // plan is built in the channel-plan stage, and readiness lists it as a step).
+  if (launchStage === "PRE_LAUNCH" || launchStage === "UNANNOUNCED") {
+    const ship = await db.ship.create({
+      data: {
+        projectId: project.id,
+        type: "LAUNCH",
+        title: `Launch: ${parsed.data.name}`,
+        summary:
+          parsed.data.description || `Introducing ${parsed.data.name}.`,
+        sourceUrl: parsed.data.url || null,
+      },
+    });
+    revalidatePath("/app", "layout");
+    redirect(`/app/ships/${ship.id}/readiness`);
+  }
+
+  // LAUNCHED → Growth Mode (existing behaviour): create the first ship from the
+  // repo's latest release/commit (or a synthetic launch) AND build its plan now,
+  // so the plan page renders a finished plan and never analyses on open.
   let firstShipId: string | null = null;
   try {
     let suggestion: ShipSuggestion | null = null;
@@ -103,4 +126,21 @@ export async function createProject(
   revalidatePath("/app", "layout");
   // Land on the first plan (aha) when we have a ship; else the new-ship form.
   redirect(firstShipId ? `/app/ships/${firstShipId}/plan` : "/app/ships/new");
+}
+
+/**
+ * Capture interest in private-repo support (coming via a GitHub App). Persists a
+ * Lead against the signed-in user's email so we can reach out when it ships.
+ * Idempotent enough for our needs — a duplicate lead is harmless.
+ */
+export async function registerPrivateRepoInterest(): Promise<{ ok: boolean }> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email) return { ok: false };
+  await captureLead({
+    email,
+    source: "private-repo-interest",
+    context: { at: new Date().toISOString() },
+  });
+  return { ok: true };
 }

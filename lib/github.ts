@@ -42,6 +42,20 @@ export type GithubRepo = {
   private: boolean;
 };
 
+/**
+ * Read a user's stored GitHub OAuth access token from the linked Account row.
+ * (Auth.js persists it via the Prisma adapter on sign-in, even under the JWT
+ * session strategy.) Null for email-only users. GitHub OAuth tokens don't
+ * expire, so no refresh handling is needed.
+ */
+export async function getUserGithubToken(userId: string): Promise<string | null> {
+  const account = await db.account.findFirst({
+    where: { userId, provider: "github" },
+    select: { access_token: true },
+  });
+  return account?.access_token ?? null;
+}
+
 /** List the authenticated user's repos (needs their OAuth access token). */
 export async function listUserRepos(accessToken: string): Promise<GithubRepo[]> {
   const res = await fetch(
