@@ -84,35 +84,40 @@ export function AppShell({
     { href: "/app/results", label: "Results", icon: "results" },
   ];
 
-  // Ship-scoped screens point at bare routes that resolve to the active ship
-  // (or show a "select a ship" prompt).
+  // Ship-scoped screens. When a ship is in context we link STRAIGHT to its
+  // id-scoped route (e.g. /app/ships/xyz/plan) so the click is a single soft
+  // navigation that Next can prefetch — instead of routing through the bare
+  // /app/plan page, which server-redirects (an extra, un-prefetchable round
+  // trip on every click). With no active ship we fall back to the bare route,
+  // which renders the "select a ship" prompt.
+  const shipBase = activeShip ? `/app/ships/${activeShip.id}` : null;
   const shipNavItems: NavItem[] = [
     {
-      href: "/app/plan",
+      href: shipBase ? `${shipBase}/plan` : "/app/plan",
       label: "Where to post",
       icon: "where",
       match: (p) => p === "/app/plan" || p.endsWith("/plan"),
     },
     {
-      href: "/app/kit",
+      href: shipBase ? `${shipBase}/kit` : "/app/kit",
       label: "Launch kit",
       icon: "kit",
       match: (p) => p === "/app/kit" || p.endsWith("/kit"),
     },
     {
-      href: "/app/queue",
+      href: shipBase ? `${shipBase}/queue` : "/app/queue",
       label: "Queue",
       icon: "calendar",
       match: (p) => p === "/app/queue" || p.endsWith("/queue"),
     },
     {
-      href: "/app/pitches",
+      href: shipBase ? `${shipBase}/pitches` : "/app/pitches",
       label: "Newsletters",
       icon: "mail",
       match: (p) => p === "/app/pitches" || p.endsWith("/pitches"),
     },
     {
-      href: "/app/launch",
+      href: shipBase ? `${shipBase}/launch` : "/app/launch",
       label: "Launch day",
       icon: "rocket",
       match: (p) => p === "/app/launch" || p.endsWith("/launch"),
