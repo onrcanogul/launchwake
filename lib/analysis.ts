@@ -20,6 +20,7 @@ import {
 } from "./stats";
 import { rollupBenchmarks } from "./benchmarks";
 import { generateQueueForShip } from "./queue";
+import { captureError } from "./observability";
 import type { BanRisk, Channel, Project, Ship } from "@prisma/client";
 
 /**
@@ -229,6 +230,15 @@ export async function buildPlan(
   const candidates = scored.map((s) => s.channel);
   const bySlug = new Map(catalog.map((c) => [c.slug, c]));
 
+  // No candidates means the channel catalog is empty (unseeded DB) — matchChannels
+  // always returns something when the catalog is non-empty. Fail with an operator-
+  // actionable message instead of an opaque "no valid recommendations" downstream.
+  if (candidates.length === 0) {
+    throw new Error(
+      "The channel catalog is empty — run `pnpm db:seed` to seed it before building plans.",
+    );
+  }
+
   const input: PlanInput = {
     project: ship.project,
     ship,
@@ -259,15 +269,29 @@ export async function buildPlan(
     const { system, prompt } = buildAnalysisPrompt(input, candidates, outcomeContext, {
       launchContext,
     });
-    ranking = await completeJSON({
-      userId: ship.project.userId,
-      system,
-      prompt,
-      schema: RankingSchema,
-      label: "analysis",
-    });
+    try {
+      ranking = await completeJSON({
+        userId: ship.project.userId,
+        system,
+        prompt,
+        schema: RankingSchema,
+        label: "analysis",
+      });
+    } catch (err) {
+      // The LLM is configured but this call failed — daily budget exhausted, a
+      // provider/API error, or invalid JSON after the repair retry. Never leave
+      // the founder without a plan: fall back to the deterministic, catalog-
+      // grounded ranking so the plan page always renders something real (the
+      // requirement is a heuristic fallback, never a blank screen). Capture the
+      // failure so a misconfigured key in prod is still visible in Sentry.
+      captureError(err, { at: "analysis.buildPlan", shipId, reason: "llm_ranking_fallback" });
+      console.warn(
+        `[analysis] LLM ranking failed — falling back to heuristic ranking: ${(err as Error).message}`,
+      );
+      ranking = heuristicRank(scored, input);
+    }
   } else {
-    console.warn("[analysis] ANTHROPIC_API_KEY not set — using heuristic ranking.");
+    console.warn("[analysis] LLM not configured — using heuristic ranking.");
     ranking = heuristicRank(scored, input);
   }
 
