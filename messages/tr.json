@@ -309,6 +309,7 @@
     "or": "veya",
     "magicLinkSent": "Sihirli bağlantı için gelen kutunu kontrol et.",
     "emailError": "Sihirli bağlantı gönderilemedi. E-posta ayarlarını kontrol et veya GitHub ile dene.",
+    "emailInvalid": "Geçerli bir e-posta adresi girin.",
     "workEmail": "İş e-postası",
     "emailPlaceholder": "sen@startup.dev",
     "continueEmail": "E-posta ile devam et",
