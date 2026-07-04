@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { db } from "./db";
 import { env } from "./env";
 import { isSafeHttpUrl } from "./url";
+import { captureError } from "./observability";
 import type { CoachResult } from "./coach";
 import type { Platform } from "@prisma/client";
 
@@ -155,9 +156,14 @@ export async function ingestClick(
   // `record: false` (rate-limited hits) still redirects the human but does not
   // log a CLICK — so a script can't inflate a channel's click count.
   if (opts.record !== false) {
-    await db.event.create({
-      data: { trackedLinkId: link.id, type: "CLICK" },
-    });
+    try {
+      await db.event.create({
+        data: { trackedLinkId: link.id, type: "CLICK" },
+      });
+    } catch (err) {
+      // Logging the click must never break the redirect — capture and continue.
+      captureError(err, { at: "attribution.ingestClick", trackedLinkId: link.id });
+    }
   }
   const u = new URL(link.destUrl);
   u.searchParams.set("lw_ref", shortCode);
@@ -171,13 +177,20 @@ export async function ingestSignup(
 ): Promise<boolean> {
   const link = await db.trackedLink.findUnique({ where: { shortCode } });
   if (!link) return false;
-  await db.event.create({
-    data: {
-      trackedLinkId: link.id,
-      type: "SIGNUP",
-      meta: meta ? (meta as object) : undefined,
-    },
-  });
+  try {
+    await db.event.create({
+      data: {
+        trackedLinkId: link.id,
+        type: "SIGNUP",
+        meta: meta ? (meta as object) : undefined,
+      },
+    });
+  } catch (err) {
+    // The signup beacon is fire-and-forget; surface the failure instead of
+    // 500-ing a sendBeacon the browser won't retry.
+    captureError(err, { at: "attribution.ingestSignup", trackedLinkId: link.id });
+    return false;
+  }
   return true;
 }
 

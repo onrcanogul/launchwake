@@ -159,7 +159,21 @@ export async function completeJSON<T>(opts: CompleteJSONOptions<T>): Promise<T> 
 
   let lastText = "";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const { text, tokens } = await callProvider(system, messages, maxTokens);
+    let result: ModelResponse;
+    try {
+      result = await callProvider(system, messages, maxTokens);
+    } catch (err) {
+      // Provider/API failure (network, rate limit, auth). Tag model + provider;
+      // never attach the prompt or any response text — it may carry user data.
+      captureError(err, {
+        at: "llm.callProvider",
+        label,
+        provider: env.LLM_PROVIDER,
+        model: activeModel(),
+      });
+      throw err;
+    }
+    const { text, tokens } = result;
     await recordUsage(userId, tokens);
     console.log(
       `[llm:${label}] provider=${env.LLM_PROVIDER} model=${activeModel()} tokens=${tokens} user=${userId} attempt=${attempt}`,
@@ -171,7 +185,16 @@ export async function completeJSON<T>(opts: CompleteJSONOptions<T>): Promise<T> 
       return schema.parse(json);
     } catch (err) {
       if (attempt === 1) {
-        captureError(err, { at: "llm.completeJSON", label, snippet: lastText.slice(0, 500) });
+        // Malformed JSON after the repair retry. Tag model + token count; record
+        // only the output length, never its content (it can echo user data).
+        captureError(err, {
+          at: "llm.completeJSON",
+          label,
+          provider: env.LLM_PROVIDER,
+          model: activeModel(),
+          tokens,
+          outputChars: lastText.length,
+        });
         throw new LLMError(
           `Model returned invalid JSON after retry: ${(err as Error).message}`,
         );

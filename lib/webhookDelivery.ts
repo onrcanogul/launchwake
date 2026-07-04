@@ -180,7 +180,10 @@ export async function processDelivery(
     });
     captureError(err, {
       at: `webhook.process.${delivery.source.toLowerCase()}`,
+      source: delivery.source,
+      projectId: delivery.projectId,
       deliveryId: delivery.id,
+      eventType: delivery.eventType,
       attempts,
       exhausted,
     });
