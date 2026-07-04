@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { db } from "./db";
-import { completeJSON, llmConfigured } from "./llm";
+import {
+  completeJSON,
+  llmConfigured,
+  wrapUntrusted,
+  UNTRUSTED_DATA_NOTICE,
+} from "./llm";
 import { matchChannels } from "./channels";
 import type { Channel, PitchStatus, Project, Ship } from "@prisma/client";
 
@@ -45,6 +50,7 @@ export function buildPitchPrompt(ctx: PitchContext) {
     "- One clear link. Keep it under ~130 words. No attachments, no hype, no fake urgency.",
     "- If the newsletter is editorial-only (no submission form), pitch why it's newsworthy rather than asking to be added.",
     "- Sound like a human who actually reads the newsletter, not a mass blast.",
+    UNTRUSTED_DATA_NOTICE,
     'Respond with ONLY a JSON object: {"subject":string,"body":string}. Subject is a tight, specific email subject line.',
   ].join("\n");
 
@@ -53,11 +59,14 @@ export function buildPitchPrompt(ctx: PitchContext) {
     ctx.channel.audienceDesc ? `Audience: ${ctx.channel.audienceDesc}` : "",
     ctx.channel.rules ? `How they select / submit: ${ctx.channel.rules}` : "",
     "",
-    `Product: ${ctx.project.name}${ctx.project.url ? ` (${ctx.project.url})` : ""}`,
-    ctx.project.description ? `What it does: ${ctx.project.description}` : "",
+    `Product: ${wrapUntrusted("product_name", ctx.project.name)}`,
+    ctx.project.url ? `Product URL: ${wrapUntrusted("product_url", ctx.project.url)}` : "",
+    ctx.project.description
+      ? `What it does: ${wrapUntrusted("product_description", ctx.project.description)}`
+      : "",
     "",
-    `The news to pitch (${ctx.ship.type}): ${ctx.ship.title}`,
-    ctx.ship.summary ? `Why it matters: ${ctx.ship.summary}` : "",
+    `The news to pitch (${ctx.ship.type}): ${wrapUntrusted("ship_title", ctx.ship.title)}`,
+    ctx.ship.summary ? `Why it matters: ${wrapUntrusted("ship_summary", ctx.ship.summary)}` : "",
     "",
     "Write the pitch email now.",
   ]

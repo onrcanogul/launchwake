@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { db } from "./db";
-import { completeJSON, llmConfigured } from "./llm";
+import {
+  completeJSON,
+  llmConfigured,
+  wrapUntrusted,
+  UNTRUSTED_DATA_NOTICE,
+} from "./llm";
 import {
   matchChannels,
   type ChannelLike,
@@ -87,6 +92,8 @@ export function buildAnalysisPrompt(
     "- Do NOT assign ban risk; that is computed separately.",
     "- Respond with ONLY a JSON object, no prose, no code fences.",
     "",
+    UNTRUSTED_DATA_NOTICE,
+    "",
     'JSON shape: {"rankings":[{"slug":string,"fitScore":0-100,"why":string,"ruleNote":string,"bestTime":string?}]}',
     "Rank every candidate you are given, best fit first.",
   ]
@@ -94,9 +101,12 @@ export function buildAnalysisPrompt(
     .join("\n");
 
   const productBlock = [
-    `Product: ${input.project.name}`,
-    input.project.description ? `Description: ${input.project.description}` : "",
-    input.project.url ? `URL: ${input.project.url}` : "",
+    `Product name: ${wrapUntrusted("product_name", input.project.name)}`,
+    input.project.description
+      ? `Description: ${wrapUntrusted("product_description", input.project.description)}`
+      : "",
+    input.project.url ? `URL: ${wrapUntrusted("product_url", input.project.url)}` : "",
+    // githubRepo is validated to "owner/repo" upstream, so it's not free text.
     input.project.githubRepo ? `GitHub: ${input.project.githubRepo}` : "",
   ]
     .filter(Boolean)
@@ -104,8 +114,10 @@ export function buildAnalysisPrompt(
 
   const shipBlock = [
     `Ship type: ${input.ship.type}`,
-    `Ship title: ${input.ship.title}`,
-    input.ship.summary ? `Why it matters: ${input.ship.summary}` : "",
+    `Ship title: ${wrapUntrusted("ship_title", input.ship.title)}`,
+    input.ship.summary
+      ? `Why it matters: ${wrapUntrusted("ship_summary", input.ship.summary)}`
+      : "",
   ]
     .filter(Boolean)
     .join("\n");

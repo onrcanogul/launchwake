@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { db } from "./db";
-import { completeJSON, llmConfigured } from "./llm";
+import {
+  completeJSON,
+  llmConfigured,
+  wrapUntrusted,
+  UNTRUSTED_DATA_NOTICE,
+} from "./llm";
 import { TONE_GUIDE, type DraftTone } from "./tones";
 import type { Channel, Draft, Project, Ship } from "@prisma/client";
 
@@ -9,7 +14,7 @@ import type { Channel, Draft, Project, Ship } from "@prisma/client";
  * recommendation's ruleNote (the safe way in). The human posts it — we never do.
  */
 
-const DraftSchema = z.object({
+export const DraftSchema = z.object({
   body: z.string().min(1).max(3000),
   safetyNote: z.string().max(280).nullish(),
 });
@@ -51,6 +56,7 @@ export function buildDraftPrompt(ctx: DraftContext, tone: DraftTone = "founder")
     TONE_GUIDE[tone],
     "Write the draft EXACTLY as it should be pasted — do NOT add 'Title:'/'Body:' labels, section headers, or meta commentary.",
     "For Show HN, the very first line must be the title, starting with 'Show HN:'.",
+    UNTRUSTED_DATA_NOTICE,
     "Respond with ONLY a JSON object: {\"body\":string,\"safetyNote\":string}. safetyNote is one line on how to post safely here.",
   ].join("\n");
 
@@ -60,12 +66,15 @@ export function buildDraftPrompt(ctx: DraftContext, tone: DraftTone = "founder")
     ctx.channel.rules ? `Channel rules: ${ctx.channel.rules}` : "",
     ctx.ruleNote ? `Safe way in for this post: ${ctx.ruleNote}` : "",
     "",
-    `Product: ${ctx.project.name}${ctx.project.url ? ` (${ctx.project.url})` : ""}`,
-    ctx.project.description ? `About: ${ctx.project.description}` : "",
+    `Product: ${wrapUntrusted("product_name", ctx.project.name)}`,
+    ctx.project.url ? `Product URL: ${wrapUntrusted("product_url", ctx.project.url)}` : "",
+    ctx.project.description
+      ? `About: ${wrapUntrusted("product_description", ctx.project.description)}`
+      : "",
     "",
     `Ship type: ${ctx.ship.type}`,
-    `Ship: ${ctx.ship.title}`,
-    ctx.ship.summary ? `Why it matters: ${ctx.ship.summary}` : "",
+    `Ship: ${wrapUntrusted("ship_title", ctx.ship.title)}`,
+    ctx.ship.summary ? `Why it matters: ${wrapUntrusted("ship_summary", ctx.ship.summary)}` : "",
     "",
     "Write the draft now.",
   ]
