@@ -66,6 +66,7 @@ export type LaunchModeState = {
     id: string;
     title: string;
     status: ShipStatus;
+    launchAt: Date | null;
     publicToken: string | null;
     publicShowRevenue: boolean;
   };
@@ -125,6 +126,7 @@ export async function getLaunchModeState(
   ]);
   const trackingLive = tracking.clicks > 0 || tracking.signups > 0;
 
+  const scheduled = ship.launchAt !== null || reminderCount > 0;
   const readiness = computeReadiness({
     trackingLive,
     hasProductUrl: Boolean(ship.project.url),
@@ -132,7 +134,7 @@ export async function getLaunchModeState(
     hasPlan: channelCount > 0,
     channelCount,
     draftCount,
-    scheduled: reminderCount > 0,
+    scheduled,
   });
 
   // Persist the snapshot (best-effort — a write hiccup must not break the page).
@@ -154,7 +156,7 @@ export async function getLaunchModeState(
     readiness: readiness.ready,
     plan: channelCount > 0,
     kit: draftCount > 0,
-    schedule: reminderCount > 0,
+    schedule: scheduled,
     launch: channelCount > 0 && postedCount === channelCount,
     retro: ship.project.launchStage === "LAUNCHED",
   };
@@ -174,6 +176,7 @@ export async function getLaunchModeState(
       id: ship.id,
       title: ship.title,
       status: ship.status,
+      launchAt: ship.launchAt,
       publicToken: ship.publicToken,
       publicShowRevenue: ship.publicShowRevenue,
     },

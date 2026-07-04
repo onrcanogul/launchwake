@@ -228,6 +228,93 @@ export async function scheduleReminder(
   return { ok: true, sendAt: sendAt.toISOString(), method };
 }
 
+/** Sentinel channelName for the single D-1 launch reminder (so re-scheduling replaces it). */
+const LAUNCH_REMINDER_CHANNEL = "your launch channels";
+
+const ScheduleLaunchSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a launch date"),
+  method: z.enum(["EMAIL", "SLACK"]).optional(),
+});
+
+export type ScheduleLaunchState =
+  | { ok: true; launchAt: string; reminderSet: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Set a ship's launch date (Launch Mode) and (re)create the D-1 reminder. The
+ * D-7..D+2 schedule + ICS are derived from launchAt on the schedule page; this
+ * only persists the date and the day-before nudge. `method` is optional — when
+ * omitted (or its transport isn't configured) we still set the date and skip
+ * the reminder. Never posts.
+ */
+export async function scheduleLaunch(
+  shipId: string,
+  date: string,
+  method?: "EMAIL" | "SLACK",
+): Promise<ScheduleLaunchState> {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  const { accountId } = await resolveAccount(session.user.id);
+
+  const parsed = ScheduleLaunchSchema.safeParse({ date, method });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const ship = await db.ship.findFirst({
+    where: { id: shipId, project: { userId: accountId } },
+    include: { project: true },
+  });
+  if (!ship) return { ok: false, error: "Ship not found" };
+
+  if (parsed.data.method === "EMAIL" && !emailConfigured()) {
+    return { ok: false, error: "Email isn't configured on this deployment yet." };
+  }
+  if (parsed.data.method === "SLACK" && !ship.project.slackWebhookUrl) {
+    return { ok: false, error: "Add a Slack webhook in Settings first." };
+  }
+
+  // Anchor the launch at 09:00 UTC on the chosen day (a definite instant).
+  const launchAt = new Date(`${parsed.data.date}T09:00:00.000Z`);
+  if (Number.isNaN(launchAt.getTime())) {
+    return { ok: false, error: "Invalid date" };
+  }
+
+  await db.ship.update({ where: { id: ship.id }, data: { launchAt } });
+
+  // Replace any prior D-1 reminder for this launch, then create a fresh one
+  // (only when a delivery method is available).
+  await db.reminder.deleteMany({
+    where: {
+      shipId: ship.id,
+      channelName: LAUNCH_REMINDER_CHANNEL,
+      status: "PENDING",
+    },
+  });
+  let reminderSet = false;
+  if (parsed.data.method) {
+    const sendAt = new Date(launchAt.getTime() - 24 * 60 * 60 * 1000);
+    await db.reminder.create({
+      data: {
+        userId: session.user.id,
+        shipId: ship.id,
+        channelName: LAUNCH_REMINDER_CHANNEL,
+        shipTitle: ship.title,
+        bestTimeLabel: "launch is tomorrow",
+        ruleNote:
+          "Final checks: drafts ready, tracking snippet live, first-comment links prepped. Post tomorrow at each channel's best time.",
+        method: parsed.data.method,
+        sendAt,
+      },
+    });
+    reminderSet = true;
+  }
+
+  revalidatePath("/app/ships");
+  revalidatePath("/app");
+  return { ok: true, launchAt: launchAt.toISOString(), reminderSet };
+}
+
 export type MarkPostedState =
   | { ok: true; trackedUrl: string }
   | { ok: false; error: string };

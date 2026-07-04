@@ -173,6 +173,9 @@ model Ship {
   sourceUrl  String? // release URL / blog URL
   commitSha  String?
   status     ShipStatus        @default(NEW)
+  // Chosen launch date (Launch Mode). Anchors the D-7..D+2 schedule, the
+  // launch-day cockpit, and the D-1 reminder. Null until scheduled.
+  launchAt   DateTime?
   plan       DistributionPlan?
   posts      Post[]
   queueTasks QueueTask[]

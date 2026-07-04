@@ -222,15 +222,10 @@ export function reminderMessage(
   return { subject, text };
 }
 
-/** Build a minimal, valid VCALENDAR with one floating-time VEVENT. */
-export function buildICS(input: ICSInput): string {
+/** One floating-time VEVENT (with a 30-min display alarm). */
+function vevent(input: ICSInput): string[] {
   const end = addMinutes(input.start, input.durationMinutes ?? 30);
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//LaunchWake//Reminders//EN",
-    "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
+  return [
     "BEGIN:VEVENT",
     `UID:${input.uid}`,
     `DTSTAMP:${input.stamp ?? fmt(input.start) + "Z"}`,
@@ -244,7 +239,25 @@ export function buildICS(input: ICSInput): string {
     `DESCRIPTION:${escapeICS(input.title)}`,
     "END:VALARM",
     "END:VEVENT",
-    "END:VCALENDAR",
   ];
-  return lines.join("\r\n");
+}
+
+const VCALENDAR_HEAD = [
+  "BEGIN:VCALENDAR",
+  "VERSION:2.0",
+  "PRODID:-//LaunchWake//Reminders//EN",
+  "CALSCALE:GREGORIAN",
+  "METHOD:PUBLISH",
+];
+
+/** Build a minimal, valid VCALENDAR with one floating-time VEVENT. */
+export function buildICS(input: ICSInput): string {
+  return [...VCALENDAR_HEAD, ...vevent(input), "END:VCALENDAR"].join("\r\n");
+}
+
+/** Build a VCALENDAR with several events — the whole launch schedule at once. */
+export function buildICSCalendar(events: ICSInput[]): string {
+  return [...VCALENDAR_HEAD, ...events.flatMap(vevent), "END:VCALENDAR"].join(
+    "\r\n",
+  );
 }

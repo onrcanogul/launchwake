@@ -1,7 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getShipKit } from "@/lib/plans";
+import { isLaunchMode, getLaunchModeState } from "@/lib/launchMode";
 import { LaunchKit } from "@/components/ship/LaunchKit";
+import { LaunchModeRail } from "@/components/ship/LaunchModeRail";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
 import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -23,6 +25,10 @@ export default async function KitPage({
   if (!kit) notFound();
 
   const ships = ws.ships;
+  const inLaunchMode = isLaunchMode(ws.project.launchStage);
+  const lm = inLaunchMode
+    ? await getLaunchModeState(id, ws.accountId, "kit")
+    : null;
 
   return (
     <>
@@ -40,6 +46,8 @@ export default async function KitPage({
         )}
       </div>
 
+      {lm && <LaunchModeRail stages={lm.stages} />}
+
       {kit.recs.length === 0 ? (
         <EmptyState
           icon="kit"
@@ -52,7 +60,20 @@ export default async function KitPage({
           }
         />
       ) : (
-        <LaunchKit recs={kit.recs} initialRecId={rec} />
+        <>
+          <LaunchKit recs={kit.recs} initialRecId={rec} />
+          {inLaunchMode && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <Button
+                variant="primary"
+                icon="calendar"
+                href={`/app/ships/${id}/schedule`}
+              >
+                Continue to schedule
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </>
   );
