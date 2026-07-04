@@ -3,8 +3,10 @@ import { getWorkspace } from "@/lib/session";
 import { getLaunchDay } from "@/lib/plans";
 import { getResultsRollup } from "@/lib/attribution";
 import { buildLaunchTimeline, groupByWindow } from "@/lib/launchday";
+import { isLaunchMode, getLaunchModeState } from "@/lib/launchMode";
 import { RoiStrip } from "@/components/results/RoiStrip";
 import { LaunchDay } from "@/components/ship/LaunchDay";
+import { LaunchModeRail } from "@/components/ship/LaunchModeRail";
 import { ShareReport } from "@/components/ship/ShareReport";
 import { reportUrl } from "@/lib/report";
 import { env } from "@/lib/env";
@@ -31,6 +33,11 @@ export default async function LaunchPage({
   const emailAvailable = emailConfigured();
   const slackAvailable = Boolean(ws.project.slackWebhookUrl);
 
+  const inLaunchMode = isLaunchMode(ws.project.launchStage);
+  const lm = inLaunchMode
+    ? await getLaunchModeState(id, ws.accountId, "launch")
+    : null;
+
   // Per-launch ROI — fills in as clicks/signups/revenue arrive for this ship.
   const rollup = await getResultsRollup(ws.project.id, { shipId: id });
   const showRoi =
@@ -52,6 +59,8 @@ export default async function LaunchPage({
           <ShipSwitcher ships={ships} currentId={launch.ship.id} mode="launch" />
         )}
       </div>
+
+      {lm && <LaunchModeRail stages={lm.stages} />}
 
       {launch.steps.length === 0 ? (
         <EmptyState
@@ -81,6 +90,13 @@ export default async function LaunchPage({
             initialUrl={launch.ship.publicToken ? reportUrl(launch.ship.publicToken) : null}
             initialShowRevenue={launch.ship.publicShowRevenue}
           />
+          {inLaunchMode && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <Button variant="primary" icon="results" href={`/app/ships/${id}/retro`}>
+                See your launch retro
+              </Button>
+            </div>
+          )}
         </>
       )}
     </>

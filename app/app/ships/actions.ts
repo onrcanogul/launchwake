@@ -315,6 +315,35 @@ export async function scheduleLaunch(
   return { ok: true, launchAt: launchAt.toISOString(), reminderSet };
 }
 
+export type CompleteLaunchState = { ok: boolean; error?: string };
+
+/**
+ * Finish Launch Mode: flip the project to LAUNCHED so it flows into Growth Mode
+ * (the every-ship cadence), and mark the launch ship done. Idempotent.
+ */
+export async function completeLaunch(
+  shipId: string,
+): Promise<CompleteLaunchState> {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  const { accountId } = await resolveAccount(session.user.id);
+
+  const ship = await db.ship.findFirst({
+    where: { id: shipId, project: { userId: accountId } },
+    select: { id: true, projectId: true },
+  });
+  if (!ship) return { ok: false, error: "Ship not found" };
+
+  await db.project.update({
+    where: { id: ship.projectId },
+    data: { launchStage: "LAUNCHED" },
+  });
+  await db.ship.update({ where: { id: ship.id }, data: { status: "DONE" } });
+
+  revalidatePath("/app", "layout");
+  return { ok: true };
+}
+
 export type MarkPostedState =
   | { ok: true; trackedUrl: string }
   | { ok: false; error: string };
