@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import { FieldError } from "@/components/ui/FieldError";
+import { CharCounter } from "@/components/ui/CharCounter";
 import { useToast } from "@/components/ui/toast";
 import {
   createShipAndPlan,
@@ -145,6 +146,9 @@ export function NewShipForm({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="e.g. Added Slack alerts for failed webhooks"
+        required
+        minLength={3}
+        maxLength={200}
         aria-invalid={fieldErrors.title ? true : undefined}
         aria-describedby={fieldErrors.title ? "err-title" : undefined}
       />
@@ -188,9 +192,11 @@ export function NewShipForm({
         value={summary}
         onChange={(e) => setSummary(e.target.value)}
         placeholder="Now Hookline pings your Slack the moment a webhook fails in prod — no more finding out from an angry customer."
+        maxLength={2000}
         aria-invalid={fieldErrors.summary ? true : undefined}
         aria-describedby={fieldErrors.summary ? "err-summary" : undefined}
       />
+      <CharCounter value={summary} max={2000} />
       <FieldError id="err-summary" message={fieldErrors.summary} />
 
       {pullMsg && (

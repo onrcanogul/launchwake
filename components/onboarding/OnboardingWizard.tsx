@@ -10,6 +10,7 @@ import {
 } from "react";
 import { Icon } from "@/components/Icon";
 import { FieldError } from "@/components/ui/FieldError";
+import { CharCounter } from "@/components/ui/CharCounter";
 import {
   createProject,
   registerPrivateRepoInterest,
@@ -254,6 +255,7 @@ export function OnboardingWizard({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Hookline"
+                maxLength={120}
                 aria-invalid={fieldErrors.name ? true : undefined}
                 aria-describedby={fieldErrors.name ? "err-manual-name" : undefined}
               />
@@ -292,6 +294,7 @@ export function OnboardingWizard({
                 value={githubRepo}
                 onChange={(e) => setGithubRepo(e.target.value)}
                 placeholder="owner/repo"
+                maxLength={200}
                 aria-invalid={fieldErrors.githubRepo ? true : undefined}
                 aria-describedby={
                   fieldErrors.githubRepo ? "err-manual-githubRepo" : undefined
@@ -313,11 +316,13 @@ export function OnboardingWizard({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="A webhook testing tool for developers — capture, inspect and replay events."
+                maxLength={2000}
                 aria-invalid={fieldErrors.description ? true : undefined}
                 aria-describedby={
                   fieldErrors.description ? "err-manual-description" : undefined
                 }
               />
+              <CharCounter value={description} max={2000} />
               <FieldError
                 id="err-manual-description"
                 message={fieldErrors.description}
@@ -423,6 +428,7 @@ export function OnboardingWizard({
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
+            maxLength={120}
             aria-invalid={fieldErrors.name ? true : undefined}
             aria-describedby={fieldErrors.name ? "err-review-name" : undefined}
           />
@@ -442,11 +448,13 @@ export function OnboardingWizard({
             }}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            maxLength={2000}
             aria-invalid={fieldErrors.description ? true : undefined}
             aria-describedby={
               fieldErrors.description ? "err-review-description" : undefined
             }
           />
+          <CharCounter value={description} max={2000} />
           <FieldError
             id="err-review-description"
             message={fieldErrors.description}
