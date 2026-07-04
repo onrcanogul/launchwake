@@ -610,3 +610,53 @@ model ProcessedStripeEvent {
   type        String
   processedAt DateTime @default(now())
 }
+
+// ─────────────────────────────────────────────────────────────
+// Webhook delivery durability + retry (ingestion resilience)
+// Every authentic inbound GitHub/Stripe webhook is persisted BEFORE its effect
+// runs, so a transient failure becomes a retryable row instead of a silent data
+// gap. A missed Ship or un-attributed payment reads to the founder as "that
+// channel didn't work" — the exact wrong conclusion — so we never swallow these.
+//
+// Idempotency: `dedupeKey` is the payload hash (GitHub) or external event id
+// (Stripe). The unique (source, dedupeKey) plus the PROCESSED short-circuit
+// guarantee a re-delivery or a retry never creates a duplicate Ship or
+// double-counts revenue. Failed rows carry an attempt count + `nextRetryAt`
+// (exponential backoff); the retry-webhooks cron reprocesses them.
+// ─────────────────────────────────────────────────────────────
+model WebhookDelivery {
+  id          String                @id @default(cuid())
+  source      WebhookSource
+  // Null only when we can't match the payload to a project — still logged.
+  projectId   String?
+  // Idempotency key: sha256 of the raw body (GitHub) / Stripe event id.
+  dedupeKey   String
+  eventType   String? // "push", "release", "checkout.session.completed", …
+  payload     Json // parsed body, replayed on retry (already signature-verified)
+  signature   String? // inbound signature header, for the audit trail
+  status      WebhookDeliveryStatus @default(RECEIVED)
+  error       String? // last failure message (never swallowed)
+  attempts    Int                   @default(0)
+  // When a FAILED delivery is next eligible for retry (exponential backoff).
+  nextRetryAt DateTime?
+  shipId      String? // Ship created by this delivery, if any (audit trail)
+  receivedAt  DateTime              @default(now())
+  processedAt DateTime?
+  updatedAt   DateTime              @updatedAt
+
+  @@unique([source, dedupeKey])
+  @@index([status, nextRetryAt])
+  @@index([projectId, source, status])
+  @@index([projectId, receivedAt])
+}
+
+enum WebhookSource {
+  GITHUB
+  STRIPE
+}
+
+enum WebhookDeliveryStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+}
