@@ -3,6 +3,13 @@ import { db } from "./db";
 import { env } from "./env";
 import { reminderMessage } from "./reminders";
 import { sendEmail, sendSlack, emailConfigured } from "./notify";
+import { captureError } from "./observability";
+import {
+  withRetry,
+  recordWebhookFailure,
+  retryDelayMs,
+  MAX_WEBHOOK_ATTEMPTS,
+} from "./webhookDelivery";
 import {
   findIntentMatches,
   ingestMatches,
@@ -17,6 +24,88 @@ import {
  */
 export async function runAnalysisJob(shipId: string): Promise<void> {
   await buildPlan(shipId);
+}
+
+/**
+ * Analyze an auto-detected ship with in-process retry; on final failure persist
+ * a retryable WebhookDelivery so the founder can see it (Settings → Tracking
+ * health) and the cron re-drives it. Called from the GitHub webhook's after(),
+ * so it must never throw. Best-effort by design; the ship already exists.
+ */
+export async function runGithubAnalysisResilient(
+  shipId: string,
+  ctx: { projectId: string; eventType: string | null },
+): Promise<void> {
+  try {
+    await withRetry(() => runAnalysisJob(shipId), { attempts: 3 });
+  } catch (err) {
+    captureError(err, { at: "github.webhook.analysis", shipId });
+    await recordWebhookFailure({
+      source: "GITHUB",
+      projectId: ctx.projectId,
+      eventType: ctx.eventType,
+      shipId,
+      attempts: 1,
+      error: (err as Error)?.message ?? String(err),
+      retryable: true,
+    });
+  }
+}
+
+export type WebhookRetrySummary = {
+  processed: number;
+  recovered: number;
+  failed: number;
+};
+
+/**
+ * Re-drive due, retryable GitHub webhook failures (analysis that kept failing
+ * after the initial in-process retries). Called by /api/cron/webhooks. Backs off
+ * per attempt and dead-letters after MAX_WEBHOOK_ATTEMPTS. Idempotent: buildPlan
+ * replaces any existing plan for the ship.
+ */
+export async function retryDueWebhookDeliveries(
+  now: Date = new Date(),
+  limit = 20,
+): Promise<WebhookRetrySummary> {
+  const due = await db.webhookDelivery.findMany({
+    where: {
+      source: "GITHUB",
+      status: "FAILED",
+      shipId: { not: null },
+      nextRetryAt: { not: null, lte: now },
+    },
+    orderBy: { nextRetryAt: "asc" },
+    take: limit,
+  });
+
+  let recovered = 0;
+  let failed = 0;
+  for (const d of due) {
+    try {
+      await runAnalysisJob(d.shipId!);
+      await db.webhookDelivery.update({
+        where: { id: d.id },
+        data: { status: "SUCCESS", succeededAt: now, nextRetryAt: null, error: null },
+      });
+      recovered += 1;
+    } catch (err) {
+      const attempts = d.attempts + 1;
+      await db.webhookDelivery.update({
+        where: { id: d.id },
+        data: {
+          attempts,
+          error: ((err as Error)?.message ?? String(err)).slice(0, 500),
+          nextRetryAt:
+            attempts < MAX_WEBHOOK_ATTEMPTS
+              ? new Date(now.getTime() + retryDelayMs(attempts))
+              : null,
+        },
+      });
+      failed += 1;
+    }
+  }
+  return { processed: due.length, recovered, failed };
 }
 
 export type ReminderRunSummary = {

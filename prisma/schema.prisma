@@ -610,3 +610,36 @@ model ProcessedStripeEvent {
   type        String
   processedAt DateTime @default(now())
 }
+
+// Failed inbound-webhook deliveries (GitHub auto-detect analysis, Stripe revenue
+// ingest). Attribution silently dropping a delivery is the worst failure mode —
+// a founder concludes a channel failed when we just lost the event. We persist
+// each failure for inspection + surface it in Settings ("Tracking health"), and
+// retryable GitHub failures carry a nextRetryAt the cron re-drives with backoff.
+model WebhookDelivery {
+  id          String                @id @default(cuid())
+  projectId   String? // which project this delivery belongs to (scalar; no FK cascade needed)
+  source      WebhookSource
+  eventType   String? // "release" / "push" / "checkout.session.completed" …
+  status      WebhookDeliveryStatus @default(FAILED)
+  attempts    Int                   @default(1)
+  error       String?
+  shipId      String? // for GitHub: the ship whose analysis failed, so a retry can re-drive it
+  nextRetryAt DateTime? // when a retryable failure is eligible for the retry cron (null = dead-letter)
+  succeededAt DateTime? // set when a later retry recovered it
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([projectId, source])
+  @@index([source, status, nextRetryAt])
+}
+
+enum WebhookSource {
+  GITHUB
+  STRIPE_REVENUE
+}
+
+enum WebhookDeliveryStatus {
+  FAILED
+  SUCCESS
+}

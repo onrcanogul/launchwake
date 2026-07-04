@@ -432,6 +432,7 @@ export async function getResultsRollup(
 export type TrackingStatus = {
   signups: number;
   clicks: number;
+  lastClickAt: Date | null;
   lastSignupAt: Date | null;
   revenueEvents: number;
   revenueCents: number;
@@ -446,9 +447,14 @@ export async function getTrackingStatus(
   const where = {
     trackedLink: { post: { ship: { projectId } } },
   } as const;
-  const [signups, clicks, last, revAgg, lastRev] = await Promise.all([
+  const [signups, clicks, lastClick, last, revAgg, lastRev] = await Promise.all([
     db.event.count({ where: { ...where, type: "SIGNUP" } }),
     db.event.count({ where: { ...where, type: "CLICK" } }),
+    db.event.findFirst({
+      where: { ...where, type: "CLICK" },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    }),
     db.event.findFirst({
       where: { ...where, type: "SIGNUP" },
       orderBy: { createdAt: "desc" },
@@ -468,6 +474,7 @@ export async function getTrackingStatus(
   return {
     signups,
     clicks,
+    lastClickAt: lastClick?.createdAt ?? null,
     lastSignupAt: last?.createdAt ?? null,
     revenueEvents: revAgg._count._all,
     revenueCents: revAgg._sum.amountCents ?? 0,

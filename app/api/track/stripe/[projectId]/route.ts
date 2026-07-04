@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { ingestRevenue } from "@/lib/attribution";
 import { parseStripeRevenue, constructUserStripeEvent } from "@/lib/stripeRevenue";
+import { withRetry, recordWebhookFailure } from "@/lib/webhookDelivery";
 
 /**
  * Turnkey Stripe revenue webhook. The user points a Stripe webhook endpoint at
@@ -49,12 +50,34 @@ export async function POST(
     return NextResponse.json({ received: true, attributed: false });
   }
 
-  const ok = await ingestRevenue(revenue.ref, {
-    amountCents: revenue.amountCents,
-    currency: revenue.currency,
-    recurring: revenue.recurring,
-    meta: { via: "stripe", eventType: event.type },
-  });
-
-  return NextResponse.json({ received: true, attributed: ok });
+  // Ingest with a couple of quick retries for transient DB blips. If it still
+  // throws, persist the failure for the founder to see and return 500 so Stripe
+  // re-delivers with its own backoff — never silently drop attributed revenue.
+  try {
+    const ok = await withRetry(
+      () =>
+        ingestRevenue(revenue.ref, {
+          amountCents: revenue.amountCents,
+          currency: revenue.currency,
+          recurring: revenue.recurring,
+          meta: { via: "stripe", eventType: event.type },
+        }),
+      { attempts: 3 },
+    );
+    return NextResponse.json({ received: true, attributed: ok });
+  } catch (err) {
+    await recordWebhookFailure({
+      source: "STRIPE_REVENUE",
+      projectId,
+      eventType: event.type,
+      attempts: 3,
+      error: (err as Error)?.message ?? String(err),
+      // Stripe re-delivers failed (non-2xx) events itself; no cron re-drive.
+      retryable: false,
+    });
+    return NextResponse.json(
+      { error: "Failed to record revenue; will retry." },
+      { status: 500 },
+    );
+  }
 }

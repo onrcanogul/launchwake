@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { TrackingSetup } from "@/components/settings/TrackingSetup";
+import { TrackingHealth } from "@/components/settings/TrackingHealth";
 import { BillingPanel } from "@/components/settings/BillingPanel";
 import { TeamPanel } from "@/components/settings/TeamPanel";
 import { BrandPanel } from "@/components/settings/BrandPanel";
@@ -23,6 +24,8 @@ import {
 import { getTeamView } from "@/lib/team";
 import { getTrackingStatus } from "@/lib/attribution";
 import { getGithubStatus } from "@/lib/github";
+import { getWebhookFailureHealth } from "@/lib/webhookDelivery";
+import { trackingHealthRows } from "@/lib/trackingHealth";
 import { env } from "@/lib/env";
 
 export default async function SettingsPage({
@@ -37,7 +40,25 @@ export default async function SettingsPage({
   const usage = await getPlanUsage(ws.accountId);
   const tracking = await getTrackingStatus(ws.project.id);
   const github = await getGithubStatus(ws.project);
+  const webhookHealth = await getWebhookFailureHealth(ws.project.id);
   const p = ws.project;
+
+  const healthRows = trackingHealthRows({
+    clicks: tracking.clicks,
+    signups: tracking.signups,
+    lastClickAt: tracking.lastClickAt,
+    lastSignupAt: tracking.lastSignupAt,
+    github: {
+      connected: github.connected,
+      lastSuccessAt: github.lastAt,
+      failure: webhookHealth.GITHUB,
+    },
+    stripe: {
+      configured: Boolean(p.stripeWebhookSecret),
+      lastSuccessAt: tracking.lastRevenueAt,
+      failure: webhookHealth.STRIPE_REVENUE,
+    },
+  });
   const webhookUrl = `${env.APP_URL.replace(/\/$/, "")}/api/github/webhook`;
   const isOwner = ws.role === "OWNER";
   const isTeamOwner = isOwner && ws.plan === "TEAM";
@@ -109,6 +130,10 @@ export default async function SettingsPage({
 
       <Panel title="Comment plans on your releases" right="GitHub Action">
         <ReleaseAction hasSecret={Boolean(p.webhookSecret)} />
+      </Panel>
+
+      <Panel title="Tracking health" right="is data flowing in?">
+        <TrackingHealth rows={healthRows} />
       </Panel>
 
       <Panel title="Attribution — signups & revenue">
