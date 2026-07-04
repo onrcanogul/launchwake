@@ -1,6 +1,7 @@
 "use server";
 
 import { randomBytes } from "crypto";
+import { z } from "zod";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
@@ -14,6 +15,44 @@ import {
   type InviteResult,
 } from "@/lib/team";
 import { saveBrand, setReportEnabled } from "@/lib/clientReport";
+import { normalizeHttpUrl } from "@/lib/url";
+
+// White-label brand input. logoUrl is https-only (normalized, then required to be
+// https); accentColor is a #rrggbb hex. The lib sanitizers re-check on write as
+// defense-in-depth.
+const BrandSchema = z.object({
+  agencyName: z.string().trim().min(1, "Agency name is required.").max(80),
+  logoUrl: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .transform((v, ctx) => {
+      if (!v) return null;
+      const normalized = normalizeHttpUrl(v);
+      if (!normalized || !normalized.startsWith("https://")) {
+        ctx.addIssue({ code: "custom", message: "Logo URL must be an https:// URL." });
+        return z.NEVER;
+      }
+      return normalized;
+    }),
+  accentColor: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .transform((v, ctx) => {
+      if (!v) return null;
+      const m = /^#?([0-9a-fA-F]{6})$/.exec(v);
+      if (!m) {
+        ctx.addIssue({ code: "custom", message: "Accent must be a #rrggbb hex colour." });
+        return z.NEVER;
+      }
+      return `#${m[1].toLowerCase()}`;
+    }),
+});
+
+const InviteEmailSchema = z.string().trim().toLowerCase().email().max(254);
 
 export type BillingState = { error?: string };
 
@@ -53,12 +92,18 @@ export async function saveAgencyBrand(
 ): Promise<BrandState> {
   try {
     const accountId = await requireTeamOwner();
-    const agencyName = String(formData.get("agencyName") ?? "").trim();
-    if (!agencyName) return { ok: false, error: "Agency name is required." };
+    const parsed = BrandSchema.safeParse({
+      agencyName: formData.get("agencyName"),
+      logoUrl: formData.get("logoUrl") || undefined,
+      accentColor: formData.get("accentColor") || undefined,
+    });
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    }
     await saveBrand(accountId, {
-      agencyName,
-      logoUrl: (formData.get("logoUrl") as string) || null,
-      accentColor: (formData.get("accentColor") as string) || null,
+      agencyName: parsed.data.agencyName,
+      logoUrl: parsed.data.logoUrl,
+      accentColor: parsed.data.accentColor,
     });
     revalidatePath("/app/settings");
     return { ok: true };
@@ -88,7 +133,11 @@ export async function toggleClientReport(
 export async function inviteTeamMember(email: string): Promise<InviteResult> {
   try {
     const ownerId = await requireOwner();
-    const res = await createInvite(ownerId, email);
+    const parsed = InviteEmailSchema.safeParse(email);
+    if (!parsed.success) {
+      return { ok: false, error: "Enter a valid email address." };
+    }
+    const res = await createInvite(ownerId, parsed.data);
     if (res.ok) revalidatePath("/app/settings");
     return res;
   } catch (err) {

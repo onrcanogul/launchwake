@@ -71,8 +71,8 @@ export function BrandPanel({
         </div>
         <div className="field">
           <label className="fl">Logo URL</label>
-          <input className="inp" name="logoUrl" defaultValue={brand?.logoUrl ?? ""} placeholder="https://acme.com/logo.png (or a data: URL)" />
-          <div className="fhint">https or inline data: image. Shown at the top of the report.</div>
+          <input className="inp" name="logoUrl" defaultValue={brand?.logoUrl ?? ""} placeholder="https://acme.com/logo.png" />
+          <div className="fhint">An https:// image URL. Shown at the top of the report.</div>
         </div>
         <div className="field">
           <label className="fl">Accent colour</label>

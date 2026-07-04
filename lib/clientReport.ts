@@ -32,19 +32,14 @@ export function sanitizeAccent(input: string | null | undefined): string | null 
 }
 
 /**
- * Only allow an https URL or an inline data:image — anything else (javascript:,
- * http:, etc.) is rejected so a logo field can't become an injection vector. Pure.
+ * Only allow an https URL (≤ 2000 chars, no quote/angle-bracket chars) — anything
+ * else (javascript:, http:, data:, …) is rejected so a logo field can't become an
+ * injection vector. https-only by design: no data: URLs. Pure.
  */
 export function sanitizeLogoUrl(input: string | null | undefined): string | null {
   if (!input) return null;
   const s = input.trim();
   if (s.length <= 2000 && /^https:\/\/[^\s"'<>]+$/i.test(s)) return s;
-  if (
-    s.length <= 500_000 &&
-    /^data:image\/(png|jpe?g|svg\+xml|webp|gif);base64,[a-z0-9+/=]+$/i.test(s)
-  ) {
-    return s;
-  }
   return null;
 }
 

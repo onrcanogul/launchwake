@@ -9,25 +9,32 @@ describe("sanitizeAccent", () => {
   it("rejects anything that isn't a 6-digit hex", () => {
     expect(sanitizeAccent("red")).toBeNull();
     expect(sanitizeAccent("#fff")).toBeNull();
+    expect(sanitizeAccent("#1234567")).toBeNull(); // too long
+    expect(sanitizeAccent("#12g456")).toBeNull(); // non-hex char
     expect(sanitizeAccent("")).toBeNull();
     expect(sanitizeAccent(null)).toBeNull();
   });
 });
 
 describe("sanitizeLogoUrl", () => {
-  it("allows https URLs", () => {
+  it("allows https URLs (only)", () => {
     expect(sanitizeLogoUrl("https://acme.com/logo.png")).toBe("https://acme.com/logo.png");
-  });
-  it("allows inline data:image URLs", () => {
-    const data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
-    expect(sanitizeLogoUrl(data)).toBe(data);
   });
   it("rejects injection vectors and non-https schemes", () => {
     expect(sanitizeLogoUrl("javascript:alert(1)")).toBeNull();
     expect(sanitizeLogoUrl("http://acme.com/logo.png")).toBeNull();
     expect(sanitizeLogoUrl('https://x.com/a" onerror="alert(1)')).toBeNull();
-    expect(sanitizeLogoUrl("data:text/html;base64,PHNjcmlwdD4=")).toBeNull();
     expect(sanitizeLogoUrl(null)).toBeNull();
+  });
+  it("rejects data: URLs entirely (https-only, no inline images)", () => {
+    expect(sanitizeLogoUrl("data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==")).toBeNull();
+    expect(sanitizeLogoUrl("data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=")).toBeNull();
+    expect(sanitizeLogoUrl("data:text/html;base64,PHNjcmlwdD4=")).toBeNull();
+  });
+  it("enforces the length cap", () => {
+    const tooLong = "https://acme.com/" + "a".repeat(2000);
+    expect(tooLong.length).toBeGreaterThan(2000);
+    expect(sanitizeLogoUrl(tooLong)).toBeNull();
   });
 });
 
