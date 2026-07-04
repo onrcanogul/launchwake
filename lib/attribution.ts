@@ -199,11 +199,12 @@ export type RevenueInput = {
 export async function ingestRevenue(
   shortCode: string,
   input: RevenueInput,
+  client: Pick<typeof db, "trackedLink" | "event"> = db,
 ): Promise<boolean> {
   if (!Number.isFinite(input.amountCents) || input.amountCents <= 0) return false;
-  const link = await db.trackedLink.findUnique({ where: { shortCode } });
+  const link = await client.trackedLink.findUnique({ where: { shortCode } });
   if (!link) return false;
-  await db.event.create({
+  await client.event.create({
     data: {
       trackedLinkId: link.id,
       type: "REVENUE",

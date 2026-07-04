@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
-import { verifyWebhookSignature, parseWebhookEvent } from "@/lib/github";
+import { verifyWebhookSignature } from "@/lib/github";
 import { runAnalysisJob } from "@/lib/jobs";
 import { captureError } from "@/lib/observability";
+import { hashPayload, recordDelivery, processDelivery } from "@/lib/webhookDelivery";
 
 /**
  * GitHub webhook → auto-detect ships (the retention engine). Matches the repo to
  * a project, verifies the signature against that project's own webhook secret,
- * creates a Ship, and analyzes it AFTER responding (so the webhook stays fast
- * and never times out). Never posts anything.
+ * then persists the delivery and idempotently creates a Ship. Every authentic
+ * delivery is logged as a `WebhookDelivery`, so a transient failure is retried by
+ * the retry-webhooks cron instead of silently dropping a ship. Never posts.
  */
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -56,30 +58,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, pong: true });
   }
 
-  const suggestion = parseWebhookEvent(eventType, payload);
-  if (!suggestion) {
-    return NextResponse.json({ ok: true, ignored: true });
-  }
-
-  const ship = await db.ship.create({
-    data: {
-      projectId: project.id,
-      type: suggestion.type,
-      title: suggestion.title,
-      summary: suggestion.summary,
-      sourceUrl: suggestion.sourceUrl,
-      commitSha: suggestion.commitSha,
-    },
+  // Persist the (authentic) delivery, then process it idempotently. The dedupe
+  // key is a hash of the raw body, so GitHub re-deliveries of the same payload
+  // resolve to one row — and one Ship.
+  const { delivery, isNew } = await recordDelivery({
+    source: "GITHUB",
+    dedupeKey: hashPayload(rawBody),
+    projectId: project.id,
+    eventType,
+    payload,
+    signature,
   });
+
+  const outcome = await processDelivery(delivery);
 
   // Analyze after the response — keeps the webhook well under GitHub's timeout.
-  after(async () => {
-    try {
-      await runAnalysisJob(ship.id);
-    } catch (err) {
-      captureError(err, { at: "github.webhook.analysis", shipId: ship.id });
-    }
-  });
+  if (outcome.created && outcome.shipId) {
+    const shipId = outcome.shipId;
+    after(async () => {
+      try {
+        await runAnalysisJob(shipId);
+      } catch (err) {
+        captureError(err, { at: "github.webhook.analysis", shipId });
+      }
+    });
+  }
 
-  return NextResponse.json({ ok: true, shipId: ship.id });
+  return NextResponse.json({
+    ok: outcome.status !== "FAILED",
+    deliveryId: delivery.id,
+    shipId: outcome.shipId,
+    status: outcome.status,
+    deduped: outcome.deduped || !isNew,
+  });
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { ingestRevenue } from "@/lib/attribution";
-import { parseStripeRevenue, constructUserStripeEvent } from "@/lib/stripeRevenue";
+import { constructUserStripeEvent } from "@/lib/stripeRevenue";
+import { recordDelivery, processDelivery } from "@/lib/webhookDelivery";
 
 /**
  * Turnkey Stripe revenue webhook. The user points a Stripe webhook endpoint at
@@ -9,6 +9,10 @@ import { parseStripeRevenue, constructUserStripeEvent } from "@/lib/stripeRevenu
  * Settings. On a completed payment carrying metadata.lw_ref, we attribute the
  * revenue to the channel that drove it. Must read the RAW body for signature
  * verification.
+ *
+ * Every verified event is persisted as a `WebhookDelivery` keyed by the Stripe
+ * event id, so a re-delivery or a retry never double-counts revenue, and a
+ * transient failure is retried by the retry-webhooks cron instead of vanishing.
  */
 export async function POST(
   req: NextRequest,
@@ -43,18 +47,22 @@ export async function POST(
     );
   }
 
-  const revenue = parseStripeRevenue(event);
-  if (!revenue) {
-    // A valid event we simply don't attribute (no lw_ref, or not a payment).
-    return NextResponse.json({ received: true, attributed: false });
-  }
-
-  const ok = await ingestRevenue(revenue.ref, {
-    amountCents: revenue.amountCents,
-    currency: revenue.currency,
-    recurring: revenue.recurring,
-    meta: { via: "stripe", eventType: event.type },
+  // Persist the verified event (idempotent on event.id), then attribute it.
+  const { delivery } = await recordDelivery({
+    source: "STRIPE",
+    dedupeKey: event.id,
+    projectId,
+    eventType: event.type,
+    payload: event,
+    signature,
   });
 
-  return NextResponse.json({ received: true, attributed: ok });
+  const outcome = await processDelivery(delivery);
+
+  return NextResponse.json({
+    received: true,
+    attributed: outcome.attributed ?? false,
+    status: outcome.status,
+    deduped: outcome.deduped,
+  });
 }
