@@ -45,6 +45,7 @@ const CreateSchema = z.object({
   sourceUrl: z
     .string()
     .trim()
+    .max(500, "URL must be 500 characters or fewer")
     .optional()
     .or(z.literal(""))
     .transform((v, ctx) => {

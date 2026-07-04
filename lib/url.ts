@@ -20,6 +20,9 @@ export function isSafeHttpUrl(raw: string): boolean {
   return u.hostname.length > 0;
 }
 
+/** A product URL longer than this is junk (or an attack) — reject it. */
+export const MAX_URL_LENGTH = 500;
+
 // Matches a leading "scheme:" (RFC 3986 scheme chars) so we can tell "myapp.com"
 // (no scheme → prepend https) apart from "javascript:…" / "https://…" (has one).
 const HAS_SCHEME = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
@@ -35,8 +38,9 @@ const HAS_SCHEME = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
  * Rules: trim; prepend "https://" when there is no scheme; parse with `new URL`;
  * reject any non-http(s) scheme (`javascript:`, `data:`, `ftp:`, `mailto:` …);
  * reject a hostname with no dot (single-label hosts like "localhost"); drop the
- * implicit root "/" so we don't store a surprise trailing slash. Pure — safe to
- * reuse in zod transforms on client or server.
+ * implicit root "/" so we don't store a surprise trailing slash; reject a result
+ * longer than MAX_URL_LENGTH. Pure — safe to reuse in zod transforms on client or
+ * server.
  */
 export function normalizeHttpUrl(input: string): string | null {
   if (typeof input !== "string") return null;
@@ -64,5 +68,8 @@ export function normalizeHttpUrl(input: string): string | null {
     href = href.slice(0, -1);
   }
 
+  // Cap after normalization — prepending "https://" can push a long bare domain
+  // over the limit even when the raw input was under it.
+  if (href.length > MAX_URL_LENGTH) return null;
   return href;
 }

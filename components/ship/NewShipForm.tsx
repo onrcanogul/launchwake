@@ -169,6 +169,7 @@ export function NewShipForm({
             value={sourceUrl}
             onChange={(e) => setSourceUrl(e.target.value)}
             placeholder="https://github.com/owner/repo/releases/tag/v1.0"
+            maxLength={500}
             aria-invalid={fieldErrors.sourceUrl ? true : undefined}
             aria-describedby={fieldErrors.sourceUrl ? "err-sourceUrl" : undefined}
           />

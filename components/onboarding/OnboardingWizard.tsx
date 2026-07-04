@@ -275,6 +275,7 @@ export function OnboardingWizard({
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://hookline.dev"
+                maxLength={500}
                 aria-invalid={fieldErrors.url ? true : undefined}
                 aria-describedby={fieldErrors.url ? "err-manual-url" : undefined}
               />

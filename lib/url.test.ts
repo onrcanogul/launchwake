@@ -61,4 +61,11 @@ describe("normalizeHttpUrl", () => {
     expect(normalizeHttpUrl("   ")).toBeNull();
     expect(normalizeHttpUrl("localhost")).toBeNull();
   });
+
+  it("rejects a URL that exceeds the length cap post-normalization", () => {
+    const under = "myapp.com/" + "a".repeat(480); // < 500 once https:// prepended
+    expect(normalizeHttpUrl(under)).not.toBeNull();
+    const over = "myapp.com/" + "a".repeat(600);
+    expect(normalizeHttpUrl(over)).toBeNull();
+  });
 });
