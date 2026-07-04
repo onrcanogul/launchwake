@@ -40,8 +40,8 @@ describe("weeklyRecommendations", () => {
     const recs = weeklyRecommendations(
       stats({
         queuedTasks: [
-          { phase: "DIRECTORIES", phaseLabel: "Submit to directories", channelName: "AlternativeTo", shipTitle: "v1", url: "https://alternativeto.net", dueAt: new Date() },
-          { phase: "DIRECTORIES", phaseLabel: "Submit to directories", channelName: "SaaSHub", shipTitle: "v1", url: null, dueAt: new Date() },
+          { phase: "DIRECTORIES", phaseLabel: "Submit to directories", channelName: "AlternativeTo", shipId: "s1", shipTitle: "v1", url: "https://alternativeto.net", dueAt: new Date() },
+          { phase: "DIRECTORIES", phaseLabel: "Submit to directories", channelName: "SaaSHub", shipId: "s1", shipTitle: "v1", url: null, dueAt: new Date() },
         ],
       }),
     );

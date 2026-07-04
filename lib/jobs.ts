@@ -4,6 +4,13 @@ import { env } from "./env";
 import { reminderMessage } from "./reminders";
 import { sendEmail, sendSlack, emailConfigured } from "./notify";
 import { captureError } from "./observability";
+import { getPlanUsage, entitlementViolation } from "./billing";
+import {
+  buildPlanReadyEmail,
+  buildPlanLimitEmail,
+  planUrl,
+  settingsUrl,
+} from "./shipNotify";
 import {
   withRetry,
   recordWebhookFailure,
@@ -27,15 +34,69 @@ export async function runAnalysisJob(shipId: string): Promise<void> {
 }
 
 /**
- * Analyze an auto-detected ship with in-process retry; on final failure persist
- * a retryable WebhookDelivery so the founder can see it (Settings → Tracking
- * health) and the cron re-drives it. Called from the GitHub webhook's after(),
- * so it must never throw. Best-effort by design; the ship already exists.
+ * Email the founder that an auto-detected ship's plan is ready. Best-effort;
+ * self-loads so both the immediate webhook path and the retry cron can call it.
+ */
+export async function notifyPlanReady(shipId: string): Promise<void> {
+  if (!emailConfigured()) return;
+  const ship = await db.ship.findUnique({
+    where: { id: shipId },
+    select: {
+      title: true,
+      project: { select: { name: true, user: { select: { email: true } } } },
+    },
+  });
+  if (!ship) return;
+  const mail = buildPlanReadyEmail({
+    shipTitle: ship.title,
+    projectName: ship.project.name,
+    url: planUrl(env.APP_URL, shipId),
+  });
+  await sendEmail(ship.project.user.email, mail.subject, mail.text).catch(() => {});
+}
+
+/**
+ * Auto-generate the distribution plan for an auto-detected ship, then email the
+ * founder it's ready — the post-launch growth loop, minus the "paste a new
+ * changelog" nudge. Respects the Free-tier monthly plan limit (lib/billing): at
+ * the limit we skip the build and send an upgrade nudge instead (the ship still
+ * lands in the feed). Retries transient failures; on final failure persists a
+ * retryable WebhookDelivery for the cron. Called from the webhook's after(), so
+ * it must never throw.
  */
 export async function runGithubAnalysisResilient(
   shipId: string,
   ctx: { projectId: string; eventType: string | null },
 ): Promise<void> {
+  const ship = await db.ship.findUnique({
+    where: { id: shipId },
+    select: {
+      title: true,
+      project: {
+        select: { name: true, userId: true, user: { select: { email: true } } },
+      },
+    },
+  });
+  if (!ship) return;
+
+  // Free-tier gate: respect the monthly plan quota for auto-plans, same as the
+  // manual "create ship" path. At the limit, nudge instead of burning a plan.
+  const usage = await getPlanUsage(ship.project.userId);
+  const violation = entitlementViolation(usage, "create_plan");
+  if (violation) {
+    if (emailConfigured() && usage.planLimit !== null) {
+      const mail = buildPlanLimitEmail({
+        shipTitle: ship.title,
+        projectName: ship.project.name,
+        used: usage.plansThisMonth,
+        limit: usage.planLimit,
+        upgradeUrl: settingsUrl(env.APP_URL),
+      });
+      await sendEmail(ship.project.user.email, mail.subject, mail.text).catch(() => {});
+    }
+    return;
+  }
+
   try {
     await withRetry(() => runAnalysisJob(shipId), { attempts: 3 });
   } catch (err) {
@@ -49,7 +110,10 @@ export async function runGithubAnalysisResilient(
       error: (err as Error)?.message ?? String(err),
       retryable: true,
     });
+    return;
   }
+
+  await notifyPlanReady(shipId);
 }
 
 export type WebhookRetrySummary = {
@@ -88,6 +152,8 @@ export async function retryDueWebhookDeliveries(
         where: { id: d.id },
         data: { status: "SUCCESS", succeededAt: now, nextRetryAt: null, error: null },
       });
+      // The plan finally built — close the loop with the "plan is ready" email.
+      await notifyPlanReady(d.shipId!);
       recovered += 1;
     } catch (err) {
       const attempts = d.attempts + 1;

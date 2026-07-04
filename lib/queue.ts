@@ -216,6 +216,7 @@ export type DueTask = {
   phase: QueuePhase;
   phaseLabel: string;
   channelName: string;
+  shipId: string;
   shipTitle: string;
   url: string | null;
   dueAt: Date;
@@ -239,7 +240,7 @@ export async function tasksDueThisWeek(
     },
     include: {
       channel: { select: { name: true, url: true } },
-      ship: { select: { title: true } },
+      ship: { select: { id: true, title: true } },
     },
     orderBy: { dueAt: "asc" },
     take: limit,
@@ -248,6 +249,7 @@ export async function tasksDueThisWeek(
     phase: t.phase,
     phaseLabel: PHASES[t.phase].label,
     channelName: t.channel.name,
+    shipId: t.ship.id,
     shipTitle: t.ship.title,
     url: t.channel.url,
     dueAt: t.dueAt,

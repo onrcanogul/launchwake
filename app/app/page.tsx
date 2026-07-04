@@ -3,7 +3,9 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { LaunchRadar } from "@/components/dashboard/LaunchRadar";
+import { DueQueue } from "@/components/dashboard/DueQueue";
 import { getShipFeed, relativeTime } from "@/lib/ships";
+import { tasksDueThisWeek } from "@/lib/queue";
 import { Icon } from "@/components/Icon";
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
@@ -19,6 +21,7 @@ export default async function ShipFeedPage() {
   if (!ws.project) redirect("/onboarding");
 
   const { ships, stats } = await getShipFeed(ws.project.id);
+  const dueTasks = await tasksDueThisWeek(ws.accountId, new Date(), 5);
 
   const shell = (children: React.ReactNode) => <>{children}</>;
 
@@ -142,6 +145,7 @@ export default async function ShipFeedPage() {
         </Note>
       )}
       <StatStrip stats={statItems} />
+      <DueQueue tasks={dueTasks} />
       <Panel title="Recent ships" right={`${ships.length} total`}>
         {ships.map((s) => (
           <Link
