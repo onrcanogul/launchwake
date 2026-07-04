@@ -1,43 +1,55 @@
-import { env } from "./env";
+import * as Sentry from "@sentry/nextjs";
 
 /**
- * Central error capture. Today it logs structured context; when `SENTRY_DSN` is
- * set and `@sentry/nextjs` is installed, it also forwards to Sentry (loaded
- * lazily so the package stays an optional dependency). Wire this at the seams
- * where failures are otherwise swallowed — LLM JSON parsing, webhooks, the
- * redirect — so they become visible instead of silent.
+ * Central error capture. Logs structured context and forwards to Sentry. When no
+ * DSN is configured the SDK is never initialized, so the Sentry calls are inert
+ * no-ops and only the console log remains — the app runs identically without it.
  *
- * To fully enable Sentry: `pnpm add @sentry/nextjs`, set `SENTRY_DSN`, and add
- * an `instrumentation.ts` that calls `Sentry.init({ dsn: env.SENTRY_DSN })`.
+ * Wire this at the seams where failures are otherwise swallowed — LLM calls,
+ * webhook processing, attribution ingestion — so they become visible. PII is
+ * scrubbed centrally in each Sentry config's `beforeSend` (see lib/sentryScrub),
+ * so callers can pass context freely without leaking emails or tracked-link codes.
  */
 
 type Context = Record<string, unknown>;
 
-// Cache the optional Sentry module (or `null` if unavailable) after first load.
-let sentry: { captureException: (e: unknown, hint?: unknown) => void } | null | undefined;
-
-// Indirect specifier: keeps `@sentry/nextjs` an OPTIONAL dependency — a literal
-// import would fail typecheck/build until it's installed.
-const SENTRY_PKG = "@sentry/nextjs";
-
-async function loadSentry() {
-  if (sentry !== undefined) return sentry;
-  if (!env.SENTRY_DSN) return (sentry = null);
-  try {
-    sentry = (await import(/* webpackIgnore: true */ SENTRY_PKG)) as never;
-  } catch {
-    sentry = null;
-  }
-  return sentry;
-}
+// Low-cardinality, high-signal keys worth indexing as searchable Sentry tags.
+// Everything else in the context is attached as (searchable-in-body) extra data.
+const TAG_KEYS = new Set([
+  "at",
+  "source",
+  "projectId",
+  "provider",
+  "model",
+  "tokens",
+  "exhausted",
+]);
 
 /**
- * Record an error with context. Never throws — capturing an error must not
- * cause a second one. Returns immediately; Sentry forwarding is fire-and-forget.
+ * Record an error with context. Never throws — capturing an error must not cause
+ * a second one.
  */
 export function captureError(error: unknown, context: Context = {}): void {
   console.error("[error]", context, error);
-  void loadSentry()
-    .then((s) => s?.captureException(error, { extra: context }))
-    .catch(() => {});
+
+  try {
+    Sentry.withScope((scope) => {
+      const extra: Context = {};
+      for (const [key, value] of Object.entries(context)) {
+        if (value === undefined || value === null) continue;
+        if (
+          TAG_KEYS.has(key) &&
+          (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+        ) {
+          scope.setTag(key, String(value));
+        } else {
+          extra[key] = value;
+        }
+      }
+      if (Object.keys(extra).length > 0) scope.setExtras(extra);
+      Sentry.captureException(error);
+    });
+  } catch {
+    // Reporting must never throw.
+  }
 }

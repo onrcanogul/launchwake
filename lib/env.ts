@@ -68,8 +68,12 @@ const schema = z.object({
   CRON_SECRET: OptionalString,
 
   // ── Error tracking (optional) ─────────────────────────
-  // Set to forward captured errors to Sentry (needs @sentry/nextjs installed).
+  // Set to forward captured errors to Sentry. Both are optional so the app boots
+  // without them; when absent, Sentry init is skipped and the build plugin is not
+  // applied (see next.config.ts). SENTRY_DSN → server/edge; NEXT_PUBLIC_SENTRY_DSN
+  // → browser (must be a NEXT_PUBLIC_ var so it's inlined into the client bundle).
   SENTRY_DSN: OptionalString,
+  NEXT_PUBLIC_SENTRY_DSN: OptionalString,
 
   // ── SEO (optional) ────────────────────────────────────
   // Google Search Console verification token → rendered as a <meta> tag.
