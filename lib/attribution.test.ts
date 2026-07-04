@@ -7,7 +7,9 @@ import {
   estimateEffortMinutes,
   formatEffort,
   formatMoney,
+  summarizeLiveStats,
   type ResultRow,
+  type LivePostInput,
 } from "./attribution";
 
 describe("generateShortCode", () => {
@@ -114,5 +116,73 @@ describe("buildInsight", () => {
     expect(insight).toMatch(/Product Hunt/);
     expect(insight).toMatch(/\$340/);
     expect(insight).toMatch(/recurring/i);
+  });
+});
+
+describe("summarizeLiveStats", () => {
+  const t = (s: string) => new Date(s);
+
+  it("reports nothing tracked before any tracked link exists", () => {
+    const s = summarizeLiveStats([
+      { channelName: "r/webdev", hasTrackedLink: false, events: [] },
+    ]);
+    expect(s.postsTracked).toBe(0);
+    expect(s.tracking).toBe(false);
+    expect(s.channels).toEqual([]);
+  });
+
+  it("arms tracking (postsTracked) before the first event fires", () => {
+    const s = summarizeLiveStats([
+      { channelName: "Show HN", hasTrackedLink: true, events: [] },
+      { channelName: "r/webdev", hasTrackedLink: true, events: [] },
+    ]);
+    expect(s.postsTracked).toBe(2);
+    expect(s.tracking).toBe(false);
+    expect(s.totalClicks).toBe(0);
+    expect(s.lastEventAt).toBeNull();
+  });
+
+  it("aggregates clicks/signups per channel and flips tracking on", () => {
+    const posts: LivePostInput[] = [
+      {
+        channelName: "Show HN",
+        hasTrackedLink: true,
+        events: [
+          { type: "CLICK", createdAt: t("2026-07-04T10:00:00Z") },
+          { type: "CLICK", createdAt: t("2026-07-04T10:05:00Z") },
+          { type: "SIGNUP", createdAt: t("2026-07-04T10:06:00Z") },
+        ],
+      },
+      {
+        channelName: "r/webdev",
+        hasTrackedLink: true,
+        events: [{ type: "CLICK", createdAt: t("2026-07-04T09:00:00Z") }],
+      },
+    ];
+    const s = summarizeLiveStats(posts);
+    expect(s.tracking).toBe(true);
+    expect(s.totalClicks).toBe(3);
+    expect(s.totalSignups).toBe(1);
+    // Show HN (has a signup) sorts before r/webdev.
+    expect(s.channels[0]).toEqual({ name: "Show HN", clicks: 2, signups: 1 });
+    expect(s.channels[1]).toEqual({ name: "r/webdev", clicks: 1, signups: 0 });
+    expect(s.lastEventAt).toEqual(t("2026-07-04T10:06:00Z"));
+  });
+
+  it("ignores REVENUE events for the click/signup view", () => {
+    const s = summarizeLiveStats([
+      {
+        channelName: "Product Hunt",
+        hasTrackedLink: true,
+        events: [
+          { type: "CLICK", createdAt: t("2026-07-04T10:00:00Z") },
+          { type: "REVENUE", createdAt: t("2026-07-04T11:00:00Z") },
+        ],
+      },
+    ]);
+    expect(s.totalClicks).toBe(1);
+    expect(s.totalSignups).toBe(0);
+    // lastEventAt tracks clicks/signups only, not the later revenue event.
+    expect(s.lastEventAt).toEqual(t("2026-07-04T10:00:00Z"));
   });
 });

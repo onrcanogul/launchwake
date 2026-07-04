@@ -476,6 +476,109 @@ export async function getTrackingStatus(
   };
 }
 
+// ── Live results (polled by the plan page) ─────────────────
+
+export type LiveChannel = { name: string; clicks: number; signups: number };
+
+export type ShipLiveStats = {
+  /** true once ANY click or signup has been recorded for this ship. */
+  tracking: boolean;
+  totalClicks: number;
+  totalSignups: number;
+  /** channels with a live tracked link (whether or not they've had events). */
+  postsTracked: number;
+  /** most recent click/signup time, or null — drives the "just now" confirmation. */
+  lastEventAt: Date | null;
+  channels: LiveChannel[];
+};
+
+export type LivePostInput = {
+  channelName: string;
+  hasTrackedLink: boolean;
+  events: { type: EventTypeLike; createdAt: Date }[];
+};
+
+type EventTypeLike = "CLICK" | "SIGNUP" | "REVENUE" | string;
+
+/**
+ * Fold a ship's posts + events into a compact live summary. Pure → unit-testable
+ * without a DB. Only channels with a tracked link count as "tracked"; only
+ * clicks/signups drive the tracking-is-working confirmation.
+ */
+export function summarizeLiveStats(posts: LivePostInput[]): ShipLiveStats {
+  const channels: LiveChannel[] = [];
+  let totalClicks = 0;
+  let totalSignups = 0;
+  let postsTracked = 0;
+  let lastEventAt: Date | null = null;
+
+  for (const p of posts) {
+    if (!p.hasTrackedLink) continue;
+    postsTracked += 1;
+    let clicks = 0;
+    let signups = 0;
+    for (const e of p.events) {
+      if (e.type === "CLICK") clicks += 1;
+      else if (e.type === "SIGNUP") signups += 1;
+      else continue; // ignore REVENUE etc. for the live click/signup view
+      if (!lastEventAt || e.createdAt > lastEventAt) lastEventAt = e.createdAt;
+    }
+    totalClicks += clicks;
+    totalSignups += signups;
+    channels.push({ name: p.channelName, clicks, signups });
+  }
+
+  // Most active channel first, so the useful line is at the top.
+  channels.sort(
+    (a, b) =>
+      b.signups - a.signups || b.clicks - a.clicks || a.name.localeCompare(b.name),
+  );
+
+  return {
+    tracking: totalClicks > 0 || totalSignups > 0,
+    totalClicks,
+    totalSignups,
+    postsTracked,
+    lastEventAt,
+    channels,
+  };
+}
+
+/**
+ * Per-channel live click/signup counts for ONE ship — the polling source for the
+ * plan page's live-results strip. Ownership-scoped: returns null when the ship
+ * isn't in this account, so the route can 404 without leaking existence.
+ */
+export async function getShipLiveStats(
+  shipId: string,
+  accountId: string,
+): Promise<ShipLiveStats | null> {
+  const ship = await db.ship.findFirst({
+    where: { id: shipId, project: { userId: accountId } },
+    select: { id: true },
+  });
+  if (!ship) return null;
+
+  const posts = await db.post.findMany({
+    where: { shipId },
+    select: {
+      channel: { select: { name: true } },
+      trackedLink: {
+        select: { events: { select: { type: true, createdAt: true } } },
+      },
+    },
+    orderBy: { postedAt: "asc" },
+  });
+
+  return summarizeLiveStats(
+    posts.map((p) => ({
+      channelName: p.channel.name,
+      hasTrackedLink: Boolean(p.trackedLink),
+      events: p.trackedLink?.events ?? [],
+    })),
+  );
+}
+
 /**
  * Heuristic "What LaunchWake sees" line (double down / avoid). Deterministic and
  * free — no LLM call on every Results view.

@@ -1516,6 +1516,45 @@ tbody tr:hover {
   border-color: rgba(227, 179, 65, 0.3);
 }
 
+/* Live per-channel click/signup counts on the plan page. */
+.live-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.live-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 2px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.live-list li:first-child {
+  border-top: none;
+}
+.live-list .lc-name {
+  flex: 1;
+  color: var(--tx);
+  font-weight: 550;
+}
+.live-list .lc-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tx2);
+  font-variant-numeric: tabular-nums;
+  min-width: 82px;
+}
+.live-list .lc-stat b {
+  color: var(--tx);
+  font-weight: 600;
+}
+.live-list .lc-stat svg {
+  width: 13px;
+  height: 13px;
+}
+
 /* ============ A11Y ============ */
 /* Keyboard focus ring — visible only for keyboard users, not mouse clicks. */
 a:focus-visible,

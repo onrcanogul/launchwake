@@ -10,6 +10,7 @@ import { RerunButton } from "@/components/ship/RerunButton";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
 import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
 import { AutoBuildPlan } from "@/components/ship/AutoBuildPlan";
+import { LiveResults } from "@/components/ship/LiveResults";
 import { LaunchModeRail } from "@/components/ship/LaunchModeRail";
 import { nextBestTime } from "@/lib/reminders";
 import { emailConfigured } from "@/lib/notify";
@@ -148,6 +149,8 @@ export default async function PlanPage({
         />
       ) : (
         <>
+          <LiveResults shipId={ship.id} />
+
           {visibleRecs.map((rec) => {
             const schedulable = nextBestTime(rec.bestTime, new Date()) !== null;
             return (
