@@ -87,8 +87,14 @@ describe("buildAnalysisPrompt", () => {
 describe("heuristicRank", () => {
   it("ranks every candidate with a bounded fit score and valid slugs", () => {
     const scored: ScoredChannel[] = [
-      { channel: candidates[0], score: 20, matchedTags: ["developers", "devtools"] },
-      { channel: candidates[1], score: 0, matchedTags: [] },
+      {
+        channel: candidates[0],
+        score: 20,
+        matchedTags: ["developers", "devtools"],
+        outcomeDelta: 0,
+        outcomeReason: null,
+      },
+      { channel: candidates[1], score: 0, matchedTags: [], outcomeDelta: 0, outcomeReason: null },
     ];
     const result = heuristicRank(scored, input);
     expect(result.rankings).toHaveLength(2);

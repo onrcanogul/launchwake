@@ -114,6 +114,37 @@ export async function getOutcomeSignals(
   return map;
 }
 
+/**
+ * THIS project's own per-channel outcomes, keyed by channelId — the strongest
+ * (first-party) re-ranking signal. Reads posts + events directly, so it doesn't
+ * depend on the ChannelStat rollup and is always current.
+ */
+export async function getProjectChannelOutcomes(
+  projectId: string,
+): Promise<Map<string, OutcomeSignal>> {
+  const posts = await db.post.findMany({
+    where: { ship: { projectId } },
+    select: {
+      channelId: true,
+      status: true,
+      trackedLink: { select: { events: { select: { type: true } } } },
+    },
+  });
+  const map = new Map<string, OutcomeSignal>();
+  for (const p of posts) {
+    const row =
+      map.get(p.channelId) ?? { posts: 0, clicks: 0, signups: 0, removals: 0 };
+    row.posts += 1;
+    if (p.status === "REMOVED") row.removals += 1;
+    for (const e of p.trackedLink?.events ?? []) {
+      if (e.type === "CLICK") row.clicks += 1;
+      else if (e.type === "SIGNUP") row.signups += 1;
+    }
+    map.set(p.channelId, row);
+  }
+  return map;
+}
+
 /** Human label for a product bucket ("devtools-webdev" → "dev-tools"). */
 const BUCKET_LABELS: Record<string, string> = {
   devtools: "dev-tools",
@@ -210,4 +241,28 @@ export function outcomeFactLine(
     parts.push(`${signal.removals} removal${signal.removals === 1 ? "" : "s"}`);
   }
   return `past results for ${label}: ${parts.join(", ")}`;
+}
+
+/**
+ * The same factual line but for THIS project's own first-party history on a
+ * channel — preferred over the category line when we have it, so the LLM weights
+ * the founder's own results. Returns null when they've never posted there.
+ */
+export function projectOutcomeFactLine(
+  outcome: OutcomeSignal | undefined,
+): string | null {
+  if (!outcome || outcome.posts === 0) return null;
+
+  const parts = [
+    `${outcome.posts} of your post${outcome.posts === 1 ? "" : "s"}`,
+    `${outcome.clicks} click${outcome.clicks === 1 ? "" : "s"}`,
+    `${outcome.signups} signup${outcome.signups === 1 ? "" : "s"}`,
+  ];
+  if (outcome.clicks > 0) {
+    parts.push(`${((outcome.signups / outcome.clicks) * 100).toFixed(1)}% conversion`);
+  }
+  if (outcome.removals > 0) {
+    parts.push(`${outcome.removals} removal${outcome.removals === 1 ? "" : "s"}`);
+  }
+  return `your own results here: ${parts.join(", ")}`;
 }

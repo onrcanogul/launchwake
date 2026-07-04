@@ -35,12 +35,56 @@ export type MatchContext = {
    * favored over evergreen channels.
    */
   launchContext?: boolean;
+  /**
+   * Real outcomes to fold into the fit score. When present, channels that have
+   * driven signups for this project (or its category) rank up and repeated
+   * zero-outcome channels decay — the moat made to bear on candidate selection.
+   */
+  outcomes?: OutcomeContext;
 };
 
 export type ScoredChannel<C extends ChannelLike = ChannelLike> = {
   channel: C;
   score: number;
   matchedTags: string[];
+  /** Outcome-driven score delta folded into `score` (0 when no history). */
+  outcomeDelta: number;
+  /** Legible reason a rank moved because of real outcomes, or null. */
+  outcomeReason: string | null;
+};
+
+/**
+ * A channel's real, historical outcomes — first-party for THIS project. Same
+ * shape as stats.ts `OutcomeSignal`; kept structural so this module stays
+ * DB/framework free.
+ */
+export type ChannelOutcome = {
+  posts: number;
+  clicks: number;
+  signups: number;
+  removals: number;
+};
+
+/**
+ * Category fallback for a channel, from ChannelBenchmark medians. Used only when
+ * THIS project has no first-party history on the channel.
+ */
+export type ChannelBenchmarkSignal = {
+  medianSignups: number;
+  sampleSize: number;
+};
+
+/**
+ * The outcome flywheel, at the candidate-selection layer: real results per
+ * channel so a proven converter surfaces into the shortlist even with thin tag
+ * overlap, and a channel that keeps getting traffic-with-no-signups (or removals)
+ * decays out of it.
+ */
+export type OutcomeContext = {
+  /** channelId → this project's own history (the strongest signal). */
+  firstParty?: Map<string, ChannelOutcome>;
+  /** channelId → category benchmark medians (fallback when no first-party). */
+  benchmarks?: Map<string, ChannelBenchmarkSignal>;
 };
 
 /**
@@ -176,6 +220,89 @@ export function deriveSignalTags(ctx: MatchContext): Set<string> {
 const LAUNCH_TAG = "launch";
 const LAUNCH_BOOST = 15;
 
+// ── Outcome weighting (deterministic; on the same additive scale as tag overlap,
+//    where one matched tag = 10 points) ──────────────────────
+const OUTCOME_SIGNUP_MAX = 30; // cap on the up-weight from proven signups
+const OUTCOME_DECAY_MAX = 22; // cap on the down-weight from no-convert traffic
+const OUTCOME_BENCH_MAX = 12; // cap on the fallback up-weight from a category benchmark
+const DECAY_MIN_CLICKS = 8; // "clear traffic but no signups" threshold
+const DECAY_MIN_POSTS = 2; // "repeated zero-outcome posts" threshold
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+export type OutcomeWeight = {
+  /** score delta to fold into fit (positive = ranked up, negative = decayed). */
+  delta: number;
+  /** legible reason for the plan UI, or null when outcomes didn't move the rank. */
+  reason: string | null;
+  /** which way outcomes pushed the channel. */
+  direction: "up" | "down" | null;
+};
+
+/**
+ * Turn one channel's real history into a deterministic fit adjustment + a
+ * legible reason. First-party (this project) is the strongest signal; a category
+ * benchmark is the fallback when this project has never posted there. Pure.
+ */
+export function outcomeWeight(
+  outcome: ChannelOutcome | undefined,
+  benchmark: ChannelBenchmarkSignal | undefined,
+): OutcomeWeight {
+  // 1) First-party history for THIS project — the strongest, most specific signal.
+  if (outcome && outcome.posts > 0) {
+    const postStr = plural(outcome.posts, "post");
+    let delta = 0;
+    let reason: string | null = null;
+    let direction: "up" | "down" | null = null;
+
+    if (outcome.signups > 0) {
+      delta = Math.min(OUTCOME_SIGNUP_MAX, 8 + outcome.signups * 2);
+      direction = "up";
+      const where =
+        outcome.posts === 1 ? "your last post here" : `your ${postStr} here`;
+      reason = `ranked up: ${plural(outcome.signups, "signup")} from ${where}`;
+    } else if (outcome.posts >= DECAY_MIN_POSTS || outcome.clicks >= DECAY_MIN_CLICKS) {
+      // Repeated posts (or clear traffic) but nothing converted → real decay.
+      delta = -Math.min(OUTCOME_DECAY_MAX, 5 + Math.floor(outcome.clicks / 4) + outcome.posts);
+      direction = "down";
+      const detail =
+        outcome.clicks > 0
+          ? `${plural(outcome.clicks, "click")}, 0 signups across ${postStr}`
+          : `0 signups across ${postStr}`;
+      reason = `ranked down: ${detail} here`;
+    }
+
+    // Removals are their own negative signal, on top of the above.
+    if (outcome.removals > 0) {
+      delta -= Math.min(OUTCOME_DECAY_MAX, 4 + outcome.removals * 3);
+      const removalNote = `${plural(outcome.removals, "removal")} here — post carefully`;
+      reason = reason ? `${reason} · ${removalNote}` : `ranked down: ${removalNote}`;
+    }
+
+    if (delta !== 0) direction = delta > 0 ? "up" : "down";
+    if (delta !== 0 || reason) return { delta, reason, direction };
+  }
+
+  // 2) Category benchmark fallback — only when this project has no history here.
+  if (
+    (!outcome || outcome.posts === 0) &&
+    benchmark &&
+    benchmark.sampleSize > 0 &&
+    benchmark.medianSignups > 0
+  ) {
+    const delta = Math.min(OUTCOME_BENCH_MAX, benchmark.medianSignups);
+    return {
+      delta,
+      direction: "up",
+      reason: `ranked up: similar products see a median of ${plural(benchmark.medianSignups, "signup")} here`,
+    };
+  }
+
+  return { delta: 0, reason: null, direction: null };
+}
+
 /**
  * Rank the catalog for this product + ship and return the top `limit` candidates.
  * Scoring = weighted tag overlap; ties broken by lower ban risk, then name.
@@ -195,9 +322,26 @@ export function matchChannels<C extends ChannelLike>(
     // deliberate boost so launch venues clear evergreen ones.
     const launchBoost =
       ctx.launchContext && channel.tags.includes(LAUNCH_TAG) ? LAUNCH_BOOST : 0;
+    // The flywheel: fold real outcomes into the score so a proven channel can
+    // clear the shortlist on weak tags, and a repeatedly-dead one decays out.
+    const ow = ctx.outcomes
+      ? outcomeWeight(
+          ctx.outcomes.firstParty?.get(channel.id),
+          ctx.outcomes.benchmarks?.get(channel.id),
+        )
+      : { delta: 0, reason: null, direction: null };
     const score =
-      matchedTags.length * 10 - BAN_RISK_ORDER[channel.defaultBanRisk] + launchBoost;
-    return { channel, score, matchedTags };
+      matchedTags.length * 10 -
+      BAN_RISK_ORDER[channel.defaultBanRisk] +
+      launchBoost +
+      ow.delta;
+    return {
+      channel,
+      score,
+      matchedTags,
+      outcomeDelta: ow.delta,
+      outcomeReason: ow.reason,
+    };
   });
 
   scored.sort((a, b) => {

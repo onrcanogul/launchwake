@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   deriveSignalTags,
   matchChannels,
+  outcomeWeight,
   type ChannelLike,
+  type ChannelOutcome,
 } from "./channels";
 
 const catalog: ChannelLike[] = [
@@ -103,6 +105,162 @@ describe("matchChannels", () => {
     expect(ranked.length).toBe(3);
     // baseline 'developers' tag means channels tagged developers still surface first
     expect(ranked[0].channel.tags).toContain("developers");
+  });
+});
+
+describe("outcomeWeight", () => {
+  const zero: ChannelOutcome = { posts: 0, clicks: 0, signups: 0, removals: 0 };
+
+  it("ranks up a channel with first-party signups and explains why", () => {
+    const w = outcomeWeight(
+      { posts: 1, clicks: 40, signups: 12, removals: 0 },
+      undefined,
+    );
+    expect(w.direction).toBe("up");
+    expect(w.delta).toBeGreaterThan(0);
+    expect(w.reason).toBe("ranked up: 12 signups from your last post here");
+  });
+
+  it("pluralizes 'posts' when there is more than one post", () => {
+    const w = outcomeWeight(
+      { posts: 3, clicks: 50, signups: 5, removals: 0 },
+      undefined,
+    );
+    expect(w.reason).toBe("ranked up: 5 signups from your 3 posts here");
+  });
+
+  it("decays a channel with repeated traffic but zero signups", () => {
+    const w = outcomeWeight(
+      { posts: 3, clicks: 30, signups: 0, removals: 0 },
+      undefined,
+    );
+    expect(w.direction).toBe("down");
+    expect(w.delta).toBeLessThan(0);
+    expect(w.reason).toMatch(/ranked down: 30 clicks, 0 signups across 3 posts here/);
+  });
+
+  it("does not decay on a single quiet post (not yet 'repeated')", () => {
+    const w = outcomeWeight(
+      { posts: 1, clicks: 2, signups: 0, removals: 0 },
+      undefined,
+    );
+    expect(w).toEqual({ delta: 0, reason: null, direction: null });
+  });
+
+  it("penalizes removals and calls them out", () => {
+    const w = outcomeWeight(
+      { posts: 2, clicks: 3, signups: 0, removals: 2 },
+      undefined,
+    );
+    expect(w.direction).toBe("down");
+    expect(w.delta).toBeLessThan(0);
+    expect(w.reason).toMatch(/2 removals here — post carefully/);
+  });
+
+  it("still calls out removals even when a channel converted", () => {
+    const w = outcomeWeight(
+      { posts: 4, clicks: 50, signups: 6, removals: 1 },
+      undefined,
+    );
+    expect(w.reason).toContain("ranked up: 6 signups");
+    expect(w.reason).toContain("1 removal here — post carefully");
+  });
+
+  it("caps the up-weight so one lucky post cannot dominate", () => {
+    const w = outcomeWeight(
+      { posts: 1, clicks: 500, signups: 500, removals: 0 },
+      undefined,
+    );
+    expect(w.delta).toBeLessThanOrEqual(30);
+  });
+
+  it("falls back to the category benchmark when there is no first-party history", () => {
+    const w = outcomeWeight(zero, { medianSignups: 8, sampleSize: 12 });
+    expect(w.direction).toBe("up");
+    expect(w.delta).toBe(8);
+    expect(w.reason).toBe(
+      "ranked up: similar products see a median of 8 signups here",
+    );
+  });
+
+  it("ignores the benchmark once the project has its own history", () => {
+    const w = outcomeWeight(
+      { posts: 2, clicks: 20, signups: 0, removals: 0 },
+      { medianSignups: 40, sampleSize: 99 },
+    );
+    // first-party decay wins; benchmark is not consulted
+    expect(w.direction).toBe("down");
+  });
+
+  it("returns a neutral weight when there is nothing to say", () => {
+    expect(outcomeWeight(undefined, undefined)).toEqual({
+      delta: 0,
+      reason: null,
+      direction: null,
+    });
+    expect(outcomeWeight(zero, { medianSignups: 0, sampleSize: 0 })).toEqual({
+      delta: 0,
+      reason: null,
+      direction: null,
+    });
+  });
+});
+
+describe("matchChannels outcome weighting", () => {
+  // A proven-but-off-topic channel vs. a topically strong one that keeps dying.
+  const c: ChannelLike[] = [
+    {
+      id: "proven",
+      slug: "r-proven",
+      name: "r/Proven",
+      platform: "REDDIT",
+      defaultBanRisk: "MEDIUM",
+      // Only ONE overlapping tag — would rank low on tags alone.
+      tags: ["developers"],
+    },
+    {
+      id: "dead",
+      slug: "hn-dead",
+      name: "HN Dead",
+      platform: "HACKERNEWS",
+      defaultBanRisk: "LOW",
+      // Strong tag overlap for a devtools/api ship.
+      tags: ["developers", "devtools", "api", "backend"],
+    },
+  ];
+  const ctx = {
+    projectText: "an api devtool for backend developers",
+    shipText: "new api feature",
+    shipType: "FEATURE",
+  };
+
+  it("surfaces a proven channel above a strong-tag channel that keeps dying", () => {
+    const ranked = matchChannels(
+      c,
+      {
+        ...ctx,
+        outcomes: {
+          firstParty: new Map([
+            ["proven", { posts: 2, clicks: 60, signups: 15, removals: 0 }],
+            ["dead", { posts: 4, clicks: 40, signups: 0, removals: 0 }],
+          ]),
+        },
+      },
+      2,
+    );
+    expect(ranked[0].channel.slug).toBe("r-proven");
+    expect(ranked[0].outcomeDelta).toBeGreaterThan(0);
+    expect(ranked[0].outcomeReason).toContain("ranked up");
+    const dead = ranked.find((r) => r.channel.slug === "hn-dead")!;
+    expect(dead.outcomeDelta).toBeLessThan(0);
+    expect(dead.outcomeReason).toContain("ranked down");
+  });
+
+  it("without outcomes, the strong-tag channel wins (regression guard)", () => {
+    const ranked = matchChannels(c, ctx, 2);
+    expect(ranked[0].channel.slug).toBe("hn-dead");
+    expect(ranked[0].outcomeDelta).toBe(0);
+    expect(ranked[0].outcomeReason).toBeNull();
   });
 });
 

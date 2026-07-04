@@ -164,6 +164,28 @@ export async function getBenchmarkMap(
   return map;
 }
 
+/**
+ * Category benchmark medians for re-ranking, keyed by channelId. This is the
+ * fallback outcome signal in matchChannels when a project has no first-party
+ * history on a channel — "similar products convert here even if you haven't yet."
+ */
+export async function getBenchmarkSignals(
+  productTag: string,
+): Promise<Map<string, { medianSignups: number; sampleSize: number }>> {
+  const rows = await db.channelBenchmark.findMany({
+    where: { productTag },
+    select: { channelId: true, medianSignups: true, sampleSize: true },
+  });
+  const map = new Map<string, { medianSignups: number; sampleSize: number }>();
+  for (const r of rows) {
+    map.set(r.channelId, {
+      medianSignups: r.medianSignups,
+      sampleSize: r.sampleSize,
+    });
+  }
+  return map;
+}
+
 // ── Public engagement bootstrap (best-effort, cached) ──────
 const CATEGORY_QUERY: Record<string, string> = {
   devtools: "developer tools",

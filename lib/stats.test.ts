@@ -3,6 +3,7 @@ import {
   productTagFor,
   outcomeEvidence,
   outcomeFactLine,
+  projectOutcomeFactLine,
   bucketLabel,
 } from "./stats";
 
@@ -112,5 +113,28 @@ describe("outcomeFactLine", () => {
       "saas",
     );
     expect(line).toMatch(/1 removal\b/);
+  });
+});
+
+describe("projectOutcomeFactLine", () => {
+  it("is null without first-party history", () => {
+    expect(projectOutcomeFactLine(undefined)).toBeNull();
+    expect(
+      projectOutcomeFactLine({ posts: 0, clicks: 0, signups: 0, removals: 0 }),
+    ).toBeNull();
+  });
+
+  it("states the founder's own numbers with conversion", () => {
+    expect(
+      projectOutcomeFactLine({ posts: 2, clicks: 50, signups: 5, removals: 0 }),
+    ).toBe(
+      "your own results here: 2 of your posts, 50 clicks, 5 signups, 10.0% conversion",
+    );
+  });
+
+  it("singularizes and mentions removals", () => {
+    expect(
+      projectOutcomeFactLine({ posts: 1, clicks: 0, signups: 0, removals: 1 }),
+    ).toBe("your own results here: 1 of your post, 0 clicks, 0 signups, 1 removal");
   });
 });

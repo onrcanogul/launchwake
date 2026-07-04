@@ -8,6 +8,7 @@ import {
 } from "./llm";
 import {
   matchChannels,
+  outcomeWeight,
   type ChannelLike,
   type ScoredChannel,
 } from "./channels";
@@ -15,10 +16,12 @@ import {
   productTagFor,
   rollupAllChannelStats,
   getOutcomeSignals,
+  getProjectChannelOutcomes,
   outcomeEvidence,
   outcomeFactLine,
+  projectOutcomeFactLine,
 } from "./stats";
-import { rollupBenchmarks } from "./benchmarks";
+import { rollupBenchmarks, getBenchmarkSignals } from "./benchmarks";
 import { generateQueueForShip } from "./queue";
 import type { BanRisk, Channel, Project, Ship } from "@prisma/client";
 
@@ -215,6 +218,25 @@ export async function buildPlan(
     opts?.launchContext ?? ship.project.launchStage !== "LAUNCHED";
 
   const catalog = await db.channel.findMany();
+
+  // Flywheel, step 0 — refresh outcome stats for this product profile BEFORE
+  // ranking, so real results shape candidate SELECTION as well as the final fit.
+  // Channels that converted rise (even on thin tag overlap); traffic-with-no-
+  // signup and removals sink out of the shortlist.
+  await rollupAllChannelStats();
+  // Refresh category benchmarks too (first-party only here — the public-engagement
+  // bootstrap runs on the daily cron to keep plan-building network-free).
+  await rollupBenchmarks().catch(() => {});
+
+  const productTag = productTagFor(
+    `${ship.project.name} ${ship.project.description ?? ""} ${ship.project.url ?? ""}`,
+  );
+  const [projectOutcomes, benchmarkSignals, signals] = await Promise.all([
+    getProjectChannelOutcomes(ship.projectId),
+    getBenchmarkSignals(productTag),
+    getOutcomeSignals(productTag),
+  ]);
+
   const scored = matchChannels(
     catalog,
     {
@@ -222,6 +244,7 @@ export async function buildPlan(
       shipText: `${ship.title} ${ship.summary ?? ""}`,
       shipType: ship.type,
       launchContext,
+      outcomes: { firstParty: projectOutcomes, benchmarks: benchmarkSignals },
     },
     MAX_CANDIDATES,
   );
@@ -234,23 +257,14 @@ export async function buildPlan(
     ship,
   };
 
-  // Flywheel, step 1 — refresh outcome stats for this product profile BEFORE
-  // ranking, so both the LLM (via the prompt) and the deterministic pass weight
-  // what actually happened. Channels that converted rise; traffic-with-no-signup
-  // and removals sink.
-  await rollupAllChannelStats();
-  // Refresh category benchmarks too (first-party only here — the public-engagement
-  // bootstrap runs on the daily cron to keep plan-building network-free).
-  await rollupBenchmarks().catch(() => {});
-  const productTag = productTagFor(
-    `${ship.project.name} ${ship.project.description ?? ""} ${ship.project.url ?? ""}`,
-  );
-  const signals = await getOutcomeSignals(productTag);
-
-  // Per-candidate factual results line for the prompt (only where we have history).
+  // Per-candidate factual results line for the prompt (only where we have
+  // history). Prefer the founder's OWN first-party numbers over the category
+  // aggregate so the LLM weights what actually happened for this product.
   const outcomeContext = new Map<string, string>();
   for (const c of candidates) {
-    const line = outcomeFactLine(signals.get(c.id), productTag);
+    const line =
+      projectOutcomeFactLine(projectOutcomes.get(c.id)) ??
+      outcomeFactLine(signals.get(c.id), productTag);
     if (line) outcomeContext.set(c.slug, line);
   }
 
@@ -278,24 +292,31 @@ export async function buildPlan(
   }
 
   // Flywheel, step 2 — apply the deterministic fit adjustment + legible evidence
-  // and re-sort. banRisk also rises with removals. Reuses the signals above.
+  // and re-sort. The founder's OWN first-party history (and, failing that, the
+  // category benchmark) takes precedence over the category conversion evidence,
+  // so the plan visibly learns from what actually worked for this product. banRisk
+  // also rises with removals — from either the project's or the category's history.
   const enriched = grounded
     .map((r) => {
       const channel = bySlug.get(r.slug)!;
-      const signal = signals.get(channel.id);
-      const evidence = outcomeEvidence(signal, productTag);
-      const fitScore = Math.max(
-        0,
-        Math.min(100, r.fitScore + evidence.boost),
+      const firstParty = projectOutcomes.get(channel.id);
+      const catSignal = signals.get(channel.id);
+      const outcome = outcomeWeight(firstParty, benchmarkSignals.get(channel.id));
+      const evidence = outcomeEvidence(catSignal, productTag);
+      const boost = outcome.reason ? outcome.delta : evidence.boost;
+      const fitScore = Math.max(0, Math.min(100, r.fitScore + boost));
+      const removals = Math.max(
+        catSignal?.removals ?? 0,
+        firstParty?.removals ?? 0,
       );
       return {
         channel,
         fitScore,
-        banRisk: computeBanRisk(channel, signal?.removals ?? 0),
+        banRisk: computeBanRisk(channel, removals),
         bestTime: r.bestTime ?? channel.bestTime,
         whyText: r.why,
         ruleNote: r.ruleNote,
-        outcomeNote: evidence.note,
+        outcomeNote: outcome.reason ?? evidence.note,
       };
     })
     .sort((a, b) => b.fitScore - a.fitScore);
