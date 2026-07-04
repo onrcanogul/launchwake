@@ -6,6 +6,7 @@ import {
   wrapUntrusted,
   UNTRUSTED_DATA_NOTICE,
 } from "./llm";
+import { checkDraft, safetyVerdict, type SafetyReport } from "./bansafety";
 import { TONE_GUIDE, type DraftTone } from "./tones";
 import type { Channel, Draft, Project, Ship } from "@prisma/client";
 
@@ -14,10 +15,42 @@ import type { Channel, Draft, Project, Ship } from "@prisma/client";
  * recommendation's ruleNote (the safe way in). The human posts it — we never do.
  */
 
-export const DraftSchema = z.object({
-  body: z.string().min(1).max(3000),
-  safetyNote: z.string().max(280).nullish(),
-});
+/**
+ * Per-channel body ceilings. A draft that overruns the platform's real limit is
+ * useless (a truncated X thread, a rejected Mastodon post), so we cap the LLM at
+ * the schema level per platform instead of a single generous 3000.
+ */
+const PLATFORM_MAX_LEN: Record<string, number> = {
+  HACKERNEWS: 2000,
+  REDDIT: 3000,
+  X: 1000, // a short numbered thread, not one 3000-char wall
+  LINKEDIN: 2900, // LinkedIn's post limit is ~3000
+  PRODUCTHUNT: 700, // tagline + a short maker comment
+  INDIEHACKERS: 3000,
+  DEVTO: 3000,
+  LOBSTERS: 2000,
+  MASTODON: 500,
+  BLUESKY: 300,
+  DISCORD: 2000,
+  SLACK: 2000,
+};
+const DEFAULT_MAX_LEN = 3000;
+
+/** The body character cap for a platform. */
+export function platformMaxLen(platform: string): number {
+  return PLATFORM_MAX_LEN[platform] ?? DEFAULT_MAX_LEN;
+}
+
+/** Draft schema tightened to a platform's real length limit. */
+export function draftSchemaFor(platform: string) {
+  return z.object({
+    body: z.string().min(1).max(platformMaxLen(platform)),
+    safetyNote: z.string().max(280).nullish(),
+  });
+}
+
+/** Default (widest) draft schema — kept for callers that aren't channel-scoped. */
+export const DraftSchema = draftSchemaFor("OTHER");
 export type DraftResult = z.infer<typeof DraftSchema>;
 
 export type DraftContext = {
@@ -117,6 +150,43 @@ function firstSentence(text?: string | null): string | undefined {
   return (m ? m[1] : text).slice(0, 200);
 }
 
+export type FinalizedDraft = {
+  body: string;
+  safetyNote: string | null;
+  report: SafetyReport;
+};
+
+/**
+ * Enforce the guardrails before a draft is returned/persisted: clamp the body to
+ * the platform's length limit, then run the deterministic ban-safety linter. When
+ * a check would get the post removed (a hard fail), the safetyNote leads with the
+ * fix so the founder can't miss it. Pure → unit-tested.
+ */
+export function enforceDraft(input: {
+  body: string;
+  safetyNote?: string | null;
+  platform: string;
+  channelRules?: string | null;
+  ruleNote?: string | null;
+}): FinalizedDraft {
+  const max = platformMaxLen(input.platform);
+  const body =
+    input.body.length > max ? input.body.slice(0, max).trimEnd() : input.body;
+
+  const report = checkDraft({
+    body,
+    platform: input.platform,
+    channelRules: input.channelRules ?? null,
+  });
+
+  const firstFail = report.checks.find((c) => c.level === "fail");
+  const safetyNote = firstFail
+    ? `${safetyVerdict(report)} — ${firstFail.detail}`
+    : (input.safetyNote ?? input.ruleNote ?? safetyVerdict(report));
+
+  return { body, safetyNote, report };
+}
+
 /** Generate (and persist) a draft for a recommendation. Idempotent per rec. */
 export async function generateDraft(
   recommendationId: string,
@@ -147,23 +217,35 @@ export async function generateDraft(
         userId: project.userId,
         system: prompt.system,
         prompt: prompt.prompt,
-        schema: DraftSchema,
+        // Per-channel length ceiling: the model is constrained (and retried) to
+        // the platform's real limit instead of a generic 3000.
+        schema: draftSchemaFor(rec.channel.platform),
         label: `draft:${rec.channel.platform}:${tone}`,
       })
     : heuristicDraft(ctx);
+
+  // Clamp to length + run the ban-safety linter before persisting, so a draft
+  // that would get removed carries the fix in its safetyNote.
+  const finalized = enforceDraft({
+    body: result.body,
+    safetyNote: result.safetyNote,
+    platform: rec.channel.platform,
+    channelRules: rec.channel.rules,
+    ruleNote: rec.ruleNote,
+  });
 
   return db.draft.upsert({
     where: { recommendationId },
     update: {
       platform: rec.channel.platform,
-      body: result.body,
-      safetyNote: result.safetyNote ?? ctx.ruleNote,
+      body: finalized.body,
+      safetyNote: finalized.safetyNote,
     },
     create: {
       recommendationId,
       platform: rec.channel.platform,
-      body: result.body,
-      safetyNote: result.safetyNote ?? ctx.ruleNote,
+      body: finalized.body,
+      safetyNote: finalized.safetyNote,
     },
   });
 }

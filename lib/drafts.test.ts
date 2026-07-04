@@ -3,6 +3,9 @@ import {
   buildDraftPrompt,
   heuristicDraft,
   DraftSchema,
+  draftSchemaFor,
+  platformMaxLen,
+  enforceDraft,
   type DraftContext,
 } from "./drafts";
 
@@ -50,6 +53,65 @@ describe("heuristicDraft", () => {
     });
     expect(d.body).toContain("1/");
     expect(d.body).toContain("https://hookline.dev");
+  });
+});
+
+describe("per-channel length limits", () => {
+  it("caps tighter for terse platforms than the default", () => {
+    expect(platformMaxLen("X")).toBeLessThan(platformMaxLen("REDDIT"));
+    expect(platformMaxLen("BLUESKY")).toBe(300);
+    // Unknown platform falls back to the default ceiling.
+    expect(platformMaxLen("SOMETHING_NEW")).toBe(3000);
+  });
+
+  it("rejects an over-length body via the platform schema", () => {
+    const schema = draftSchemaFor("X");
+    const tooLong = { body: "a".repeat(platformMaxLen("X") + 1) };
+    expect(schema.safeParse(tooLong).success).toBe(false);
+    const ok = { body: "a".repeat(platformMaxLen("X")) };
+    expect(schema.safeParse(ok).success).toBe(true);
+  });
+});
+
+describe("enforceDraft", () => {
+  it("clamps an over-length body to the platform limit", () => {
+    const long = "x".repeat(5000);
+    const out = enforceDraft({ body: long, platform: "X", channelRules: null });
+    expect(out.body.length).toBeLessThanOrEqual(platformMaxLen("X"));
+  });
+
+  it("leads the safetyNote with the fix when a ban-safety check hard-fails", () => {
+    // A Reddit post with a link in the title is a hard fail.
+    const out = enforceDraft({
+      body: "Check out https://hookline.dev\n\nMore detail here.",
+      platform: "REDDIT",
+      channelRules: null,
+      ruleNote: "Value-first.",
+    });
+    expect(out.report.fails).toBeGreaterThan(0);
+    expect(out.safetyNote).toMatch(/Likely to be removed/);
+    expect(out.safetyNote).toMatch(/title/i);
+  });
+
+  it("keeps the provided safetyNote when nothing hard-fails", () => {
+    const out = enforceDraft({
+      body: "Show HN: Hookline — a webhook tester\n\nWhat do you use today?",
+      safetyNote: "Post from your own account.",
+      platform: "HACKERNEWS",
+      channelRules: "Show HN",
+    });
+    expect(out.report.fails).toBe(0);
+    expect(out.safetyNote).toBe("Post from your own account.");
+  });
+
+  it("falls back to ruleNote, then the safety verdict, when no note is given", () => {
+    const out = enforceDraft({
+      body: "Show HN: Hookline\n\nWhat do you use today?",
+      platform: "HACKERNEWS",
+      channelRules: "Show HN",
+      ruleNote: "Frame it problem-first.",
+    });
+    expect(out.safetyNote).toBe("Frame it problem-first.");
   });
 });
 
