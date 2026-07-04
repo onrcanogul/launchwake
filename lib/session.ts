@@ -38,29 +38,34 @@ export type Workspace = {
 export const getWorkspace = cache(async (): Promise<Workspace> => {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
+  const userId = session.user.id;
 
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-  });
+  // These four only depend on the signed-in user id, so fire them together as
+  // one round-trip wave instead of awaiting each in turn.
+  const [user, resolved, activeShipId, channelsCount] = await Promise.all([
+    db.user.findUnique({ where: { id: userId } }),
+    resolveAccount(userId),
+    readActiveShipId(),
+    db.channel.count(),
+  ]);
   if (!user) redirect("/login");
 
-  const { accountId, role } = await resolveAccount(user.id);
-  const account =
-    accountId === user.id
-      ? user
-      : await db.user.findUnique({ where: { id: accountId } });
+  const { accountId, role } = resolved;
+
+  // account (for the plan) and project both key off accountId → run in parallel.
+  const [account, project] = await Promise.all([
+    accountId === userId
+      ? Promise.resolve(user)
+      : db.user.findUnique({ where: { id: accountId } }),
+    db.project.findFirst({
+      where: { userId: accountId },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
   const plan = account?.plan ?? user.plan;
 
-  const project = await db.project.findFirst({
-    where: { userId: accountId },
-    orderBy: { createdAt: "asc" },
-  });
-
   const ships = project ? await listProjectShips(project.id) : [];
-  const activeShipId = await readActiveShipId();
   const activeShip = ships.find((s) => s.id === activeShipId) ?? null;
-
-  const channelsCount = await db.channel.count();
 
   return {
     user: { id: user.id, name: user.name, email: user.email, plan: user.plan },
