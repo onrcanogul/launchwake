@@ -22,6 +22,7 @@ export function LoginForm({
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState(false);
 
   const start = (id: string, extra?: Record<string, unknown>) => {
     setPending(id);
@@ -31,10 +32,16 @@ export function LoginForm({
   const sendEmail = () => {
     if (!email) return;
     setPending("nodemailer");
-    void signIn("nodemailer", { email, callbackUrl }).then(() => {
-      setSent(true);
-      setPending(null);
-    });
+    setError(false);
+    // redirect:false so a send failure (SMTP/config) surfaces inline here
+    // instead of navigating to NextAuth's generic "Server error" page.
+    void signIn("nodemailer", { email, callbackUrl, redirect: false })
+      .then((res) => {
+        if (res?.error) setError(true);
+        else setSent(true);
+      })
+      .catch(() => setError(true))
+      .finally(() => setPending(null));
   };
 
   return (
@@ -75,6 +82,19 @@ export function LoginForm({
               >
                 {t("continueEmail")}
               </button>
+              {error && (
+                <p
+                  style={{
+                    color: "var(--danger, #d64545)",
+                    fontSize: 13,
+                    textAlign: "center",
+                    marginTop: 10,
+                  }}
+                  role="alert"
+                >
+                  {t("emailError")}
+                </p>
+              )}
             </>
           )}
         </>

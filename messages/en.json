@@ -308,6 +308,7 @@
     "continueGithub": "Continue with GitHub",
     "or": "or",
     "magicLinkSent": "Check your inbox for a magic link.",
+    "emailError": "Couldn't send the magic link. Check the email settings or try GitHub.",
     "workEmail": "Work email",
     "emailPlaceholder": "you@startup.dev",
     "continueEmail": "Continue with email",
