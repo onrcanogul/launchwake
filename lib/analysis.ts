@@ -66,6 +66,7 @@ export function buildAnalysisPrompt(
   input: PlanInput,
   candidates: ChannelLike[],
   outcomeContext?: Map<string, string>,
+  opts?: { launchContext?: boolean },
 ) {
   const hasOutcomes = Boolean(outcomeContext && outcomeContext.size > 0);
   const system = [
@@ -77,6 +78,9 @@ export function buildAnalysisPrompt(
     "- You may ONLY use channels from the provided candidate list. NEVER invent communities, subreddits, or platforms. Refer to each by its exact slug.",
     "- Ground the 'ruleNote' in the channel's stated rules — the concrete safe way in for this post (e.g. 'lead with the build story, no marketing tone').",
     "- 'why' must be specific to this product + ship, not generic. One or two sentences.",
+    opts?.launchContext
+      ? "- This is a FIRST public launch. Favor launch venues (Product Hunt, Show HN, launch-friendly communities) — rank them higher than evergreen posting channels, and frame 'why' around making the launch land."
+      : "",
     hasOutcomes
       ? "- Some candidates include a 'past results' line — REAL outcomes from posting similar products there. Weight it heavily: a channel that produced signups should rank higher; one that got clicks but ZERO signups, or had removals, should rank LOWER even if it looks topically relevant. When past results change the call, say so in 'why' (e.g. 'drove 4% signups for similar tools last time')."
       : "",
@@ -181,13 +185,22 @@ export function computeBanRisk(channel: Channel, removals = 0): BanRisk {
 
 /**
  * Build (or rebuild) the distribution plan for a ship. Returns the plan id.
+ *
+ * `launchContext` favors launch venues in ranking; when omitted it's derived
+ * from the project's launch stage (pre-launch / unannounced → launch context).
  */
-export async function buildPlan(shipId: string): Promise<string> {
+export async function buildPlan(
+  shipId: string,
+  opts?: { launchContext?: boolean },
+): Promise<string> {
   const ship = await db.ship.findUnique({
     where: { id: shipId },
     include: { project: true },
   });
   if (!ship) throw new Error(`Ship ${shipId} not found`);
+
+  const launchContext =
+    opts?.launchContext ?? ship.project.launchStage !== "LAUNCHED";
 
   const catalog = await db.channel.findMany();
   const scored = matchChannels(
@@ -196,6 +209,7 @@ export async function buildPlan(shipId: string): Promise<string> {
       projectText: `${ship.project.name} ${ship.project.description ?? ""} ${ship.project.url ?? ""}`,
       shipText: `${ship.title} ${ship.summary ?? ""}`,
       shipType: ship.type,
+      launchContext,
     },
     MAX_CANDIDATES,
   );
@@ -230,7 +244,9 @@ export async function buildPlan(shipId: string): Promise<string> {
 
   let ranking: RankingResult;
   if (llmConfigured()) {
-    const { system, prompt } = buildAnalysisPrompt(input, candidates, outcomeContext);
+    const { system, prompt } = buildAnalysisPrompt(input, candidates, outcomeContext, {
+      launchContext,
+    });
     ranking = await completeJSON({
       userId: ship.project.userId,
       system,

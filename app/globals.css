@@ -4919,3 +4919,11 @@ tbody tr {
   background: var(--ac);
   border-radius: 3px;
 }
+
+/* Launch Mode: channels beyond the Free launch cap (non-interactive teaser). */
+.plan-locked {
+  opacity: 0.5;
+  filter: saturate(0.7);
+  pointer-events: none;
+  user-select: none;
+}

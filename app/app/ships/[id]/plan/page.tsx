@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getShipWithPlan } from "@/lib/plans";
@@ -9,9 +10,11 @@ import { RerunButton } from "@/components/ship/RerunButton";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
 import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
 import { AutoBuildPlan } from "@/components/ship/AutoBuildPlan";
+import { LaunchModeRail } from "@/components/ship/LaunchModeRail";
 import { nextBestTime } from "@/lib/reminders";
 import { emailConfigured } from "@/lib/notify";
-import { isPaidPlan } from "@/lib/billing";
+import { isPaidPlan, launchChannelLimit, launchChannelPaywall } from "@/lib/billing";
+import { isLaunchMode, getLaunchModeState } from "@/lib/launchMode";
 import { productTagFor, bucketLabel } from "@/lib/stats";
 import { getBenchmarkMap, benchmarkDisplay } from "@/lib/benchmarks";
 
@@ -37,6 +40,19 @@ export default async function PlanPage({
   const emailAvailable = emailConfigured();
   const slackAvailable = Boolean(ws.project.slackWebhookUrl);
   const building = recs.length === 0 && ship.status === "NEW";
+
+  // Launch Mode: show the guided rail and cap how many channels a Free plan can
+  // launch on (the full ranking is still shown; the rest are locked below).
+  const inLaunchMode = isLaunchMode(ws.project.launchStage);
+  const lm = inLaunchMode
+    ? await getLaunchModeState(id, ws.accountId, "plan")
+    : null;
+  const channelLimit = inLaunchMode ? launchChannelLimit(ws.plan) : null;
+  const visibleRecs = channelLimit === null ? recs : recs.slice(0, channelLimit);
+  const lockedRecs = channelLimit === null ? [] : recs.slice(channelLimit);
+  const paywall = inLaunchMode
+    ? launchChannelPaywall(ws.plan, recs.length)
+    : null;
 
   // Category benchmarks — the paywall trigger. Free sees the label + a masked,
   // blurred number ("unlock with Pro"); paid sees the real figure.
@@ -90,6 +106,8 @@ export default async function PlanPage({
         </div>
       </div>
 
+      {lm && <LaunchModeRail stages={lm.stages} />}
+
       {recs.length === 0 && ship.status === "NEW" ? (
         <>
           <AutoBuildPlan shipId={ship.id} />
@@ -130,42 +148,82 @@ export default async function PlanPage({
         />
       ) : (
         <>
-          {recs.map((rec) => {
-          const schedulable = nextBestTime(rec.bestTime, new Date()) !== null;
-          return (
-            <ChannelCard
-              key={rec.id}
-              data={{
-                name: rec.channelName,
-                platform: rec.platform,
-                audienceDesc: rec.audienceDesc,
-                fitScore: rec.fitScore,
-                banRisk: rec.banRisk,
-                bestTime: rec.bestTime,
-                whyText: rec.whyText,
-                ruleNote: rec.ruleNote,
-                outcomeNote: rec.outcomeNote,
-              }}
-              draftHref={`/app/ships/${ship.id}/kit?rec=${rec.id}`}
-              benchmark={benchmarkFor(rec.channelSlug)}
-              remind={
-                schedulable
-                  ? {
-                      recId: rec.id,
-                      icsHref: `/api/ics/${rec.id}`,
-                      emailAvailable,
-                      slackAvailable,
-                    }
-                  : undefined
-              }
-            />
-          );
-        })}
-          <Note icon="results">
-            This plan re-ranks itself as results come in — LaunchWake learns which
-            channels actually convert for products like yours, so every launch
-            gets smarter.
-          </Note>
+          {visibleRecs.map((rec) => {
+            const schedulable = nextBestTime(rec.bestTime, new Date()) !== null;
+            return (
+              <ChannelCard
+                key={rec.id}
+                data={{
+                  name: rec.channelName,
+                  platform: rec.platform,
+                  audienceDesc: rec.audienceDesc,
+                  fitScore: rec.fitScore,
+                  banRisk: rec.banRisk,
+                  bestTime: rec.bestTime,
+                  whyText: rec.whyText,
+                  ruleNote: rec.ruleNote,
+                  outcomeNote: rec.outcomeNote,
+                }}
+                draftHref={`/app/ships/${ship.id}/kit?rec=${rec.id}`}
+                benchmark={benchmarkFor(rec.channelSlug)}
+                remind={
+                  schedulable
+                    ? {
+                        recId: rec.id,
+                        icsHref: `/api/ics/${rec.id}`,
+                        emailAvailable,
+                        slackAvailable,
+                      }
+                    : undefined
+                }
+              />
+            );
+          })}
+
+          {paywall && lockedRecs.length > 0 && (
+            <>
+              <Note icon="lock">
+                {paywall}{" "}
+                <Link href="/app/settings" style={{ color: "var(--ac)" }}>
+                  Upgrade to Pro
+                </Link>
+              </Note>
+              <div className="plan-locked" aria-hidden>
+                {lockedRecs.map((rec) => (
+                  <ChannelCard
+                    key={rec.id}
+                    data={{
+                      name: rec.channelName,
+                      platform: rec.platform,
+                      audienceDesc: rec.audienceDesc,
+                      fitScore: rec.fitScore,
+                      banRisk: rec.banRisk,
+                      bestTime: rec.bestTime,
+                      whyText: rec.whyText,
+                      ruleNote: rec.ruleNote,
+                      outcomeNote: rec.outcomeNote,
+                    }}
+                    draftHref="/app/settings"
+                    benchmark={benchmarkFor(rec.channelSlug)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
+          {inLaunchMode ? (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <Button variant="primary" icon="kit" href={`/app/ships/${ship.id}/kit`}>
+                Continue to launch kit
+              </Button>
+            </div>
+          ) : (
+            <Note icon="results">
+              This plan re-ranks itself as results come in — LaunchWake learns which
+              channels actually convert for products like yours, so every launch
+              gets smarter.
+            </Note>
+          )}
         </>
       )}
     </>

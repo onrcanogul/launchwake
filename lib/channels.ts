@@ -29,6 +29,12 @@ export type MatchContext = {
   shipText: string;
   /** LAUNCH | FEATURE | BLOG | OTHER — nudges tag weighting. */
   shipType?: string;
+  /**
+   * First-launch context (Launch Mode). When true, launch-appropriate venues
+   * (Product Hunt, Show HN, launch-friendly communities — tagged "launch") are
+   * favored over evergreen channels.
+   */
+  launchContext?: boolean;
 };
 
 export type ScoredChannel<C extends ChannelLike = ChannelLike> = {
@@ -156,8 +162,19 @@ export function deriveSignalTags(ctx: MatchContext): Set<string> {
     tags.add(t);
   }
 
+  // First-launch bias: treat launch/product as active signals so launch venues
+  // enter (and rise within) the candidate set.
+  if (ctx.launchContext) {
+    tags.add("launch");
+    tags.add("product");
+  }
+
   return tags;
 }
+
+/** Extra score for launch-appropriate channels when in a first-launch context. */
+const LAUNCH_TAG = "launch";
+const LAUNCH_BOOST = 15;
 
 /**
  * Rank the catalog for this product + ship and return the top `limit` candidates.
@@ -174,8 +191,12 @@ export function matchChannels<C extends ChannelLike>(
   const scored: ScoredChannel<C>[] = catalog.map((channel) => {
     const matchedTags = channel.tags.filter((t) => signals.has(t));
     // Overlap count is the core signal; tiny bonus for low ban risk so that,
-    // all else equal, safer channels surface first.
-    const score = matchedTags.length * 10 - BAN_RISK_ORDER[channel.defaultBanRisk];
+    // all else equal, safer channels surface first. In a launch context, add a
+    // deliberate boost so launch venues clear evergreen ones.
+    const launchBoost =
+      ctx.launchContext && channel.tags.includes(LAUNCH_TAG) ? LAUNCH_BOOST : 0;
+    const score =
+      matchedTags.length * 10 - BAN_RISK_ORDER[channel.defaultBanRisk] + launchBoost;
     return { channel, score, matchedTags };
   });
 

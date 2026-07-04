@@ -24,6 +24,30 @@ export const TEAM_MAX_SEATS = 50;
 
 export const FREE_LIMITS = { projects: 1, plansPerMonth: 2 } as const;
 
+// How many channels a Free plan can actually launch on (Launch Mode). The full
+// ranked plan is always shown; acting on more than this is a Pro upgrade. Matches
+// the public Launch Checker teaser so the free ceiling is consistent.
+export const FREE_LAUNCH_CHANNELS = 3;
+
+/** Max channels the plan can launch on; null = unlimited (paid). */
+export function launchChannelLimit(plan: Plan | string): number | null {
+  return isPaidPlan(plan) ? null : FREE_LAUNCH_CHANNELS;
+}
+
+/**
+ * Paywall copy shown when a Free launch plan has more channels than the free
+ * ceiling. Null when nothing is gated (paid, or at/under the limit).
+ */
+export function launchChannelPaywall(
+  plan: Plan | string,
+  totalChannels: number,
+): string | null {
+  const limit = launchChannelLimit(plan);
+  if (limit === null || totalChannels <= limit) return null;
+  const locked = totalChannels - limit;
+  return `Your plan ranks all ${totalChannels} channels, but Free launches on ${limit}. Upgrade to Pro to launch on all ${totalChannels} — including the ${locked} locked below.`;
+}
+
 // Intent Radar saved-query caps per plan. Free can't use it (upsell); Pro gets a
 // handful; Team is unlimited (null). Not a simple paid→unlimited like projects.
 export const INTENT_QUERY_LIMITS: Record<Plan, number | null> = {

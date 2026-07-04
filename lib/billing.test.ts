@@ -4,6 +4,9 @@ import {
   clampSeats,
   teamPriceCents,
   isPaidPlan,
+  launchChannelLimit,
+  launchChannelPaywall,
+  FREE_LAUNCH_CHANNELS,
   TEAM_MIN_SEATS,
   TEAM_MAX_SEATS,
   TEAM_PRICE_PER_SEAT_CENTS,
@@ -77,6 +80,21 @@ describe("isPaidPlan", () => {
     expect(isPaidPlan("FREE")).toBe(false);
     expect(isPaidPlan("PRO")).toBe(true);
     expect(isPaidPlan("TEAM")).toBe(true);
+  });
+});
+
+describe("launch channel cap", () => {
+  it("caps Free launches and leaves paid unlimited", () => {
+    expect(launchChannelLimit("FREE")).toBe(FREE_LAUNCH_CHANNELS);
+    expect(launchChannelLimit("PRO")).toBeNull();
+    expect(launchChannelLimit("TEAM")).toBeNull();
+  });
+  it("shows paywall copy only when a Free plan exceeds the cap", () => {
+    expect(launchChannelPaywall("FREE", FREE_LAUNCH_CHANNELS)).toBeNull();
+    expect(launchChannelPaywall("FREE", FREE_LAUNCH_CHANNELS + 3)).toMatch(
+      /Upgrade to Pro/,
+    );
+    expect(launchChannelPaywall("PRO", 12)).toBeNull();
   });
 });
 

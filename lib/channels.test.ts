@@ -105,3 +105,43 @@ describe("matchChannels", () => {
     expect(ranked[0].channel.tags).toContain("developers");
   });
 });
+
+describe("matchChannels launch context", () => {
+  const c: ChannelLike[] = [
+    {
+      id: "ph",
+      slug: "product-hunt",
+      name: "Product Hunt",
+      platform: "PRODUCTHUNT",
+      defaultBanRisk: "LOW",
+      tags: ["launch", "product", "startup"],
+    },
+    {
+      id: "devto",
+      slug: "dev-to",
+      name: "dev.to",
+      platform: "DEVTO",
+      defaultBanRisk: "LOW",
+      tags: ["blog", "writeup", "developers"],
+    },
+  ];
+  const ctx = { projectText: "a small tool", shipText: "first release" };
+
+  it("favors launch venues when launchContext is set", () => {
+    const order = matchChannels(c, { ...ctx, launchContext: true }, 2).map(
+      (r) => r.channel.slug,
+    );
+    expect(order[0]).toBe("product-hunt");
+  });
+
+  it("does not add the launch boost without launchContext", () => {
+    // dev.to matches the baseline 'developers' tag; Product Hunt matches nothing.
+    const order = matchChannels(c, ctx, 2).map((r) => r.channel.slug);
+    expect(order[0]).toBe("dev-to");
+  });
+
+  it("adds launch/product signal tags only in launch context", () => {
+    expect(deriveSignalTags({ ...ctx, launchContext: true }).has("launch")).toBe(true);
+    expect(deriveSignalTags(ctx).has("launch")).toBe(false);
+  });
+});
