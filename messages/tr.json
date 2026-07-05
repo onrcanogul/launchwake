@@ -308,6 +308,7 @@
     "continueGithub": "GitHub ile devam et",
     "or": "veya",
     "magicLinkSent": "Sihirli bağlantı için gelen kutunu kontrol et.",
+    "signinError": "Giriş yapılamadı. Lütfen tekrar deneyin.",
     "emailError": "Sihirli bağlantı gönderilemedi. E-posta ayarlarını kontrol et veya GitHub ile dene.",
     "emailInvalid": "Geçerli bir e-posta adresi girin.",
     "workEmail": "İş e-postası",

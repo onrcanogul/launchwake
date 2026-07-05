@@ -22,11 +22,11 @@ export default async function LoginPage({
   searchParams,
 }: {
   params: Promise<{ locale: Locale }>;
-  searchParams: Promise<{ callbackUrl?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; error?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const { callbackUrl } = await searchParams;
+  const { callbackUrl, error } = await searchParams;
   const t = await getTranslations("Login");
 
   return (
@@ -44,6 +44,20 @@ export default async function LoginPage({
           LaunchWake
         </div>
         <p className="sub">{t("subtitle")}</p>
+
+        {error && (
+          <p
+            style={{
+              color: "var(--danger, #d64545)",
+              fontSize: 13,
+              textAlign: "center",
+              marginBottom: 12,
+            }}
+            role="alert"
+          >
+            {t("signinError")}
+          </p>
+        )}
 
         <LoginForm
           githubEnabled={Boolean(env.AUTH_GITHUB_ID && env.AUTH_GITHUB_SECRET)}

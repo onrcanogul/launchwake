@@ -15,6 +15,12 @@ export const authConfig = {
           GitHub({
             clientId: env.AUTH_GITHUB_ID,
             clientSecret: env.AUTH_GITHUB_SECRET,
+            // Link the GitHub sign-in to an existing user that shares the same
+            // email (e.g. one created earlier via the magic-link flow) instead
+            // of failing with OAuthAccountNotLinked. Safe here because GitHub
+            // only returns verified primary emails, so ownership is proven —
+            // the same guarantee the magic-link flow relies on.
+            allowDangerousEmailAccountLinking: true,
           }),
         ]
       : [],
