@@ -309,6 +309,7 @@
     "or": "veya",
     "magicLinkSent": "Sihirli bağlantı için gelen kutunu kontrol et.",
     "signinError": "Giriş yapılamadı. Lütfen tekrar deneyin.",
+    "signinErrorLinked": "Bu GitHub hesabı başka bir LaunchWake girişine bağlı. Önce çıkış yap ya da ilk kullandığın e-posta ile devam et.",
     "emailError": "Sihirli bağlantı gönderilemedi. E-posta ayarlarını kontrol et veya GitHub ile dene.",
     "emailInvalid": "Geçerli bir e-posta adresi girin.",
     "workEmail": "İş e-postası",

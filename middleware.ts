@@ -23,6 +23,14 @@ export default auth((req) => {
     return;
   }
 
+  // An already-signed-in user has nothing to do on the login page. Send them to
+  // the app. This also removes the trap where clicking "Continue with GitHub"
+  // while holding a session for a *different* user (e.g. one created via the
+  // magic-link email) makes Auth.js reject the sign-in as OAuthAccountNotLinked.
+  if (req.auth && (pathname === "/login" || /^\/(en|tr)\/login$/.test(pathname))) {
+    return Response.redirect(new URL("/app", req.nextUrl.origin));
+  }
+
   // Everything else the matcher lets through is a marketing route → localize it.
   return intlMiddleware(req);
 });

@@ -309,6 +309,7 @@
     "or": "or",
     "magicLinkSent": "Check your inbox for a magic link.",
     "signinError": "Couldn't sign you in. Please try again.",
+    "signinErrorLinked": "That GitHub account is linked to a different LaunchWake sign-in. Sign out first, or continue with the email you originally used.",
     "emailError": "Couldn't send the magic link. Check the email settings or try GitHub.",
     "emailInvalid": "Enter a valid email address.",
     "workEmail": "Work email",

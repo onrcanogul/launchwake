@@ -55,7 +55,9 @@ export default async function LoginPage({
             }}
             role="alert"
           >
-            {t("signinError")}
+            {error === "OAuthAccountNotLinked"
+              ? t("signinErrorLinked")
+              : t("signinError")}
           </p>
         )}
 
