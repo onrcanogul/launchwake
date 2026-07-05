@@ -197,11 +197,8 @@ export default async function PlanPage({
 
           {paywall && lockedRecs.length > 0 && (
             <>
-              <Note icon="lock">
-                {paywall}{" "}
-                <Link href="/app/settings" style={{ color: "var(--ac)" }}>
-                  Upgrade to Pro
-                </Link>
+              <Note icon="lock" className="note-flow">
+                {paywall} <Link href="/app/settings">Upgrade to Pro</Link>
               </Note>
               <div className="plan-locked" aria-hidden>
                 {lockedRecs.map((rec) => (
@@ -234,7 +231,7 @@ export default async function PlanPage({
               </Button>
             </div>
           ) : (
-            <Note icon="results">
+            <Note icon="results" className="note-flow">
               This plan re-ranks itself as results come in — LaunchWake learns which
               channels actually convert for products like yours, so every launch
               gets smarter.

@@ -109,7 +109,7 @@ export function ChannelCard({
           </div>
         )}
         {data.ruleNote && (
-          <div className="m">
+          <div className="m m-rule" title={data.ruleNote}>
             <Icon name="rules" /> Rule <b>{data.ruleNote}</b>
           </div>
         )}

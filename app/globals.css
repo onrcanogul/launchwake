@@ -83,6 +83,7 @@ svg {
   border: 1px solid transparent;
   transition: 0.12s;
   font-family: inherit;
+  white-space: nowrap;
 }
 .btn svg {
   width: 14px;
@@ -1349,7 +1350,6 @@ textarea.inp {
   gap: 22px;
   padding: 11px 17px;
   border-top: 1px solid var(--line);
-  flex-wrap: wrap;
 }
 .chan .ft .m {
   display: flex;
@@ -1357,10 +1357,24 @@ textarea.inp {
   gap: 7px;
   font-size: 11.5px;
   color: var(--tx3);
+  flex: none;
+  white-space: nowrap;
 }
 .chan .ft .m b {
   color: var(--tx);
   font-weight: 550;
+}
+/* The rule note can be a full sentence — clip it to one line so the footer
+   never wraps and the action stays put. Full text lives in the title attr. */
+.chan .ft .m.m-rule {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.chan .ft .m.m-rule b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .chan .ft .m svg {
   width: 13px;
@@ -1371,6 +1385,7 @@ textarea.inp {
 }
 .chan .ft .act {
   margin-left: auto;
+  flex: none;
 }
 
 /* ============ ACCOUNT READINESS (launch mode) ============ */
@@ -2531,6 +2546,15 @@ tbody tr {
   }
   .chan .ft {
     gap: 14px;
+    flex-wrap: wrap;
+  }
+  /* Narrow screens: give the rule its own full line and let it wrap. */
+  .chan .ft .m.m-rule {
+    flex: 1 1 100%;
+    white-space: normal;
+  }
+  .chan .ft .m.m-rule b {
+    white-space: normal;
   }
   .chan .ft .act {
     margin-left: 0;
