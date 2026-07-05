@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getPlanUsage } from "@/lib/billing";
 import { listIntentQueries } from "@/lib/intentQueries";
-import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { Note } from "@/components/ui/Note";
@@ -24,12 +23,6 @@ export default async function RadarPage() {
           while the conversation is still warm.
         </div>
       </div>
-      {usage.intentQueryLimit !== 0 && (
-        <Badge accent>
-          {usage.intentQueryCount}
-          {usage.intentQueryLimit !== null ? `/${usage.intentQueryLimit}` : ""} watches
-        </Badge>
-      )}
     </div>
   );
 
@@ -65,7 +58,7 @@ export default async function RadarPage() {
   return (
     <>
       {head}
-      <Note icon="shield">
+      <Note icon="shield" className="note-flow">
         LaunchWake never posts for you. You review each draft, edit it, and reply in
         your own voice — the only ban-safe way to do this.
       </Note>

@@ -4858,6 +4858,11 @@ tbody tr {
   justify-content: space-between;
   gap: 12px;
 }
+.radar-addbar .psub b {
+  color: var(--tx);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .radar-card {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -4899,15 +4904,18 @@ tbody tr {
   gap: 12px;
   margin-bottom: 9px;
 }
-.radar-src {
+/* imatch-* names: the Launch-radar panel on the feed already owns .radar-src
+   /.radar-when with a different shape — sharing them squashes this chip. */
+.imatch-src {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 11.5px;
   font-weight: 550;
   color: var(--tx2);
+  white-space: nowrap;
 }
-.radar-src svg {
+.imatch-src svg {
   width: 14px;
   height: 14px;
   stroke: var(--tx2);
@@ -4922,7 +4930,7 @@ tbody tr {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.radar-when {
+.imatch-when {
   font-size: 11.5px;
 }
 .radar-open {
@@ -4991,6 +4999,29 @@ tbody tr {
   line-height: 1.55;
   color: var(--tx);
   white-space: pre-wrap;
+}
+/* The draft is meant to be edited before posting — it's a real textarea. */
+.radar-draft-edit {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tx);
+  white-space: pre-wrap;
+}
+/* Armed destructive action (two-step delete). */
+.btn-gh.danger {
+  color: var(--bad);
+}
+.btn-gh.danger:hover {
+  background: rgba(240, 97, 109, 0.08);
+  color: var(--bad);
 }
 .radar-draft .note {
   margin-top: 10px;

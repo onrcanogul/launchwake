@@ -27,7 +27,7 @@ function ago(date: Date): string {
 function scoreTone(score: number): string {
   if (score >= 70) return "var(--ok)";
   if (score >= 50) return "var(--warn)";
-  return "var(--line)";
+  return "var(--tx3)";
 }
 
 export function IntentRadar({
@@ -48,15 +48,22 @@ export function IntentRadar({
   return (
     <div className="stack-lg">
       {(adding || queries.length === 0) && canAdd ? (
-        <QueryForm projectName={projectName} onDone={() => setAdding(false)} />
+        <QueryForm
+          projectName={projectName}
+          cancellable={queries.length > 0}
+          onDone={() => setAdding(false)}
+        />
       ) : (
         <div className="radar-addbar">
-          <div className="psub">
-            {used} watch{used === 1 ? "" : "es"} active
-            {limit !== null ? ` · ${limit - used} left on your plan` : " · unlimited"}
+          <div className="psub num">
+            <b>{used}</b>
+            {limit !== null ? ` of ${limit}` : ""} watch{used === 1 && limit === null ? "" : "es"} active
+            {limit !== null
+              ? ` · ${limit - used} left on your plan`
+              : " · unlimited on your plan"}
           </div>
           {canAdd ? (
-            <Button variant="secondary" icon="plus" onClick={() => setAdding(true)}>
+            <Button variant="primary" icon="plus" onClick={() => setAdding(true)}>
               New watch
             </Button>
           ) : (
@@ -78,9 +85,11 @@ export function IntentRadar({
 
 function QueryForm({
   projectName,
+  cancellable,
   onDone,
 }: {
   projectName: string;
+  cancellable: boolean;
   onDone: () => void;
 }) {
   const [state, formAction, pending] = useActionState<IntentQueryState, FormData>(
@@ -114,6 +123,7 @@ function QueryForm({
           className="inp"
           name="title"
           placeholder="People asking for attribution tools"
+          autoFocus
           required
         />
       </div>
@@ -153,12 +163,15 @@ function QueryForm({
       </div>
 
       <div className="row-end">
-        <Button variant="ghost" onClick={onDone} type="button">
-          Cancel
-        </Button>
-        <Button variant="primary" icon="target" type="submit">
+        {cancellable && (
+          <Button variant="ghost" onClick={onDone} type="button">
+            Cancel
+          </Button>
+        )}
+        <button type="submit" className="btn btn-p" disabled={pending}>
+          {pending ? <span className="lw-spin" aria-hidden /> : <Icon name="target" />}
           {pending ? "Creating…" : "Start watching"}
-        </Button>
+        </button>
       </div>
     </form>
   );
@@ -168,7 +181,15 @@ function QueryForm({
 
 function QueryBlock({ query }: { query: IntentQueryView }) {
   const [pending, start] = useTransition();
+  const [confirmDel, setConfirmDel] = useState(false);
   const { toast } = useToast();
+
+  // A primed delete disarms itself if left alone.
+  useEffect(() => {
+    if (!confirmDel) return;
+    const t = setTimeout(() => setConfirmDel(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirmDel]);
 
   const onToggle = () =>
     start(async () => {
@@ -204,9 +225,18 @@ function QueryBlock({ query }: { query: IntentQueryView }) {
             <Icon name={query.active ? "clock" : "refresh"} />
             {query.active ? "Pause" : "Resume"}
           </button>
-          <button className="btn btn-gh" onClick={onDelete} disabled={pending} title="Delete">
-            <Icon name="external" />
-            Delete
+          <button
+            className={confirmDel ? "btn btn-gh danger" : "btn btn-gh"}
+            onClick={() => (confirmDel ? onDelete() : setConfirmDel(true))}
+            disabled={pending}
+            title={
+              confirmDel
+                ? "Click again to delete this watch and its matches"
+                : "Delete this watch"
+            }
+          >
+            <Icon name="trash" />
+            {confirmDel ? "Confirm delete" : "Delete"}
           </button>
         </div>
       </div>
@@ -279,15 +309,19 @@ function MatchCard({ match }: { match: IntentMatchView }) {
   return (
     <article className="radar-match">
       <div className="radar-match-top">
-        <span className="radar-src">
+        <span className="imatch-src">
           <Icon name={sourceIcon} />
           {sourceLabel}
         </span>
-        <span className="radar-score" style={{ color: scoreTone(match.score) }}>
+        <span
+          className="radar-score"
+          style={{ color: scoreTone(match.score) }}
+          title="Match strength (0–100)"
+        >
           <span className="dot" style={{ background: scoreTone(match.score) }} aria-hidden />
           {match.score}
         </span>
-        <span className="psub radar-when">
+        <span className="psub imatch-when">
           {match.author ? `${match.author} · ` : ""}
           {ago(match.postedAt)}
         </span>
@@ -320,11 +354,20 @@ function MatchCard({ match }: { match: IntentMatchView }) {
                 <Icon name="refresh" /> Regenerate
               </button>
               <button className="btn btn-s" onClick={copy}>
-                <Icon name="copy" /> {copied ? "Copied" : "Copy"}
+                <Icon name={copied ? "check" : "copy"} /> {copied ? "Copied" : "Copy"}
               </button>
             </div>
           </div>
-          <p className="radar-draft-body">{draft}</p>
+          <textarea
+            className="radar-draft-edit"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={Math.min(
+              14,
+              Math.max(4, Math.ceil(draft.length / 90) + draft.split("\n").length),
+            )}
+            aria-label="Draft reply — edit before posting"
+          />
           {safety && (
             <div className="note">
               <Icon name="shield" />
@@ -341,7 +384,8 @@ function MatchCard({ match }: { match: IntentMatchView }) {
             Dismiss
           </button>
           <button className="btn btn-p" onClick={() => draftReply(false)} disabled={pending}>
-            <Icon name="wave" /> {pending ? "Drafting…" : "Draft a reply"}
+            {pending ? <span className="lw-spin" aria-hidden /> : <Icon name="kit" />}
+            {pending ? "Drafting…" : "Draft a reply"}
           </button>
         </div>
       )}
