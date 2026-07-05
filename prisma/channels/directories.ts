@@ -1,5 +1,6 @@
 import { Platform, BanRisk } from "@prisma/client";
 import type { Seed } from "./types";
+import { ALTERNATIVETO_READINESS, SAASHUB_READINESS } from "./requirements";
 
 /** Product/startup/software directories & launch platforms (built for listing). */
 export const directories: Seed[] = [
@@ -13,6 +14,7 @@ export const directories: Seed[] = [
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Anytime (queued)",
     tags: ["directory", "software", "product", "saas", "showcase", "b2b"],
+    accountRequirements: ALTERNATIVETO_READINESS,
   },
   {
     slug: "dir-saashub",
@@ -24,6 +26,7 @@ export const directories: Seed[] = [
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Anytime (queued)",
     tags: ["directory", "saas", "software", "b2b", "product", "startup"],
+    accountRequirements: SAASHUB_READINESS,
   },
   {
     slug: "dir-uneed",

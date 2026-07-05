@@ -47,15 +47,61 @@ describe("channel catalog", () => {
 
   it("seeds valid account requirements on the launch channels", () => {
     const withReqs = channels.filter((c) => c.accountRequirements);
-    // The key launch venues must carry account-readiness guidance.
+    // The key launch venues must carry account-readiness guidance — including
+    // the researched July-2026 batch (blogs, socials, directories, subreddits).
     const slugs = new Set(withReqs.map((c) => c.slug));
-    for (const s of ["hn-show", "product-hunt", "r-saas"]) {
-      expect(slugs.has(s)).toBe(true);
+    for (const s of [
+      "hn-show",
+      "product-hunt",
+      "r-saas",
+      // core additions
+      "dev-to",
+      "hashnode",
+      "lobsters",
+      "x",
+      "linkedin",
+      "wip",
+      "betalist",
+      // subreddits
+      "r-sideproject",
+      "r-golang",
+      "r-django",
+      "r-vuejs",
+      "r-rails",
+      "r-gamedev",
+      "r-machinelearning",
+      "r-cybersecurity",
+      // blogs & directories
+      "medium",
+      "hackernoon",
+      "substack",
+      "freecodecamp-news",
+      "dzone",
+      "dir-alternativeto",
+      "dir-saashub",
+    ]) {
+      expect(slugs.has(s), `${s} should carry accountRequirements`).toBe(true);
     }
-    // Every seeded requirement must satisfy the schema (grounded, not malformed).
+    // Every seeded requirement must satisfy the schema (grounded, not malformed)
+    // and cite where it came from (the never-invent rule).
     for (const c of withReqs) {
       const parsed = AccountRequirementsSchema.safeParse(c.accountRequirements);
       expect(parsed.success, `${c.slug} accountRequirements invalid`).toBe(true);
+      if (parsed.success) {
+        expect(
+          parsed.data.sourceNote.length,
+          `${c.slug} missing a real sourceNote`,
+        ).toBeGreaterThan(10);
+      }
     }
+    // Documented hard gates from the July 2026 research survive re-edits.
+    const req = (slug: string) =>
+      AccountRequirementsSchema.parse(
+        channels.find((c) => c.slug === slug)?.accountRequirements,
+      );
+    expect(req("lobsters").minAccountAgeDays).toBe(70);
+    expect(req("lobsters").level).toBe("required");
+    expect(req("dir-alternativeto").minAccountAgeDays).toBe(7);
+    expect(req("freecodecamp-news").minKarmaOrReputation?.value).toBe(3);
   });
 });

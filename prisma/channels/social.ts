@@ -1,5 +1,12 @@
 import { Platform, BanRisk } from "@prisma/client";
 import type { Seed } from "./types";
+import {
+  MEDIUM_READINESS,
+  HACKERNOON_READINESS,
+  SUBSTACK_READINESS,
+  FCC_NEWS_READINESS,
+  DZONE_READINESS,
+} from "./requirements";
 
 /** Blogging platforms, dev-heavy social networks, and technical forums. */
 export const social: Seed[] = [
@@ -13,6 +20,7 @@ export const social: Seed[] = [
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Tue-Thu, 9-11am ET",
     tags: ["developers", "technical", "blog", "writeup", "startup", "product"],
+    accountRequirements: MEDIUM_READINESS,
   },
   {
     slug: "hackernoon",
@@ -24,6 +32,7 @@ export const social: Seed[] = [
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Tue-Wed, 8-10am ET",
     tags: ["developers", "technical", "startup", "ai", "blog", "writeup"],
+    accountRequirements: HACKERNOON_READINESS,
   },
   {
     slug: "substack",
@@ -35,6 +44,7 @@ export const social: Seed[] = [
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Tue/Thu, 7-9am ET",
     tags: ["developers", "technical", "blog", "writeup", "founders", "saas"],
+    accountRequirements: SUBSTACK_READINESS,
   },
   {
     slug: "freecodecamp-news",
@@ -46,6 +56,7 @@ export const social: Seed[] = [
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Mon-Wed, 9am-12pm ET",
     tags: ["developers", "technical", "webdev", "javascript", "blog", "writeup"],
+    accountRequirements: FCC_NEWS_READINESS,
   },
   {
     slug: "dzone",
@@ -57,6 +68,7 @@ export const social: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Tue-Thu, 8-10am ET",
     tags: ["developers", "technical", "backend", "devtools", "blog", "writeup"],
+    accountRequirements: DZONE_READINESS,
   },
   {
     slug: "mastodon-fosstodon",

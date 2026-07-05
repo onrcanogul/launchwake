@@ -1,6 +1,6 @@
 import { Platform, BanRisk } from "@prisma/client";
 import type { Seed } from "./types";
-import { redditReadiness } from "./requirements";
+import { redditReadiness, R_CYBERSECURITY_READINESS } from "./requirements";
 
 /** Niche language/framework/domain subreddits (verified real, promo rules honest). */
 export const subreddits: Seed[] = [
@@ -26,6 +26,12 @@ export const subreddits: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Weekday mornings ET",
     tags: ["developers", "technical", "backend", "opensource", "community", "golang"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Small/new projects (months of effort, one contributor) belong in the weekly 'Small Projects' thread per the project-requirements wiki.",
+        "No emoji, engagement hooks, or AI-generated text in project posts — a couple of plain paragraphs on purpose and results.",
+      ],
+    }),
   },
   {
     slug: "r-python",
@@ -51,6 +57,11 @@ export const subreddits: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Weekday mornings ET",
     tags: ["developers", "technical", "backend", "webdev", "python", "django"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "The sub's own rules warn: share your work, but participate in other ways too 'or the spam algorithm might get you'.",
+      ],
+    }),
   },
   {
     slug: "r-reactjs",
@@ -78,6 +89,11 @@ export const subreddits: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Weekday mornings ET",
     tags: ["developers", "frontend", "webdev", "javascript", "vue", "community"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "The sub's rule allows self-promo 'in a tasteful way' — don't flood the feed with your own links.",
+      ],
+    }),
   },
   {
     slug: "r-sveltejs",
@@ -100,6 +116,12 @@ export const subreddits: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Weekday mornings ET",
     tags: ["developers", "technical", "backend", "webdev", "ruby", "rails"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Label AI-assisted content clearly — the sub added a 'no AI slop' rule.",
+        "Hiring/job posts go in the biweekly 'Work it Wednesday' thread, not the feed.",
+      ],
+    }),
   },
   {
     slug: "r-laravel",
@@ -206,10 +228,16 @@ export const subreddits: Seed[] = [
     platform: Platform.REDDIT,
     url: "https://www.reddit.com/r/gamedev/",
     audienceDesc: "~1.3M game developers",
-    rules: "This sub is for development discussion, not marketing; game promotion, Steam links, and 'wishlist my game' posts are removed and pushed to Feedback Friday / Screenshot Saturday threads. Share process, tools, and postmortems instead.",
+    rules: "This sub is for development discussion, not marketing: showcasing your game at any stage is banned, and posts that are only a link to a game or social page are a documented ban. Share postmortems, process, and marketing lessons here — launch the game itself on r/indiegames or r/playmygame.",
     defaultBanRisk: BanRisk.HIGH,
-    bestTime: "Feedback Friday",
+    bestTime: "Anytime (discussion only)",
     tags: ["developers", "technical", "gamedev", "makers", "community"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Don't launch the game here — showcasing is banned at any dev stage; write a postmortem or feedback request instead.",
+        "Link-only posts to game/social pages 'will result in a ban' per the sub's rules.",
+      ],
+    }),
   },
   {
     slug: "r-datascience",
@@ -228,10 +256,16 @@ export const subreddits: Seed[] = [
     platform: Platform.REDDIT,
     url: "https://www.reddit.com/r/MachineLearning/",
     audienceDesc: "~3M ML researchers & engineers",
-    rules: "A research-focused sub: product promotion belongs in the weekly 'Self-Promotion' thread and projects should use the [P] tag with substance. Marketing-flavored posts are removed; lead with method and results.",
+    rules: "A research-focused sub: promotion of paid products is not permitted, and a project link passes only when the post offers real substance and invites discussion. Coordinated marketing or SEO posts mean a permanent ban with your history purged; bare paper links without commentary are removed.",
     defaultBanRisk: BanRisk.HIGH,
-    bestTime: "Weekly Self-Promotion thread",
+    bestTime: "Weekday mornings ET",
     tags: ["developers", "technical", "ml", "ai", "data", "community"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Paid-product promotion is not permitted — share as an open feedback discussion with real substance, at mod discretion.",
+        "Coordinated marketing/SEO posts carry a permanent ban with all past posts purged.",
+      ],
+    }),
   },
   {
     slug: "r-localllama",
@@ -250,10 +284,11 @@ export const subreddits: Seed[] = [
     platform: Platform.REDDIT,
     url: "https://www.reddit.com/r/cybersecurity/",
     audienceDesc: "~900k security professionals",
-    rules: "Vendor and self-promotion are restricted to designated weekly threads (e.g. the mentorship/promo threads); standalone product posts are removed as spam. Share educational content and disclose any commercial interest.",
+    rules: "Promotion is formally capped: under 10% of your posts+comments in the sub and at most once a week per product, with automated enforcement. Educational blog posts carrying ads need the 'Corporate Blog' flair; AI-generated content is forbidden sub-wide and soliciting DMs can mean a ban.",
     defaultBanRisk: BanRisk.HIGH,
-    bestTime: "Weekly promo thread",
+    bestTime: "Weekday mornings ET",
     tags: ["developers", "technical", "security", "infra", "community"],
+    accountRequirements: R_CYBERSECURITY_READINESS,
   },
   {
     slug: "r-netsec",
@@ -298,5 +333,10 @@ export const subreddits: Seed[] = [
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Weekday mornings ET",
     tags: ["founders", "indie", "makers", "startup", "launch", "showcase"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Use the submit-page title format: '[Project name] - [short description]'.",
+      ],
+    }),
   },
 ];

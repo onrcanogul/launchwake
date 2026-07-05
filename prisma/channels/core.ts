@@ -5,6 +5,13 @@ import {
   HN_SHOW_READINESS,
   PRODUCT_HUNT_READINESS,
   INDIE_HACKERS_READINESS,
+  DEVTO_READINESS,
+  HASHNODE_READINESS,
+  LOBSTERS_READINESS,
+  X_READINESS,
+  LINKEDIN_READINESS,
+  WIP_READINESS,
+  BETALIST_READINESS,
   redditReadiness,
 } from "./requirements";
 
@@ -257,6 +264,7 @@ export const core: Seed[] = [
       "devtools",
       "technical",
     ],
+    accountRequirements: DEVTO_READINESS,
   },
   {
     slug: "hashnode",
@@ -269,6 +277,7 @@ export const core: Seed[] = [
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Any weekday",
     tags: ["blog", "writeup", "developers", "technical", "backend", "webdev"],
+    accountRequirements: HASHNODE_READINESS,
   },
   {
     slug: "lobsters",
@@ -289,6 +298,7 @@ export const core: Seed[] = [
       "security",
       "opensource",
     ],
+    accountRequirements: LOBSTERS_READINESS,
   },
   {
     slug: "x",
@@ -309,6 +319,7 @@ export const core: Seed[] = [
       "launch",
       "saas",
     ],
+    accountRequirements: X_READINESS,
   },
   {
     slug: "linkedin",
@@ -321,6 +332,7 @@ export const core: Seed[] = [
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Tue–Thu 8–10am local",
     tags: ["b2b", "saas", "founders", "product", "startup"],
+    accountRequirements: LINKEDIN_READINESS,
   },
   {
     slug: "wip",
@@ -333,6 +345,7 @@ export const core: Seed[] = [
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Any day",
     tags: ["makers", "indie", "founders", "product", "startup", "launch"],
+    accountRequirements: WIP_READINESS,
   },
   {
     slug: "betalist",
@@ -345,5 +358,6 @@ export const core: Seed[] = [
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Anytime (queued)",
     tags: ["launch", "startup", "saas", "product", "b2b"],
+    accountRequirements: BETALIST_READINESS,
   },
 ];
