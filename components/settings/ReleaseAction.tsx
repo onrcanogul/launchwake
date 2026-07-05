@@ -1,17 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Icon } from "@/components/Icon";
-import { useToast } from "@/components/ui/toast";
+import { CodePrompt } from "@/components/settings/CodePrompt";
 
 /**
  * Shows the GitHub Action workflow to copy — comments a distribution plan on
  * every release. The api-key is the project's webhook secret (set up above).
  */
 export function ReleaseAction({ hasSecret }: { hasSecret: boolean }) {
-  const { toast } = useToast();
-  const [copied, setCopied] = useState(false);
-
   const workflow = `# .github/workflows/launchwake.yml
 name: LaunchWake
 on:
@@ -28,16 +23,16 @@ jobs:
         with:
           api-key: \${{ secrets.LAUNCHWAKE_API_KEY }}`;
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(workflow);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-      toast("Workflow copied");
-    } catch {
-      toast("Couldn't copy", "error");
-    }
-  };
+  const prompt = `Add a GitHub Actions workflow to this repository that runs LaunchWake on every published release.
+
+Create the file \`.github/workflows/launchwake.yml\`:
+- Trigger on \`release\` with type \`published\`.
+- Grant the job \`contents: write\` and \`pull-requests: write\` permissions.
+- Add one job \`plan\` running on \`ubuntu-latest\` whose only step uses the action \`onrcanogul/launchwake/action@v1\`, passing \`api-key: \${{ secrets.LAUNCHWAKE_API_KEY }}\`.
+
+Then remind me to add my LaunchWake webhook secret as a repository secret named \`LAUNCHWAKE_API_KEY\` (Repo → Settings → Secrets → Actions).
+
+On each published release this builds the distribution plan and comments the link on the GitHub release. Do not add any auto-posting — LaunchWake only drafts plans; a human posts.`;
 
   return (
     <div style={{ padding: "14px 16px" }}>
@@ -58,25 +53,7 @@ jobs:
         <code className="mono">LAUNCHWAKE_API_KEY</code> (Repo → Settings →
         Secrets → Actions).
       </p>
-      <pre
-        className="mono"
-        style={{
-          background: "var(--bg2)",
-          border: "1px solid var(--line)",
-          borderRadius: 8,
-          padding: "12px 14px",
-          fontSize: 11.5,
-          lineHeight: 1.6,
-          color: "var(--tx2)",
-          overflowX: "auto",
-          whiteSpace: "pre",
-        }}
-      >
-        {workflow}
-      </pre>
-      <button className="btn btn-s" style={{ marginTop: 10 }} onClick={copy}>
-        <Icon name="copy" /> {copied ? "Copied" : "Copy workflow"}
-      </button>
+      <CodePrompt code={workflow} prompt={prompt} codeLabel="Workflow" />
     </div>
   );
 }

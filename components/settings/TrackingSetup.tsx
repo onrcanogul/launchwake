@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Icon } from "@/components/Icon";
 import { useToast } from "@/components/ui/toast";
 import { saveStripeWebhookSecret } from "@/app/app/settings/actions";
+import { CodePrompt, preStyle } from "@/components/settings/CodePrompt";
 
 type Status = {
   signups: number;
@@ -36,43 +37,6 @@ function money(cents: number, currency: string): string {
   } catch {
     return `${(cents / 100).toFixed(0)} ${currency.toUpperCase()}`;
   }
-}
-
-const preStyle: React.CSSProperties = {
-  background: "var(--bg2)",
-  border: "1px solid var(--line)",
-  borderRadius: 8,
-  padding: "12px 14px",
-  fontSize: 11.5,
-  lineHeight: 1.6,
-  color: "var(--tx2)",
-  overflowX: "auto",
-  whiteSpace: "pre",
-};
-
-function CopyBlock({ code, label }: { code: string; label: string }) {
-  const { toast } = useToast();
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-      toast(`${label} copied`);
-    } catch {
-      toast("Couldn't copy to clipboard", "error");
-    }
-  };
-  return (
-    <>
-      <pre className="mono" style={preStyle}>
-        {code}
-      </pre>
-      <button className="btn btn-s" style={{ marginTop: 10 }} onClick={copy}>
-        <Icon name="copy" /> {copied ? "Copied" : `Copy ${label.toLowerCase()}`}
-      </button>
-    </>
-  );
 }
 
 const sub: React.CSSProperties = {
@@ -116,6 +80,13 @@ export function TrackingSetup({
 })();
 </script>`;
 
+  const signupPrompt = `Add LaunchWake signup attribution to my web app.
+
+1. Site-wide (in the root layout / <head> so it runs on every page): read the \`lw_ref\` query parameter from the URL and, if present, save it to localStorage under the key \`lw_ref\`. Then define a global function \`window.launchwakeSignup()\` that reads \`lw_ref\` from localStorage and, if present, sends a POST beacon to \`${base}/api/track/signup\` with the JSON body \`{ "ref": <the stored lw_ref> }\` using \`navigator.sendBeacon\`. Wrap the localStorage calls in try/catch so private-mode browsers don't throw.
+2. On my signup-success page, call \`launchwakeSignup()\` once the signup has succeeded.
+
+Clicks are tracked automatically; a signup only counts once launchwakeSignup() runs. This credits each signup to the channel that drove the click.`;
+
   const revenueSnippet = `// Server-side, after a successful payment. Pass the lw_ref you
 // stored at signup so the revenue is attributed to the channel.
 await fetch('${base}/api/track/revenue', {
@@ -129,12 +100,30 @@ await fetch('${base}/api/track/revenue', {
   })
 });`;
 
+  const revenuePrompt = `Add server-side revenue attribution to LaunchWake.
+
+After a successful payment on my backend, send a POST to \`${base}/api/track/revenue\` with a JSON body:
+- \`ref\`: the \`lw_ref\` value captured and stored for this user at signup,
+- \`amountCents\`: the amount in cents (e.g. 4900 for $49.00),
+- \`currency\`: the ISO currency code (e.g. "usd"),
+- \`recurring\`: true for subscription payments (these count toward MRR), false for one-off charges.
+
+Make sure each user's \`lw_ref\` is persisted at signup so it's available here. This attributes the revenue to the channel that drove the signup. Works with any provider — call it from your backend, a PostHog action, or GA4.`;
+
   const stripeUrl = `${base}/api/track/stripe/${projectId}`;
   const stripeNote = `// When you create the Stripe Checkout Session, tag it with lw_ref:
 stripe.checkout.sessions.create({
   // …line_items, mode, success_url…
   metadata: { lw_ref: lwRef }   // the value you captured at signup
 });`;
+
+  const stripePrompt = `Wire up LaunchWake's turnkey Stripe revenue tracking.
+
+1. Wherever I create a Stripe Checkout Session, add \`metadata: { lw_ref: <the lw_ref captured at signup> }\` so LaunchWake knows which channel to credit.
+2. In Stripe → Developers → Webhooks, add the endpoint \`${stripeUrl}\` and subscribe it to the events \`checkout.session.completed\` and \`invoice.paid\`.
+3. Copy that webhook's signing secret (starts with \`whsec_\`) and remind me to paste it into LaunchWake Settings so incoming events can be verified.
+
+This attributes Stripe revenue automatically — no custom payment-handling code needed.`;
 
   // ── status banners ──
   const signupBanner =
@@ -197,7 +186,7 @@ stripe.checkout.sessions.create({
         <code className="mono" style={{ color: "var(--tx)" }}>launchwakeSignup()</code>{" "}
         on your signup-success page. Clicks are tracked without it; signups need it.
       </p>
-      <CopyBlock code={signupSnippet} label="Snippet" />
+      <CodePrompt code={signupSnippet} prompt={signupPrompt} codeLabel="Snippet" />
 
       {/* 2 — Revenue (generic) */}
       <div style={sub}>
@@ -217,7 +206,7 @@ stripe.checkout.sessions.create({
         to the revenue endpoint with the same <code className="mono">lw_ref</code>.
         Recurring payments count toward MRR.
       </p>
-      <CopyBlock code={revenueSnippet} label="Revenue example" />
+      <CodePrompt code={revenueSnippet} prompt={revenuePrompt} codeLabel="Revenue example" />
 
       {/* 3 — Stripe turnkey */}
       <div style={sub}>
@@ -240,7 +229,7 @@ stripe.checkout.sessions.create({
       <p style={{ color: "var(--tx2)", fontSize: 12.5, marginBottom: 8 }}>
         Tag the Checkout Session with the visitor&apos;s <code className="mono">lw_ref</code> so we know which channel to credit:
       </p>
-      <CopyBlock code={stripeNote} label="Metadata example" />
+      <CodePrompt code={stripeNote} prompt={stripePrompt} codeLabel="Metadata example" />
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 12 }}>
         <input
           className="inp"
