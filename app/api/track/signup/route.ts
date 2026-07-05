@@ -1,6 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
-import { ingestSignup } from "@/lib/attribution";
+import { NextRequest, NextResponse, after } from "next/server";
+import { ingestSignup, signupContext } from "@/lib/attribution";
 import { rateLimitDurable, clientIp } from "@/lib/ratelimit";
+import { captureUser, EVENTS } from "@/lib/analytics";
+
+/**
+ * Funnel: the account's first tracked signup proves the pixel is installed and
+ * working — fire `pixel_installed` exactly once (per account, effectively).
+ */
+async function trackPixelInstalled(shortCode: string, via: string): Promise<void> {
+  const ctx = await signupContext(shortCode).catch(() => null);
+  if (ctx?.firstSignup) {
+    await captureUser(ctx.accountId, EVENTS.pixelInstalled, { via });
+  }
+}
 
 // Signup ingest is open + CORS-wide, so cap it per IP to blunt fake-signup spam.
 const RL_LIMIT = 30;
@@ -37,7 +49,10 @@ export async function GET(req: NextRequest) {
   // Over the limit we still return the pixel (never break the product page) but
   // skip recording, so a scripted pixel-loop can't manufacture signups.
   const rl = await rateLimitDurable(`signup:${clientIp(req.headers)}`, RL_LIMIT, RL_WINDOW_MS);
-  if (ref && rl.ok) await ingestSignup(ref, { via: "pixel" });
+  if (ref && rl.ok) {
+    const ok = await ingestSignup(ref, { via: "pixel" });
+    if (ok) after(() => trackPixelInstalled(ref, "pixel"));
+  }
 
   return new NextResponse(PIXEL, {
     status: 200,
@@ -65,5 +80,9 @@ export async function POST(req: NextRequest) {
   }
 
   const ok = ref ? await ingestSignup(ref, { via: "beacon" }) : false;
+  if (ok && ref) {
+    const code = ref;
+    after(() => trackPixelInstalled(code, "beacon"));
+  }
   return NextResponse.json({ ok }, { headers: CORS });
 }

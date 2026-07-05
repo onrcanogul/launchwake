@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { after } from "next/server";
 import { getWorkspace } from "@/lib/session";
-import { getShipWithPlan } from "@/lib/plans";
+import { getShipWithPlan, countAccountPlans } from "@/lib/plans";
+import { captureUser, EVENTS } from "@/lib/analytics";
 import { ChannelCard, type BenchmarkCardData } from "@/components/channel/ChannelCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Note } from "@/components/ui/Note";
@@ -41,6 +43,12 @@ export default async function PlanPage({
   const emailAvailable = emailConfigured();
   const slackAvailable = Boolean(ws.project.slackWebhookUrl);
   const building = recs.length === 0 && ship.status === "NEW";
+
+  // Funnel: activation = seeing a real plan for your own product. Only the
+  // account's first-ever plan counts; PostHog dedupes repeat views per user.
+  if (recs.length > 0 && (await countAccountPlans(ws.accountId)) === 1) {
+    after(() => captureUser(ws.user.id, EVENTS.firstPlanViewed));
+  }
 
   // Launch Mode: show the guided rail and cap how many channels a Free plan can
   // launch on (the full ranking is still shown; the rest are locked below).

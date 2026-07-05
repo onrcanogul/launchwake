@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { alternatesFor, type Locale } from "@/i18n/paths";
 import { PublicShell } from "@/components/public/PublicShell";
+import { TrackView } from "@/components/analytics/TrackView";
 import { LaunchChecker } from "@/components/public/LaunchChecker";
 import { PUBLIC_FREE_RECS } from "@/lib/launchChecker";
 import { PricingCards } from "@/components/public/PricingCards";
@@ -52,6 +53,9 @@ export default async function LandingPage(props: {
 
   return (
     <PublicShell wide locale={locale}>
+      {/* Client beacon — this page is statically generated, so a server-side
+          capture would fire at build time, not per view. */}
+      <TrackView event="landing_view" />
       {/* ── Hero ── */}
       <section className="lp-hero">
         <div className="lp-hero-bg" aria-hidden />

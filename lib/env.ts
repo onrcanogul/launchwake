@@ -67,6 +67,12 @@ const schema = z.object({
   // Shared secret; the scheduler must send it to /api/cron/reminders.
   CRON_SECRET: OptionalString,
 
+  // ── Product analytics (optional) ──────────────────────
+  // PostHog project API key for server-side event capture (activation funnel).
+  // When absent, lib/analytics.ts is a no-op — the app runs identically.
+  POSTHOG_API_KEY: OptionalString,
+  POSTHOG_HOST: z.string().url().default("https://us.i.posthog.com"),
+
   // ── Error tracking (optional) ─────────────────────────
   // Set to forward captured errors to Sentry. Both are optional so the app boots
   // without them; when absent, Sentry init is skipped and the build plugin is not

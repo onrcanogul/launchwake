@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { buildPlan } from "@/lib/analysis";
@@ -23,6 +24,7 @@ import { nextBestTimeUTC } from "@/lib/reminders";
 import { emailConfigured } from "@/lib/notify";
 import { normalizeHttpUrl } from "@/lib/url";
 import { fieldErrorsFromZod } from "@/lib/formErrors";
+import { captureUser, EVENTS } from "@/lib/analytics";
 
 async function requireProject() {
   const session = await auth();
@@ -378,12 +380,14 @@ export async function markPosted(
   recommendationId: string,
   postedUrl?: string,
 ): Promise<MarkPostedState> {
-  await requireProject();
+  const project = await requireProject();
   try {
     const res = await recordPostForRecommendation(recommendationId, postedUrl);
     revalidatePath("/app");
     revalidatePath("/app/results");
     revalidatePath("/app/ships");
+    // Funnel: the human posted and got a tracked link — attribution can begin.
+    after(() => captureUser(project.userId, EVENTS.shipMarkedPosted));
     return { ok: true, trackedUrl: res.trackedUrl };
   } catch (err) {
     return { ok: false, error: (err as Error).message };

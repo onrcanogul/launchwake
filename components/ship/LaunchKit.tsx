@@ -6,6 +6,7 @@ import { Icon } from "@/components/Icon";
 import { platformIcon } from "@/components/ui/platform";
 import { useToast } from "@/components/ui/toast";
 import { ensureDraft, markPosted } from "@/app/app/ships/actions";
+import { trackClientEvent } from "@/components/analytics/TrackView";
 import { checkDraft, safetyVerdict } from "@/lib/bansafety";
 import { DRAFT_TONES, type DraftTone } from "@/lib/tones";
 import type { KitRec } from "@/lib/plans";
@@ -169,6 +170,8 @@ export function LaunchKit({
       setCopied(key);
       setTimeout(() => setCopied(null), 1500);
       toast(key === "link" ? "Tracked link copied" : "Draft copied");
+      // Funnel: copying the draft body is the "kit used" moment (not link copies).
+      if (key === "body") void trackClientEvent("draft_copied");
     } catch {
       toast("Couldn't copy to clipboard", "error");
     }

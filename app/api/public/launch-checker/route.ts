@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { parseRepo, getRepoMeta, getLatestRelease } from "@/lib/github";
 import { buildPublicPlan, type PublicPlanInput } from "@/lib/launchChecker";
 import { rateLimitDurable, clientIp } from "@/lib/ratelimit";
+import { captureAnon, EVENTS } from "@/lib/analytics";
 
 /**
  * Public, login-less Launch Checker.
@@ -82,5 +83,8 @@ export async function POST(req: Request) {
   };
 
   const plan = buildPublicPlan(catalog, input);
+  // Funnel: top of the activation funnel for logged-out visitors. After the
+  // response so a slow analytics host can't delay the checker.
+  after(() => captureAnon(EVENTS.launchCheckerRun, { has_release: Boolean(ship) }));
   return NextResponse.json({ plan, repo: meta.fullName });
 }

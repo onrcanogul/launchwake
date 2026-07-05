@@ -194,6 +194,40 @@ export async function ingestSignup(
   return true;
 }
 
+export type SignupContext = {
+  /** The account that owns the product this signup belongs to. */
+  accountId: string;
+  /** True when this is the account's first-ever tracked signup. */
+  firstSignup: boolean;
+};
+
+/**
+ * Owner + first-signup flag for a short code, read AFTER a signup was ingested.
+ * Powers the `pixel_installed` activation event: the first signup that arrives
+ * proves the pixel is live on the product's thank-you page.
+ */
+export async function signupContext(shortCode: string): Promise<SignupContext | null> {
+  const link = await db.trackedLink.findUnique({
+    where: { shortCode },
+    include: {
+      post: {
+        include: {
+          ship: { include: { project: { select: { userId: true } } } },
+        },
+      },
+    },
+  });
+  if (!link) return null;
+  const accountId = link.post.ship.project.userId;
+  const signups = await db.event.count({
+    where: {
+      type: "SIGNUP",
+      trackedLink: { post: { ship: { project: { userId: accountId } } } },
+    },
+  });
+  return { accountId, firstSignup: signups === 1 };
+}
+
 export type RevenueInput = {
   /** Amount in the smallest currency unit (e.g. cents). */
   amountCents: number;

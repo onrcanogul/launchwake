@@ -92,6 +92,16 @@ export async function getShipWithPlan(
   };
 }
 
+/**
+ * How many distribution plans this account has ever generated. Used to detect
+ * the "first plan viewed" activation moment (count === 1) on the plan page.
+ */
+export async function countAccountPlans(accountId: string): Promise<number> {
+  return db.distributionPlan.count({
+    where: { ship: { project: { userId: accountId } } },
+  });
+}
+
 export type KitRec = {
   id: string;
   channelSlug: string;

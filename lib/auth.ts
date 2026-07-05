@@ -8,6 +8,7 @@ import { env } from "./env";
 import { authConfig } from "./auth.config";
 import { pickAccountColumns } from "./authAccount";
 import { ensureDemoUser, DEMO_EMAIL } from "./demo";
+import { captureUser, EVENTS } from "./analytics";
 
 /**
  * Wrap the Prisma adapter so `linkAccount` only writes columns our `Account`
@@ -61,6 +62,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: scopedPrismaAdapter(),
   providers,
+  events: {
+    // Funnel: a brand-new account (magic link or OAuth), not a repeat sign-in.
+    async createUser({ user }) {
+      if (user.id) await captureUser(user.id, EVENTS.signup);
+    },
+  },
 });
 
 export { DEMO_EMAIL };
