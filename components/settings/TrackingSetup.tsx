@@ -5,6 +5,7 @@ import { Icon } from "@/components/Icon";
 import { useToast } from "@/components/ui/toast";
 import { saveStripeWebhookSecret } from "@/app/app/settings/actions";
 import { CodePrompt, preStyle } from "@/components/settings/CodePrompt";
+import { PixelSnippet } from "@/components/settings/PixelSnippet";
 
 type Status = {
   signups: number;
@@ -55,37 +56,17 @@ export function TrackingSetup({
   projectId,
   status,
   stripeSecretSet,
+  pixelVerifiedAt,
 }: {
   appUrl: string;
   projectId: string;
   status: Status;
   stripeSecretSet: boolean;
+  /** Last pixel verification ping — null until the snippet goes live. */
+  pixelVerifiedAt: Date | null;
 }) {
   const base = appUrl.replace(/\/$/, "");
   const { toast } = useToast();
-
-  const signupSnippet = `<script>
-(function () {
-  // 1. capture lw_ref from the tracked-link click (any page)
-  var p = new URLSearchParams(location.search).get('lw_ref');
-  if (p) { try { localStorage.setItem('lw_ref', p); } catch (e) {} }
-  // 2. call launchwakeSignup() on your signup-success page
-  window.launchwakeSignup = function () {
-    var r; try { r = localStorage.getItem('lw_ref'); } catch (e) {}
-    if (r) navigator.sendBeacon(
-      '${base}/api/track/signup',
-      new Blob([JSON.stringify({ ref: r })], { type: 'application/json' })
-    );
-  };
-})();
-</script>`;
-
-  const signupPrompt = `Add LaunchWake signup attribution to my web app. First detect the framework this repo uses (Next.js, Nuxt, SvelteKit, Rails, plain HTML, etc.) and fit the integration to how it already injects site-wide scripts and renders pages — don't assume my stack. The one exception: the browser snippet below stays JS, since it runs in the page.
-
-1. Site-wide (wherever my framework runs a script on every page — e.g. the root layout or <head>): read the \`lw_ref\` query parameter from the URL and, if present, save it to localStorage under the key \`lw_ref\`. Then define a global function \`window.launchwakeSignup()\` that reads \`lw_ref\` from localStorage and, if present, sends a POST beacon to \`${base}/api/track/signup\` with the JSON body \`{ "ref": <the stored lw_ref> }\` using \`navigator.sendBeacon\`. Wrap the localStorage calls in try/catch so private-mode browsers don't throw.
-2. On my signup-success page, call \`launchwakeSignup()\` once the signup has succeeded.
-
-Clicks are tracked automatically; a signup only counts once launchwakeSignup() runs. This credits each signup to the channel that drove the click.`;
 
   const revenueSnippet = `// Server-side, after a successful payment. Pass the lw_ref you
 // stored at signup so the revenue is attributed to the channel.
@@ -134,18 +115,25 @@ This attributes Stripe revenue automatically — no custom payment-handling code
         {status.signups === 1 ? "" : "s"} attributed
         {status.lastSignupAt ? `, last ${ago(status.lastSignupAt)}` : ""}.
       </div>
+    ) : pixelVerifiedAt ? (
+      <div className="track-status ok">
+        <span className="dot" style={{ background: "var(--ok)" }} />
+        Pixel detected — live on your site (last seen {ago(pixelVerifiedAt)}).
+        Signups appear once <code className="mono">launchwakeSignup()</code> runs
+        on your success page.
+      </div>
     ) : status.clicks > 0 ? (
       <div className="track-status warn">
         <span className="dot" style={{ background: "var(--warn)" }} />
-        <b>{status.clicks}</b> click{status.clicks === 1 ? "" : "s"} tracked but no
-        signups yet — make sure the snippet is installed and{" "}
-        <code className="mono">launchwakeSignup()</code> runs on your success page.
+        <b>{status.clicks}</b> click{status.clicks === 1 ? "" : "s"} tracked but the
+        pixel hasn&apos;t been detected yet — add the one-liner below so signups get
+        attributed too.
       </div>
     ) : (
       <div className="track-status">
         <span className="dot" style={{ background: "var(--tx3)" }} />
-        No data yet — add the snippet below, then it lights up as clicks and
-        signups arrive.
+        No data yet — paste the one-liner below; this lights up the moment the
+        pixel goes live.
       </div>
     );
 
@@ -180,13 +168,20 @@ This attributes Stripe revenue automatically — no custom payment-handling code
       <div style={sub}>
         <Icon name="results" style={{ width: 14, height: 14, stroke: "var(--ac)", strokeWidth: 1.7, fill: "none" }} />
         1 · Attribute signups (pixel)
+        {pixelVerifiedAt && (
+          <span className="badge" style={{ color: "var(--ok)" }}>
+            <span className="dot" style={{ background: "var(--ok)" }} />detected
+          </span>
+        )}
       </div>
       <p style={{ color: "var(--tx2)", fontSize: 12.5, marginBottom: 10 }}>
-        Add this site-wide, then call{" "}
+        Paste this one line site-wide, then call{" "}
         <code className="mono" style={{ color: "var(--tx)" }}>launchwakeSignup()</code>{" "}
         on your signup-success page. Clicks are tracked without it; signups need it.
+        The script pings back once it&apos;s live, so you&apos;ll see &ldquo;pixel
+        detected&rdquo; here and on Results.
       </p>
-      <CodePrompt code={signupSnippet} prompt={signupPrompt} codeLabel="Snippet" />
+      <PixelSnippet appUrl={appUrl} projectId={projectId} />
 
       {/* 2 — Revenue (generic) */}
       <div style={sub}>

@@ -81,6 +81,8 @@ export type LaunchModeState = {
   /** Attribution status (for the tracking-setup card on the readiness stage). */
   tracking: TrackingStatus;
   stripeSecretSet: boolean;
+  /** Last pixel verification ping (null until the snippet goes live). */
+  pixelVerifiedAt: Date | null;
   channelCount: number;
   draftCount: number;
   postedCount: number;
@@ -124,7 +126,13 @@ export async function getLaunchModeState(
     getTrackingStatus(ship.project.id),
     db.reminder.count({ where: { shipId } }),
   ]);
-  const trackingLive = tracking.clicks > 0 || tracking.signups > 0;
+  // A verify ping or an attributed signup proves the snippet; clicks alone
+  // don't (they go through the /r/ redirect and never touch the pixel), but we
+  // keep them as a legacy signal for pre-pixel installs of the inline snippet.
+  const trackingLive =
+    ship.project.pixelVerifiedAt !== null ||
+    tracking.clicks > 0 ||
+    tracking.signups > 0;
 
   const scheduled = ship.launchAt !== null || reminderCount > 0;
   const readiness = computeReadiness({
@@ -192,6 +200,7 @@ export async function getLaunchModeState(
     readiness,
     tracking,
     stripeSecretSet: Boolean(ship.project.stripeWebhookSecret),
+    pixelVerifiedAt: ship.project.pixelVerifiedAt,
     channelCount,
     draftCount,
     postedCount,

@@ -228,6 +228,47 @@ export async function signupContext(shortCode: string): Promise<SignupContext | 
   return { accountId, firstSignup: signups === 1 };
 }
 
+// ── Pixel verification (see lib/pixel.ts for the served script) ────────────
+
+export type PixelPingResult = {
+  ok: boolean;
+  /** True when this ping flipped the project from never-verified to verified. */
+  first: boolean;
+  /** Owner account id (for the pixel_installed funnel event); null if unknown. */
+  accountId: string | null;
+};
+
+/**
+ * Record a pixel verification ping: stamp `Project.pixelVerifiedAt`. Unknown
+ * project ids are acknowledged but not recorded (the endpoint is public).
+ */
+export async function recordPixelPing(projectId: string): Promise<PixelPingResult> {
+  const project = await db.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, userId: true, pixelVerifiedAt: true },
+  });
+  if (!project) return { ok: false, first: false, accountId: null };
+
+  await db.project.update({
+    where: { id: project.id },
+    data: { pixelVerifiedAt: new Date() },
+  });
+  return {
+    ok: true,
+    first: project.pixelVerifiedAt === null,
+    accountId: project.userId,
+  };
+}
+
+/** Does the pixel route have a project to serve? (Existence check for GET.) */
+export async function pixelProjectExists(projectId: string): Promise<boolean> {
+  const project = await db.project.findUnique({
+    where: { id: projectId },
+    select: { id: true },
+  });
+  return Boolean(project);
+}
+
 export type RevenueInput = {
   /** Amount in the smallest currency unit (e.g. cents). */
   amountCents: number;

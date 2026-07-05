@@ -150,6 +150,7 @@ export default async function ReadinessPage({
           projectId={state.project.id}
           status={state.tracking}
           stripeSecretSet={state.stripeSecretSet}
+          pixelVerifiedAt={state.pixelVerifiedAt}
         />
       </Panel>
     </>

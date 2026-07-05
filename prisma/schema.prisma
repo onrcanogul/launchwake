@@ -153,6 +153,9 @@ model Project {
   githubInstallationId String? // for webhook auto-detect
   webhookSecret        String? // per-project GitHub webhook signing secret
   stripeWebhookSecret  String? // the user's Stripe endpoint signing secret (whsec_…) for revenue attribution
+  // Last time the LaunchWake pixel pinged /api/track/verify from the user's
+  // product — powers the "pixel detected" state on Results/Settings.
+  pixelVerifiedAt      DateTime?
   slackWebhookUrl      String? // Slack incoming webhook for reminders / new-ship pings
   ships                Ship[]
   intentQueries        IntentQuery[] // Intent Radar: saved "people looking for us" watches

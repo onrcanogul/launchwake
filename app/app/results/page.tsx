@@ -5,11 +5,10 @@ import { getTrackingHealth } from "@/lib/trackingHealth";
 import { RoiStrip } from "@/components/results/RoiStrip";
 import { TrackingHealthBanner } from "@/components/results/TrackingHealthBanner";
 import { PostCoachList } from "@/components/results/PostCoach";
+import { GetStartedSteps } from "@/components/results/GetStartedSteps";
 import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { StatStrip, type Stat } from "@/components/ui/StatStrip";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Button } from "@/components/ui/Button";
 
 function ConversionCell({
   conversion,
@@ -71,21 +70,7 @@ export default async function ResultsPage() {
       <>
         {header}
         <TrackingHealthBanner failedCount={failedDeliveries} />
-        <EmptyState
-          icon="results"
-          title="No data yet"
-          message="Mark a ship as posted to mint a tracked link, add the LaunchWake pixel to your signup page, and this fills with per-channel clicks and conversions."
-          actions={
-            <>
-              <Button variant="primary" icon="where" href="/app/plan">
-                Go to a plan
-              </Button>
-              <Button variant="secondary" icon="settings" href="/app/settings">
-                Set up tracking
-              </Button>
-            </>
-          }
-        />
+        <GetStartedSteps pixelVerifiedAt={ws.project.pixelVerifiedAt} />
       </>
     );
   }

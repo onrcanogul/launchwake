@@ -126,6 +126,7 @@ export default async function SettingsPage({
           projectId={p.id}
           status={tracking}
           stripeSecretSet={Boolean(p.stripeWebhookSecret)}
+          pixelVerifiedAt={p.pixelVerifiedAt}
         />
       </Panel>
 
