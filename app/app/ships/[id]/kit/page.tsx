@@ -75,11 +75,8 @@ export default async function KitPage({
         <>
           <LaunchKit recs={visibleRecs} initialRecId={rec} />
           {paywall && (
-            <Note icon="lock">
-              {paywall}{" "}
-              <Link href="/app/settings" style={{ color: "var(--ac)" }}>
-                Upgrade to Pro
-              </Link>
+            <Note icon="lock" className="note-flow">
+              {paywall} <Link href="/app/settings">Upgrade to Pro</Link>
             </Note>
           )}
           {inLaunchMode && (

@@ -99,6 +99,7 @@ export type KitRec = {
   platform: Platform;
   ruleNote: string | null;
   channelRules: string | null;
+  bestTime: string | null;
   draft: { body: string; safetyNote: string | null } | null;
   post: { url: string | null; trackedUrl: string | null } | null;
 };
@@ -141,6 +142,7 @@ export async function getShipKit(
         platform: r.channel.platform,
         ruleNote: r.ruleNote,
         channelRules: r.channel.rules,
+        bestTime: r.channel.bestTime,
         draft: r.draft
           ? { body: r.draft.body, safetyNote: r.draft.safetyNote }
           : null,
