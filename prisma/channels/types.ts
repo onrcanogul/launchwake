@@ -1,5 +1,11 @@
 import { Platform, BanRisk } from "@prisma/client";
 import { z } from "zod";
+// Canonical account-requirements schema lives in /lib (framework-agnostic).
+// Imported via a relative path so the tsx-run seed doesn't rely on the `@/` alias.
+import {
+  AccountRequirementsSchema,
+  type AccountRequirementsInput,
+} from "../../lib/accountReadiness";
 
 /**
  * One seeded channel. The catalog is the intelligence asset — every entry is a
@@ -17,6 +23,11 @@ export type Seed = {
   defaultBanRisk: BanRisk;
   bestTime: string;
   tags: string[];
+  /**
+   * Optional per-channel account-readiness data (age/karma thresholds, profile
+   * tips, source). Drives launch-mode "account readiness" tips + at-risk warnings.
+   */
+  accountRequirements?: AccountRequirementsInput;
 };
 
 /** Boot-time validation so a malformed entry fails the seed loudly, not silently. */
@@ -35,4 +46,5 @@ export const SeedSchema = z.object({
   tags: z
     .array(z.string().regex(/^[a-z0-9+.-]+$/, "tags must be lowercase"))
     .min(1),
+  accountRequirements: AccountRequirementsSchema.optional(),
 });

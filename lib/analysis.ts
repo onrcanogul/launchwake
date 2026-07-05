@@ -21,6 +21,10 @@ import {
 import { rollupBenchmarks } from "./benchmarks";
 import { generateQueueForShip } from "./queue";
 import { captureError } from "./observability";
+import {
+  parseAccountRequirements,
+  computeAccountReadiness,
+} from "./accountReadiness";
 import type { BanRisk, Channel, Project, Ship } from "@prisma/client";
 
 /**
@@ -303,14 +307,26 @@ export async function buildPlan(
 
   // Flywheel, step 2 — apply the deterministic fit adjustment + legible evidence
   // and re-sort. banRisk also rises with removals. Reuses the signals above.
+  //
+  // In launch context we ALSO apply a small account-readiness penalty: if the
+  // launch date is set and too soon to prepare a credible account for a channel
+  // (fresh-account ban risk), that channel drops in the ranking so safer venues
+  // surface first. When no launch date is set yet, no penalty applies (graceful).
+  const now = new Date();
   const enriched = grounded
     .map((r) => {
       const channel = bySlug.get(r.slug)!;
       const signal = signals.get(channel.id);
       const evidence = outcomeEvidence(signal, productTag);
+      const readiness = launchContext
+        ? computeAccountReadiness(
+            parseAccountRequirements(channel.accountRequirements),
+            { launchAt: ship.launchAt, now, channelName: channel.name },
+          )
+        : null;
       const fitScore = Math.max(
         0,
-        Math.min(100, r.fitScore + evidence.boost),
+        Math.min(100, r.fitScore + evidence.boost - (readiness?.fitPenalty ?? 0)),
       );
       return {
         channel,

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/Button";
 import { RISK, type BanRiskValue } from "@/components/ui/risk";
 import { platformIcon } from "@/components/ui/platform";
 import { RemindMenu, type RemindProps } from "@/components/channel/RemindMenu";
+import { AccountReadinessRow } from "@/components/channel/AccountReadinessRow";
+import type { AccountReadinessBlock } from "@/lib/accountReadiness";
 
 export type ChannelCardData = {
   name: string;
@@ -37,11 +39,14 @@ export function ChannelCard({
   draftHref,
   remind,
   benchmark,
+  accountReadiness,
 }: {
   data: ChannelCardData;
   draftHref: string;
   remind?: RemindProps;
   benchmark?: BenchmarkCardData | null;
+  /** Launch-mode account-readiness detail; omit outside launch mode. */
+  accountReadiness?: AccountReadinessBlock | null;
 }) {
   const risk = RISK[data.banRisk];
   const fit = Math.max(0, Math.min(100, data.fitScore));
@@ -90,6 +95,8 @@ export function ChannelCard({
           {data.outcomeNote}
         </div>
       )}
+
+      {accountReadiness && <AccountReadinessRow block={accountReadiness} />}
 
       <div className="ft">
         <div className="m">

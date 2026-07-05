@@ -15,6 +15,7 @@ import { nextBestTime } from "@/lib/reminders";
 import { emailConfigured } from "@/lib/notify";
 import { isPaidPlan, launchChannelLimit, launchChannelPaywall } from "@/lib/billing";
 import { isLaunchMode, getLaunchModeState } from "@/lib/launchMode";
+import { computeAccountReadiness } from "@/lib/accountReadiness";
 import { productTagFor, bucketLabel } from "@/lib/stats";
 import { getBenchmarkMap, benchmarkDisplay } from "@/lib/benchmarks";
 
@@ -62,6 +63,19 @@ export default async function PlanPage({
   const categoryLabel = bucketLabel(productTag);
   const benchmarks = await getBenchmarkMap(productTag);
   const locked = !isPaidPlan(ws.plan);
+
+  // Account readiness (launch mode only): warn/prepare founders posting from
+  // fresh accounts. Computed at render from the current launch date, so it
+  // stays accurate even if the date changed after the plan was built.
+  const now = new Date();
+  const readinessFor = (rec: (typeof recs)[number]) =>
+    inLaunchMode
+      ? computeAccountReadiness(rec.accountRequirements, {
+          launchAt: ship.launchAt,
+          now,
+          channelName: rec.channelName,
+        })
+      : null;
 
   const benchmarkFor = (channelSlug: string): BenchmarkCardData | null => {
     const view = benchmarks.get(channelSlug);
@@ -166,6 +180,7 @@ export default async function PlanPage({
                 }}
                 draftHref={`/app/ships/${ship.id}/kit?rec=${rec.id}`}
                 benchmark={benchmarkFor(rec.channelSlug)}
+                accountReadiness={readinessFor(rec)}
                 remind={
                   schedulable
                     ? {
@@ -205,6 +220,7 @@ export default async function PlanPage({
                     }}
                     draftHref="/app/settings"
                     benchmark={benchmarkFor(rec.channelSlug)}
+                    accountReadiness={readinessFor(rec)}
                   />
                 ))}
               </div>

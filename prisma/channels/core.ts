@@ -1,5 +1,12 @@
 import { Platform, BanRisk } from "@prisma/client";
 import type { Seed } from "./types";
+import {
+  HN_READINESS,
+  HN_SHOW_READINESS,
+  PRODUCT_HUNT_READINESS,
+  INDIE_HACKERS_READINESS,
+  redditReadiness,
+} from "./requirements";
 
 /** The original hand-authored core catalog (HN, top subreddits, PH, IH, blogs, X/LI). */
 export const core: Seed[] = [
@@ -24,6 +31,7 @@ export const core: Seed[] = [
       "backend",
       "startup",
     ],
+    accountRequirements: HN_SHOW_READINESS,
   },
   {
     slug: "hn",
@@ -45,6 +53,7 @@ export const core: Seed[] = [
       "security",
       "opensource",
     ],
+    accountRequirements: HN_READINESS,
   },
   {
     slug: "product-hunt",
@@ -65,6 +74,7 @@ export const core: Seed[] = [
       "startup",
       "b2b",
     ],
+    accountRequirements: PRODUCT_HUNT_READINESS,
   },
   {
     slug: "indie-hackers",
@@ -85,6 +95,7 @@ export const core: Seed[] = [
       "b2b",
       "makers",
     ],
+    accountRequirements: INDIE_HACKERS_READINESS,
   },
   {
     slug: "r-webdev",
@@ -97,6 +108,7 @@ export const core: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Mon/Wed 9am ET",
     tags: ["webdev", "frontend", "javascript", "developers", "api", "devtools"],
+    accountRequirements: redditReadiness(),
   },
   {
     slug: "r-saas",
@@ -109,6 +121,11 @@ export const core: Seed[] = [
     defaultBanRisk: BanRisk.HIGH,
     bestTime: "Tue–Thu 10am ET",
     tags: ["saas", "founders", "b2b", "startup", "product"],
+    accountRequirements: redditReadiness({
+      minAccountAgeDays: 60,
+      minKarma: 250,
+      extraTips: ["Share metrics/lessons, not a pitch — direct product links are often removed."],
+    }),
   },
   {
     slug: "r-programming",
@@ -128,6 +145,11 @@ export const core: Seed[] = [
       "backend",
       "opensource",
     ],
+    accountRequirements: redditReadiness({
+      minAccountAgeDays: 60,
+      minKarma: 250,
+      extraTips: ["Only a genuinely substantive writeup survives here — no product promotion."],
+    }),
   },
   {
     slug: "r-devops",
@@ -140,6 +162,7 @@ export const core: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Tue–Thu 9am ET",
     tags: ["devops", "infra", "backend", "developers", "security", "api"],
+    accountRequirements: redditReadiness(),
   },
   {
     slug: "r-selfhosted",
@@ -152,6 +175,9 @@ export const core: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Weekend mornings",
     tags: ["selfhosted", "opensource", "infra", "devtools", "developers"],
+    accountRequirements: redditReadiness({
+      extraTips: ["Show a real setup with screenshots; be upfront if it's closed-source or paid."],
+    }),
   },
   {
     slug: "r-node",
@@ -164,6 +190,7 @@ export const core: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Weekday mornings ET",
     tags: ["node", "javascript", "backend", "developers", "api", "webhooks"],
+    accountRequirements: redditReadiness(),
   },
   {
     slug: "r-javascript",
@@ -176,6 +203,11 @@ export const core: Seed[] = [
     defaultBanRisk: BanRisk.HIGH,
     bestTime: "Weekday mornings ET",
     tags: ["javascript", "frontend", "node", "developers", "webdev"],
+    accountRequirements: redditReadiness({
+      minAccountAgeDays: 60,
+      minKarma: 250,
+      extraTips: ["Showoff posts belong in the weekly thread; standalone promo is removed."],
+    }),
   },
   {
     slug: "r-startups",
@@ -188,6 +220,9 @@ export const core: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Weekday mornings ET",
     tags: ["startup", "founders", "saas", "product", "b2b"],
+    accountRequirements: redditReadiness({
+      extraTips: ["Promotion only lands in the weekly 'Share Your Startup' thread."],
+    }),
   },
   {
     slug: "r-entrepreneur",
@@ -200,6 +235,7 @@ export const core: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Weekday mornings ET",
     tags: ["founders", "startup", "saas", "b2b", "product"],
+    accountRequirements: redditReadiness(),
   },
   {
     slug: "dev-to",

@@ -1,5 +1,6 @@
 import { Platform, BanRisk } from "@prisma/client";
 import type { Seed } from "./types";
+import { redditReadiness } from "./requirements";
 
 /** Niche language/framework/domain subreddits (verified real, promo rules honest). */
 export const subreddits: Seed[] = [
@@ -13,6 +14,7 @@ export const subreddits: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Weekday mornings ET",
     tags: ["developers", "technical", "opensource", "backend", "community", "rust"],
+    accountRequirements: redditReadiness(),
   },
   {
     slug: "r-golang",
@@ -35,6 +37,9 @@ export const subreddits: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Weekday mornings ET",
     tags: ["developers", "technical", "opensource", "backend", "community", "python"],
+    accountRequirements: redditReadiness({
+      extraTips: ["Use the required Showcase format (What My Project Does / Target Audience / Comparison)."],
+    }),
   },
   {
     slug: "r-django",
@@ -57,6 +62,11 @@ export const subreddits: Seed[] = [
     defaultBanRisk: BanRisk.HIGH,
     bestTime: "Weekly Show thread",
     tags: ["developers", "frontend", "webdev", "javascript", "react", "community"],
+    accountRequirements: redditReadiness({
+      minAccountAgeDays: 60,
+      minKarma: 250,
+      extraTips: ["'I built X' posts go in the pinned weekly Show thread; standalone promo is removed."],
+    }),
   },
   {
     slug: "r-vuejs",

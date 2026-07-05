@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { assembleCatalog } from "./channels";
 
 const db = new PrismaClient();
@@ -25,19 +25,26 @@ async function main() {
   }
 
   for (const c of channels) {
+    // JSON columns need an explicit DbNull to clear a value on update; passing
+    // `undefined` would leave a previously-seeded value in place.
+    const accountRequirements = c.accountRequirements
+      ? (c.accountRequirements as Prisma.InputJsonValue)
+      : Prisma.DbNull;
+    const data = {
+      name: c.name,
+      platform: c.platform,
+      url: c.url,
+      audienceDesc: c.audienceDesc,
+      rules: c.rules,
+      defaultBanRisk: c.defaultBanRisk,
+      bestTime: c.bestTime,
+      tags: c.tags,
+      accountRequirements,
+    };
     await db.channel.upsert({
       where: { slug: c.slug },
-      update: {
-        name: c.name,
-        platform: c.platform,
-        url: c.url,
-        audienceDesc: c.audienceDesc,
-        rules: c.rules,
-        defaultBanRisk: c.defaultBanRisk,
-        bestTime: c.bestTime,
-        tags: c.tags,
-      },
-      create: c,
+      update: data,
+      create: { slug: c.slug, ...data },
     });
   }
 

@@ -1,10 +1,16 @@
 import { notFound, redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getLaunchModeState } from "@/lib/launchMode";
+import { getShipWithPlan } from "@/lib/plans";
+import { computeAccountReadiness } from "@/lib/accountReadiness";
 import { env } from "@/lib/env";
 import { LaunchModeRail } from "@/components/ship/LaunchModeRail";
 import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
 import { Checklist } from "@/components/ui/Checklist";
+import {
+  AccountReadinessChecklist,
+  type AccountReadyChannel,
+} from "@/components/ship/AccountReadinessChecklist";
 import { Panel } from "@/components/ui/Panel";
 import { Button } from "@/components/ui/Button";
 import { TrackingSetup } from "@/components/settings/TrackingSetup";
@@ -28,6 +34,30 @@ export default async function ReadinessPage({
   }
 
   const { readiness } = state;
+
+  // Per-channel account readiness (launch mode): warn + prepare founders posting
+  // from fresh accounts. Computed from the plan's recommended channels + the
+  // chosen launch date; empty until a plan exists or none carry requirements.
+  const plan = await getShipWithPlan(id, ws.accountId);
+  const now = new Date();
+  const accountChannels: AccountReadyChannel[] = (plan?.recs ?? [])
+    .map((rec): AccountReadyChannel | null => {
+      const block = computeAccountReadiness(rec.accountRequirements, {
+        launchAt: plan?.ship.launchAt ?? null,
+        now,
+        channelName: rec.channelName,
+      });
+      return block
+        ? {
+            slug: rec.channelSlug,
+            channelName: rec.channelName,
+            platform: rec.platform,
+            block,
+          }
+        : null;
+    })
+    .filter((c): c is AccountReadyChannel => c !== null);
+
   const scoreColor = readiness.ready ? "var(--ac)" : "var(--warn)";
   const nextLabel =
     state.nextKey === "plan"
@@ -91,6 +121,28 @@ export default async function ReadinessPage({
           />
         </div>
       </Panel>
+
+      {accountChannels.length > 0 && (
+        <Panel title="Account readiness">
+          <div style={{ padding: "10px 16px 16px" }}>
+            <p
+              style={{
+                fontSize: 12,
+                color: "var(--tx2)",
+                margin: "0 0 12px",
+                lineHeight: 1.5,
+              }}
+            >
+              Most launch-day bans hit fresh, zero-history accounts. Set up and
+              warm up each account well before launch, then check it off here.
+            </p>
+            <AccountReadinessChecklist
+              shipId={state.ship.id}
+              channels={accountChannels}
+            />
+          </div>
+        </Panel>
+      )}
 
       <Panel title="Attribution — the launch-day reward">
         <TrackingSetup

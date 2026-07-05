@@ -1106,6 +1106,297 @@ textarea.inp {
   margin-left: auto;
 }
 
+/* ============ ACCOUNT READINESS (launch mode) ============ */
+/* Expandable row on the plan card. Shared visual atoms (badges/tips/warn/lead/
+   chip/src) are de-scoped below so the readiness checklist can reuse them. */
+.acct {
+  border-top: 1px solid var(--line);
+}
+.acct .acct-sum {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 17px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+/* Hide the native disclosure triangle across engines. */
+.acct .acct-sum::-webkit-details-marker {
+  display: none;
+}
+.acct .acct-sum > svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--tx3);
+  stroke-width: 1.6;
+  fill: none;
+  flex-shrink: 0;
+}
+.acct .acct-caret {
+  margin-left: auto;
+  display: inline-flex;
+  transition: transform 0.15s ease;
+}
+.acct .acct-caret svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--tx3);
+  stroke-width: 1.6;
+  fill: none;
+}
+.acct[open] .acct-caret {
+  transform: rotate(180deg);
+}
+.acct .acct-body {
+  padding: 2px 17px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.acct-title {
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--tx2);
+}
+.acct-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px;
+  border-radius: 100px;
+  font-size: 10.5px;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--line2);
+  color: var(--tx3);
+}
+.acct-chip::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.acct-chip.info {
+  color: var(--tx2);
+}
+.acct-chip.met {
+  color: var(--ok);
+  border-color: rgba(62, 207, 142, 0.35);
+}
+.acct-chip.at-risk {
+  color: var(--bad);
+  border-color: rgba(240, 97, 109, 0.4);
+  background: rgba(240, 97, 109, 0.08);
+}
+.acct-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.acct-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line);
+  background: var(--bg2);
+  color: var(--tx2);
+}
+.acct-badge svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.7;
+  fill: none;
+}
+.acct-badge.met {
+  color: var(--ok);
+  border-color: rgba(62, 207, 142, 0.3);
+}
+.acct-badge.met svg {
+  stroke: var(--ok);
+}
+.acct-badge.unknown {
+  color: var(--tx3);
+}
+.acct-badge.unknown svg {
+  stroke: var(--tx3);
+}
+.acct-badge.at-risk {
+  color: var(--bad);
+  border-color: rgba(240, 97, 109, 0.35);
+  background: rgba(240, 97, 109, 0.07);
+}
+.acct-badge.at-risk svg {
+  stroke: var(--bad);
+}
+.acct-lead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--tx2);
+}
+.acct-lead svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--tx3);
+  stroke-width: 1.6;
+  fill: none;
+  flex-shrink: 0;
+}
+.acct-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 11px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--bad);
+  background: rgba(240, 97, 109, 0.08);
+  border: 1px solid rgba(240, 97, 109, 0.28);
+}
+.acct-warn svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--bad);
+  stroke-width: 1.6;
+  fill: none;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.acct-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.acct-tips li {
+  position: relative;
+  padding-left: 15px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--tx2);
+}
+.acct-tips li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 6px;
+  height: 1px;
+  background: var(--tx3);
+}
+.acct-src {
+  font-size: 10.5px;
+  color: var(--tx3);
+  line-height: 1.4;
+}
+
+/* ---- Account-readiness checklist (readiness stage) ---- */
+.acctlist {
+  display: flex;
+  flex-direction: column;
+}
+.acctlist-progress {
+  font-size: 11.5px;
+  color: var(--tx3);
+  padding: 0 0 12px;
+}
+.acctlist-progress b {
+  color: var(--tx);
+  font-variant-numeric: tabular-nums;
+}
+.acctlist-item {
+  display: flex;
+  gap: 11px;
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+}
+.acctlist-item:first-of-type {
+  border-top: none;
+}
+.acctlist-check {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 5px;
+  border: 1px solid var(--line2);
+  background: var(--bg2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: transparent;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+.acctlist-check svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+.acctlist-check.on {
+  background: var(--ac);
+  border-color: var(--ac);
+  color: var(--bg);
+}
+.acctlist-check:focus-visible {
+  outline: 2px solid var(--acb);
+  outline-offset: 2px;
+}
+.acctlist-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.acctlist-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.acctlist-head .acctlist-ico {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.acctlist-head .acctlist-ico svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--tx2);
+  stroke-width: 1.6;
+  fill: none;
+}
+.acctlist-head b {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.acctlist-item.done .acctlist-name {
+  color: var(--tx3);
+  text-decoration: line-through;
+}
+
 /* ============ TABS / DRAFT ============ */
 .tabs {
   display: flex;

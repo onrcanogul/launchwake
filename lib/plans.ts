@@ -1,5 +1,9 @@
 import { db } from "./db";
 import { trackedUrl } from "./attribution";
+import {
+  parseAccountRequirements,
+  type AccountRequirements,
+} from "./accountReadiness";
 import type { BanRisk, Platform, ShipType, ShipStatus } from "@prisma/client";
 
 export type RecView = {
@@ -15,6 +19,8 @@ export type RecView = {
   ruleNote: string | null;
   outcomeNote: string | null;
   hasDraft: boolean;
+  /** Seeded account-readiness data for this channel (null when none). */
+  accountRequirements: AccountRequirements | null;
 };
 
 export type ShipWithPlan = {
@@ -24,6 +30,8 @@ export type ShipWithPlan = {
     title: string;
     summary: string | null;
     status: ShipStatus;
+    /** Chosen launch date (Launch Mode) — anchors account-readiness timing. */
+    launchAt: Date | null;
   };
   project: { id: string; name: string; userId: string };
   recs: RecView[];
@@ -67,6 +75,7 @@ export async function getShipWithPlan(
       ruleNote: r.ruleNote,
       outcomeNote: r.outcomeNote,
       hasDraft: Boolean(r.draft),
+      accountRequirements: parseAccountRequirements(r.channel.accountRequirements),
     })) ?? [];
 
   return {
@@ -76,6 +85,7 @@ export async function getShipWithPlan(
       title: ship.title,
       summary: ship.summary,
       status: ship.status,
+      launchAt: ship.launchAt,
     },
     project: ship.project,
     recs,

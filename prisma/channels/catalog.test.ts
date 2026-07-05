@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { assembleCatalog, channelCatalog, CATEGORIES } from "./index";
+import { AccountRequirementsSchema } from "../../lib/accountReadiness";
 
 describe("channel catalog", () => {
   const { channels, issues, byCategory } = assembleCatalog();
@@ -41,6 +42,20 @@ describe("channel catalog", () => {
     // Every registered category contributes entries.
     for (const cat of Object.keys(CATEGORIES)) {
       expect(byCategory[cat]).toBeGreaterThan(0);
+    }
+  });
+
+  it("seeds valid account requirements on the launch channels", () => {
+    const withReqs = channels.filter((c) => c.accountRequirements);
+    // The key launch venues must carry account-readiness guidance.
+    const slugs = new Set(withReqs.map((c) => c.slug));
+    for (const s of ["hn-show", "product-hunt", "r-saas"]) {
+      expect(slugs.has(s)).toBe(true);
+    }
+    // Every seeded requirement must satisfy the schema (grounded, not malformed).
+    for (const c of withReqs) {
+      const parsed = AccountRequirementsSchema.safeParse(c.accountRequirements);
+      expect(parsed.success, `${c.slug} accountRequirements invalid`).toBe(true);
     }
   });
 });

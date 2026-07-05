@@ -226,6 +226,9 @@ model Channel {
   defaultBanRisk BanRisk          @default(LOW)
   bestTime       String? // "Tue–Thu 8am ET"
   tags           String[] // ["devtools","backend","infra"] for fit matching
+  // Optional account-readiness data (age/karma thresholds, profile tips, source).
+  // Shape: lib/accountReadiness.ts AccountRequirementsSchema. Drives launch-mode tips.
+  accountRequirements Json?
   recs           Recommendation[]
   posts          Post[]
   stats          ChannelStat[]
