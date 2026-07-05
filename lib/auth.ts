@@ -1,11 +1,26 @@
 import NextAuth, { type NextAuthConfig } from "next-auth";
+import type { Adapter } from "next-auth/adapters";
 import Nodemailer from "next-auth/providers/nodemailer";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
 import { env } from "./env";
 import { authConfig } from "./auth.config";
+import { pickAccountColumns } from "./authAccount";
 import { ensureDemoUser, DEMO_EMAIL } from "./demo";
+
+/**
+ * Wrap the Prisma adapter so `linkAccount` only writes columns our `Account`
+ * model has. See `pickAccountColumns` for why this is necessary (GitHub returns
+ * stray token fields that would otherwise make Prisma throw on unknown args).
+ */
+function scopedPrismaAdapter(): Adapter {
+  const base = PrismaAdapter(db);
+  return {
+    ...base,
+    linkAccount: (account) => base.linkAccount!(pickAccountColumns(account)),
+  };
+}
 
 /**
  * Full (Node runtime) auth. Extends the edge-safe base with the Prisma adapter,
@@ -44,7 +59,7 @@ if (env.NODE_ENV !== "production") {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
-  adapter: PrismaAdapter(db),
+  adapter: scopedPrismaAdapter(),
   providers,
 });
 
