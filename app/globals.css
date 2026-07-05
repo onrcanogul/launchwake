@@ -925,10 +925,40 @@ h1.pg {
 .li .tt {
   font-size: 12.5px;
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .li .st {
   font-size: 11.5px;
   color: var(--tx3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Long titles clip to one line so the row's right-side cluster stays put. */
+.li .lft > div {
+  min-width: 0;
+}
+/* Right-side cluster of a list row (status badges) never squashes. */
+.li .rgt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+/* Inline "auto-detected from GitHub" mark after a ship title. */
+.tt-auto {
+  display: inline-flex;
+  vertical-align: -1.5px;
+  margin-left: 7px;
+  color: var(--tx3);
+}
+.tt-auto svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+  stroke: none;
 }
 .tag-t {
   font-size: 10px;
@@ -992,6 +1022,18 @@ textarea.inp {
   fill: none;
   flex-shrink: 0;
   margin-top: 1px;
+}
+.note a {
+  color: var(--ac);
+}
+.note a:hover {
+  color: var(--ac2);
+}
+/* Note placed in the page flow (above a stat strip) instead of after a card:
+   full width, no top gap (the page header provides it), spacing below. */
+.note-flow {
+  margin: 0 0 18px;
+  max-width: none;
 }
 
 /* ============ CHANNEL CARD (hero) ============ */

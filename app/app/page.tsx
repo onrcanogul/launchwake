@@ -20,8 +20,6 @@ export default async function ShipFeedPage() {
 
   const { ships, stats } = await getShipFeed(ws.project.id);
 
-  const shell = (children: React.ReactNode) => <>{children}</>;
-
   const header = (
     <div className="phead">
       <div>
@@ -56,7 +54,7 @@ export default async function ShipFeedPage() {
       { title: "See what converted", hint: "Add the tracking pixel", done: false },
     ];
 
-    return shell(
+    return (
       <>
         {header}
         <EmptyState
@@ -79,19 +77,20 @@ export default async function ShipFeedPage() {
             <Checklist items={checklist} />
           </Panel>
         </div>
-      </>,
+      </>
     );
   }
 
   // ── Loaded state ───────────────────────────────────────
+  const livePosts = ships.reduce((n, s) => n + s.postCount, 0);
   const statItems: Stat[] = [
     {
       label: "Clicks tracked",
       value: stats.clicks.toLocaleString(),
       detail:
-        stats.shipsNeedingPlan > 0
-          ? `${stats.shipsNeedingPlan} ship${stats.shipsNeedingPlan === 1 ? "" : "s"} need a plan`
-          : "all ships planned",
+        livePosts > 0
+          ? `across ${livePosts} live post${livePosts === 1 ? "" : "s"}`
+          : "tracked links report here",
     },
     {
       label: "Signups driven",
@@ -128,52 +127,34 @@ export default async function ShipFeedPage() {
     stats.shipsNeedingPlan === 0 &&
     stats.shipsDistributed === stats.shipsTotal;
 
-  return shell(
+  return (
     <>
       {header}
       {caughtUp && (
-        <Note icon="plus">
+        <Note icon="check" className="note-flow">
           You&apos;re all caught up — every ship is distributed. Shipped something
           new?{" "}
-          <Link href="/app/ships/new" style={{ color: "var(--ac)" }}>
+          <Link href="/app/ships/new">
             Paste your changelog or create a ship
           </Link>{" "}
           to keep the momentum going.
         </Note>
       )}
       <StatStrip stats={statItems} />
-      <Panel title="Recent ships" right={`${ships.length} total`}>
+      <Panel
+        title="Recent ships"
+        right={`${ships.length} ship${ships.length === 1 ? "" : "s"}`}
+      >
         {ships.map((s) => (
-          <Link
-            key={s.id}
-            href={`/app/ships/${s.id}/plan`}
-            className="li"
-            style={{ color: "inherit" }}
-          >
+          <Link key={s.id} href={`/app/ships/${s.id}/plan`} className="li">
             <div className="lft">
               <ShipTypeTag type={s.type} />
               <div>
                 <div className="tt">
                   {s.title}
                   {s.autoDetected && (
-                    <span
-                      title="Auto-detected from GitHub"
-                      style={{
-                        display: "inline-flex",
-                        verticalAlign: "middle",
-                        marginLeft: 7,
-                        color: "var(--tx3)",
-                      }}
-                    >
-                      <Icon
-                        name="github"
-                        style={{
-                          width: 12,
-                          height: 12,
-                          fill: "currentColor",
-                          stroke: "none",
-                        }}
-                      />
+                    <span className="tt-auto" title="Auto-detected from GitHub">
+                      <Icon name="github" />
                     </span>
                   )}
                 </div>
@@ -185,7 +166,7 @@ export default async function ShipFeedPage() {
                 </div>
               </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="rgt">
               {ws.activeShip?.id === s.id && (
                 <span className="badge ac">active</span>
               )}
@@ -206,14 +187,24 @@ export default async function ShipFeedPage() {
       <Suspense fallback={<RadarFallback />}>
         <LaunchRadar project={ws.project} />
       </Suspense>
-    </>,
+    </>
   );
 }
 
 function RadarFallback() {
   return (
     <Panel title="Launch radar" right="your category">
-      <div style={{ padding: "16px", color: "var(--tx3)", fontSize: 12.5 }}>
+      <div
+        style={{
+          padding: "14px 16px",
+          color: "var(--tx3)",
+          fontSize: 12.5,
+          display: "flex",
+          alignItems: "center",
+          gap: 9,
+        }}
+      >
+        <span className="lw-spin" aria-hidden />
         Scanning Show HN and Reddit for launches in your space…
       </div>
     </Panel>
