@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { retryFailedDeliveries } from "@/lib/webhookDelivery";
-import { runAnalysisJob } from "@/lib/jobs";
+import { runWebhookShipJob } from "@/lib/jobs";
 import { captureError } from "@/lib/observability";
 
 /**
@@ -30,10 +30,11 @@ async function handle(req: NextRequest) {
 
   const summary = await retryFailedDeliveries();
 
-  // Analyze ships resurrected by a successful retry — best-effort, non-fatal.
+  // Analyze + notify for ships resurrected by a successful retry — same
+  // entitlement-aware job as the live webhook path. Best-effort, non-fatal.
   for (const shipId of summary.analyzedShipIds) {
     try {
-      await runAnalysisJob(shipId);
+      await runWebhookShipJob(shipId);
     } catch (err) {
       captureError(err, { at: "cron.retry-webhooks.analysis", shipId });
     }

@@ -18,13 +18,28 @@ export async function sendEmail(
   to: string,
   subject: string,
   text: string,
+  opts: {
+    /** Adds RFC 8058 one-click List-Unsubscribe headers (product emails). */
+    unsubscribeUrl?: string;
+  } = {},
 ): Promise<DeliveryResult> {
   if (!emailConfigured()) {
     return { ok: false, error: "Email is not configured (set EMAIL_SERVER)." };
   }
   try {
     const transport = nodemailer.createTransport(env.EMAIL_SERVER!);
-    await transport.sendMail({ from: env.EMAIL_FROM, to, subject, text });
+    await transport.sendMail({
+      from: env.EMAIL_FROM,
+      to,
+      subject,
+      text,
+      headers: opts.unsubscribeUrl
+        ? {
+            "List-Unsubscribe": `<${opts.unsubscribeUrl}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          }
+        : undefined,
+    });
     return { ok: true };
   } catch (err) {
     return { ok: false, error: `Email send failed: ${(err as Error).message}` };

@@ -3,6 +3,9 @@ import { db } from "./db";
 import { env } from "./env";
 import { reminderMessage } from "./reminders";
 import { sendEmail, sendSlack, emailConfigured } from "./notify";
+import { assertEntitlement, EntitlementError } from "./billing";
+import { unsubscribeUrl } from "./emailPrefs";
+import { buildPlanReadyEmail, buildPlanLimitEmail } from "./shipEmail";
 import {
   findIntentMatches,
   ingestMatches,
@@ -15,8 +18,74 @@ import {
  * boundary is here so they can be moved behind Inngest without touching callers.
  * Keep job functions idempotent.
  */
-export async function runAnalysisJob(shipId: string): Promise<void> {
-  await buildPlan(shipId);
+/**
+ * The release → return loop. After a GitHub webhook creates a Ship: build its
+ * DistributionPlan (respecting the Free 2-plans/month gate — the webhook path
+ * gets no free pass) and email "your distribution plan is ready" so the founder
+ * comes back to distribute what they shipped. At the limit, the ship is kept
+ * and the email says so instead — detected-but-silent releases churn people.
+ * Email is best-effort and gated by the user's email preference.
+ */
+export async function runWebhookShipJob(shipId: string): Promise<void> {
+  const ship = await db.ship.findUnique({
+    where: { id: shipId },
+    include: {
+      project: {
+        select: {
+          name: true,
+          userId: true,
+          user: { select: { id: true, email: true, emailNotifications: true } },
+        },
+      },
+    },
+  });
+  if (!ship) return;
+  const owner = ship.project.user;
+
+  let limited = false;
+  try {
+    await assertEntitlement(ship.project.userId, "create_plan");
+  } catch (err) {
+    if (err instanceof EntitlementError) limited = true;
+    else throw err;
+  }
+
+  if (!limited) await buildPlan(shipId);
+
+  if (!emailConfigured() || !owner.emailNotifications) return;
+
+  const unsub = unsubscribeUrl(env.APP_URL, owner.id);
+  let email;
+  if (limited) {
+    email = buildPlanLimitEmail({
+      projectName: ship.project.name,
+      shipTitle: ship.title,
+      appUrl: env.APP_URL,
+      unsubscribeUrl: unsub,
+    });
+  } else {
+    const recs = await db.recommendation.findMany({
+      where: { plan: { shipId } },
+      orderBy: [{ rank: "asc" }, { fitScore: "desc" }],
+      take: 3,
+      include: { channel: { select: { name: true } } },
+    });
+    email = buildPlanReadyEmail({
+      projectName: ship.project.name,
+      shipTitle: ship.title,
+      shipId,
+      appUrl: env.APP_URL,
+      channels: recs.map((r) => ({
+        name: r.channel.name,
+        fitScore: r.fitScore,
+        banRisk: r.banRisk,
+      })),
+      unsubscribeUrl: unsub,
+    });
+  }
+  // Best-effort: sendEmail reports failure in its result instead of throwing,
+  // so a mail hiccup can't fail the (already processed) delivery.
+  await sendEmail(owner.email, email.subject, email.text, { unsubscribeUrl: unsub });
 }
 
 export type ReminderRunSummary = {

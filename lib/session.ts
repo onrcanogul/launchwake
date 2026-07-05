@@ -8,7 +8,7 @@ import { resolveAccount, type AccountRole } from "./team";
 import type { Plan, Project, User } from "@prisma/client";
 
 export type Workspace = {
-  user: Pick<User, "id" | "name" | "email" | "plan">;
+  user: Pick<User, "id" | "name" | "email" | "plan" | "emailNotifications">;
   /**
    * The account whose data this user sees. For a Team member this is the owner's
    * id; for everyone else it's their own. ALL data queries scope to this.
@@ -68,7 +68,13 @@ export const getWorkspace = cache(async (): Promise<Workspace> => {
   const activeShip = ships.find((s) => s.id === activeShipId) ?? null;
 
   return {
-    user: { id: user.id, name: user.name, email: user.email, plan: user.plan },
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      plan: user.plan,
+      emailNotifications: user.emailNotifications,
+    },
     accountId,
     role,
     plan,

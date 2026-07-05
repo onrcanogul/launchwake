@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { TrackingSetup } from "@/components/settings/TrackingSetup";
+import { EmailPrefs } from "@/components/settings/EmailPrefs";
 import {
   TrackingHealthSection,
   TrackingHealthLoading,
@@ -118,6 +119,10 @@ export default async function SettingsPage({
 
       <Panel title="Comment plans on your releases" right="GitHub Action">
         <ReleaseAction hasSecret={Boolean(p.webhookSecret)} />
+      </Panel>
+
+      <Panel title="Emails">
+        <EmailPrefs initialEnabled={ws.user.emailNotifications} />
       </Panel>
 
       <Panel title="Attribution — signups & revenue">

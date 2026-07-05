@@ -15,6 +15,7 @@ import {
   type InviteResult,
 } from "@/lib/team";
 import { saveBrand, setReportEnabled } from "@/lib/clientReport";
+import { setEmailNotifications } from "@/lib/emailPrefs";
 import { normalizeHttpUrl } from "@/lib/url";
 
 // White-label brand input. logoUrl is https-only (normalized, then required to be
@@ -282,6 +283,18 @@ export async function saveStripeWebhookSecret(
     where: { id: project.id },
     data: { stripeWebhookSecret: trimmed || null },
   });
+  revalidatePath("/app/settings");
+  return { ok: true };
+}
+
+/** Toggle product-notification emails (weekly digest, plan-ready) for the signed-in user. */
+export async function setEmailPreference(
+  enabled: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  const ok = await setEmailNotifications(session.user.id, Boolean(enabled));
+  if (!ok) return { ok: false, error: "Couldn't save your preference." };
   revalidatePath("/app/settings");
   return { ok: true };
 }

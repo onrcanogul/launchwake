@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { verifyWebhookSignature } from "@/lib/github";
-import { runAnalysisJob } from "@/lib/jobs";
+import { runWebhookShipJob } from "@/lib/jobs";
 import { captureError } from "@/lib/observability";
 import { hashPayload, recordDelivery, processDelivery } from "@/lib/webhookDelivery";
 
@@ -72,12 +72,14 @@ export async function POST(req: NextRequest) {
 
   const outcome = await processDelivery(delivery);
 
-  // Analyze after the response — keeps the webhook well under GitHub's timeout.
+  // Analyze + notify after the response — keeps the webhook well under
+  // GitHub's timeout. The job respects plan entitlements and emails "your
+  // distribution plan is ready" (the release → return loop).
   if (outcome.created && outcome.shipId) {
     const shipId = outcome.shipId;
     after(async () => {
       try {
-        await runAnalysisJob(shipId);
+        await runWebhookShipJob(shipId);
       } catch (err) {
         captureError(err, { at: "github.webhook.analysis", shipId });
       }

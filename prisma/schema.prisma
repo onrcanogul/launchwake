@@ -37,6 +37,10 @@ model User {
   sentInvites      TeamInvite[]     @relation("TeamInvites")
   brand            Brand? // agency white-label branding (Team)
   lastDigestAt     DateTime? // last weekly digest sent (guards against re-sends)
+  // Product-notification emails (weekly digest, plan-ready). Default on; the
+  // one-click unsubscribe link and the Settings toggle turn it off. Never
+  // gates transactional auth email (magic links).
+  emailNotifications Boolean @default(true)
   createdAt        DateTime  @default(now())
 }
 

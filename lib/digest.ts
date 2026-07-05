@@ -3,6 +3,7 @@ import { env } from "./env";
 import { formatMoney } from "./attribution";
 import { getLaunchRadar, buildRadarDigest } from "./radar";
 import { sendEmail, emailConfigured } from "./notify";
+import { unsubscribeUrl, emailFooter } from "./emailPrefs";
 import { tasksDueThisWeek, type DueTask } from "./queue";
 import { pitchesToFollowUp, type FollowUpPitch } from "./pitch";
 
@@ -199,6 +200,8 @@ export function buildDigest(input: {
   appUrl: string;
   stats: WeeklyStats;
   radar?: { subject: string; text: string } | null;
+  /** One-click unsubscribe link for the footer (falls back to a Settings hint). */
+  unsubscribeUrl?: string;
 }): DigestEmail {
   const { stats } = input;
   const base = input.appUrl.replace(/\/$/, "");
@@ -262,7 +265,9 @@ export function buildDigest(input: {
     "",
     `Open LaunchWake → ${base}/app`,
     "",
-    "— LaunchWake · you post it, we tell you where. Manage emails in Settings.",
+    input.unsubscribeUrl
+      ? emailFooter(input.unsubscribeUrl)
+      : "— LaunchWake · you post it, we tell you where. Manage emails in Settings.",
   );
 
   return { subject, text: lines.join("\n") };
@@ -289,10 +294,11 @@ export async function runWeeklyDigest(now: Date = new Date()): Promise<DigestSum
   const guard = new Date(now.getTime() - 6 * 86_400_000);
 
   // Account owners = users who own a project (members share the owner's, and are
-  // excluded because they don't own one).
+  // excluded because they don't own one). Unsubscribed users are never selected.
   const owners = await db.user.findMany({
     where: {
       projects: { some: {} },
+      emailNotifications: true,
       OR: [{ lastDigestAt: null }, { lastDigestAt: { lt: guard } }],
     },
     include: { projects: { orderBy: { createdAt: "asc" }, take: 1 } },
@@ -313,8 +319,17 @@ export async function runWeeklyDigest(now: Date = new Date()): Promise<DigestSum
       const radar = await getLaunchRadar(project)
         .then((items) => buildRadarDigest(items, project.name))
         .catch(() => null);
-      const email = buildDigest({ projectName: project.name, appUrl: env.APP_URL, stats, radar });
-      const res = await sendEmail(owner.email, email.subject, email.text);
+      const unsub = unsubscribeUrl(env.APP_URL, owner.id);
+      const email = buildDigest({
+        projectName: project.name,
+        appUrl: env.APP_URL,
+        stats,
+        radar,
+        unsubscribeUrl: unsub,
+      });
+      const res = await sendEmail(owner.email, email.subject, email.text, {
+        unsubscribeUrl: unsub,
+      });
       if (res.ok) {
         await db.user.update({ where: { id: owner.id }, data: { lastDigestAt: now } });
         sent += 1;
