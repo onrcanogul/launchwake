@@ -1036,6 +1036,223 @@ textarea.inp {
   max-width: none;
 }
 
+/* ============ NEW SHIP ============ */
+/* Form card + a slim "what you'll get" rail on wide screens. */
+.newship {
+  display: grid;
+  grid-template-columns: minmax(0, 600px) 280px;
+  gap: 20px;
+  align-items: start;
+}
+.newship-aside {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 4px 17px 13px;
+}
+.newship-aside h2 {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 0 4px;
+}
+.gain {
+  display: flex;
+  gap: 11px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+.gain:first-of-type {
+  border-top: 0;
+}
+.gain .gico {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.gain .gico svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--tx2);
+  stroke-width: 1.6;
+  fill: none;
+}
+.gain b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.gain span {
+  font-size: 11.5px;
+  color: var(--tx3);
+  line-height: 1.45;
+}
+.newship-eta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--tx3);
+}
+.newship-eta svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  fill: none;
+  flex: none;
+}
+@media (max-width: 880px) {
+  .newship {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Segmented controls with a leading line icon. */
+.seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.seg button svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  fill: none;
+}
+/* Selected ship type picks up its (sanctioned) tag hue. */
+.seg button.on.ty-launch {
+  color: var(--ac);
+}
+.seg button.on.ty-feature {
+  color: var(--vi);
+}
+.seg button.on.ty-blog {
+  color: var(--warn);
+}
+
+/* Consistent 16px rhythm between form groups. */
+.fgrp {
+  margin-top: 16px;
+}
+.fl .opt {
+  color: var(--tx3);
+  font-weight: 400;
+}
+
+/* Connected-repo row (github mode). */
+.repo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg1);
+  padding: 8px 8px 8px 10px;
+}
+.repo-row .ico {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+}
+.repo-row .ico svg {
+  width: 14px;
+  height: 14px;
+}
+.repo-row .repo-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* No repo yet: same silhouette, pointing at the connect flow. */
+.repo-connect {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg1);
+  padding: 11px 12px;
+  font-size: 12px;
+  color: var(--tx2);
+}
+.repo-connect svg {
+  width: 15px;
+  height: 15px;
+  stroke: var(--tx3);
+  stroke-width: 1.6;
+  fill: none;
+  flex: none;
+}
+.repo-connect a {
+  color: var(--ac);
+  font-weight: 550;
+}
+.repo-connect a:hover {
+  color: var(--ac2);
+}
+
+/* Inline form feedback (pull result, submit errors). */
+.form-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--tx2);
+}
+.form-msg svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  fill: none;
+  flex: none;
+  margin-top: 1px;
+}
+.form-msg.ok {
+  color: var(--ac);
+}
+.form-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 9px 11px;
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--bad);
+  background: rgba(240, 97, 109, 0.08);
+  border: 1px solid rgba(240, 97, 109, 0.28);
+}
+.form-alert svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--bad);
+  stroke-width: 1.6;
+  fill: none;
+  flex: none;
+  margin-top: 1px;
+}
+
+/* Spinner inside a primary (teal) button needs dark strokes. */
+.btn-p .lw-spin {
+  border-color: rgba(4, 20, 15, 0.3);
+  border-top-color: #04140f;
+}
+
 /* ============ CHANNEL CARD (hero) ============ */
 .chan {
   border: 1px solid var(--line);
