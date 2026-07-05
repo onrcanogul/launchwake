@@ -95,6 +95,48 @@ describe("buildPublicPlan", () => {
     expect(plan.recs.length).toBeGreaterThan(0);
   });
 
+  it("ranks from GitHub topics even with no release (project-first)", () => {
+    // Deliberately vague name/description; the signal lives entirely in topics.
+    const plan = buildPublicPlan(catalog, {
+      project: {
+        name: "acme",
+        description: "an internal tool",
+        url: null,
+        githubRepo: "acme/acme",
+        topics: ["nodejs", "webhooks", "backend", "api"],
+        language: "TypeScript",
+      },
+      ship: null,
+    });
+    const rank = (slug: string) => plan.recs.findIndex((r) => r.slug === slug);
+    // Topics alone should surface the node/backend/api channel above generic B2B.
+    expect(rank("r-node")).toBeGreaterThanOrEqual(0);
+    expect(rank("r-node")).toBeLessThan(rank("r-saas"));
+  });
+
+  it("normalizes hyphenated topics so multi-word keywords match", () => {
+    // "machine learning" is a two-word keyword; a GitHub topic arrives hyphenated.
+    // The ml channel only wins the top slot if we normalize the hyphen away.
+    const mlCatalog: ChannelLike[] = [
+      { ...catalog[3] }, // linkedin: b2b/saas/founders — no ml signal
+      {
+        id: "5",
+        slug: "r-ml",
+        name: "r/MachineLearning",
+        platform: "REDDIT",
+        rules: "Research-grade only.",
+        defaultBanRisk: "MEDIUM",
+        bestTime: "Weekdays",
+        tags: ["ml", "ai", "data"],
+      },
+    ];
+    const plan = buildPublicPlan(mlCatalog, {
+      project: { name: "x", topics: ["machine-learning"], githubRepo: "x/x" },
+      ship: null,
+    });
+    expect(plan.recs[0].slug).toBe("r-ml");
+  });
+
   it("reports the total catalog size for the gated teaser", () => {
     const plan = buildPublicPlan(catalog, input);
     expect(plan.totalChannels).toBe(catalog.length);

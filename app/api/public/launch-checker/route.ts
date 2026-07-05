@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { parseRepo, getRepoMeta, suggestShip } from "@/lib/github";
+import { parseRepo, getRepoMeta, getLatestRelease } from "@/lib/github";
 import { buildPublicPlan, type PublicPlanInput } from "@/lib/launchChecker";
 import { rateLimitDurable, clientIp } from "@/lib/ratelimit";
 
@@ -9,9 +9,10 @@ import { rateLimitDurable, clientIp } from "@/lib/ratelimit";
  * Public, login-less Launch Checker.
  *
  * POST { repo } — repo is "owner/repo" or a GitHub URL. Fetches public repo
- * metadata + latest release/commit, ranks the seeded catalog with the heuristic
- * (no LLM → free + instant), and returns a grounded mini distribution plan.
- * IP rate-limited as a cheap abuse guard.
+ * metadata (incl. topics/language) and the latest RELEASE — never a raw commit,
+ * since there's no human in the loop here to correct a noisy commit message.
+ * Ranks the seeded catalog with the heuristic (no LLM → free + instant) and
+ * returns a grounded mini distribution plan. IP rate-limited as an abuse guard.
  */
 
 const BodySchema = z.object({ repo: z.string().min(1).max(200) });
@@ -63,7 +64,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const ship = await suggestShip(ref).catch(() => null);
+  // Release only — an intentional, human-curated ship. No commit fallback: the
+  // plan is project-first, and a release (when present) merely refines it.
+  const ship = await getLatestRelease(ref).catch(() => null);
 
   const catalog = await db.channel.findMany();
   const input: PublicPlanInput = {
@@ -72,6 +75,8 @@ export async function POST(req: Request) {
       description: meta.description,
       url: meta.homepage,
       githubRepo: meta.fullName,
+      topics: meta.topics,
+      language: meta.language,
     },
     ship: ship ? { type: ship.type, title: ship.title, summary: ship.summary } : null,
   };

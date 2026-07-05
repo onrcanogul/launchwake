@@ -1,9 +1,12 @@
 /**
  * Launch Checker — the public, login-less lead magnet.
  *
- * Given a repo's public metadata (name/description) and, optionally, its latest
- * release/commit as a "ship", produce a grounded mini distribution plan from the
- * SAME seeded catalog the real product uses. No LLM call (cost = 0, instant), so
+ * Given a repo's public metadata (name/description/topics/language) and,
+ * optionally, its latest RELEASE as a "ship", produce a grounded mini distribution
+ * plan from the SAME seeded catalog the real product uses. Raw commits are never
+ * used here: on the public tool there is no human in the loop to correct a noisy
+ * `chore:`/`wip` message, so we rank the PROJECT and only let a real release (an
+ * intentional ship) refine it. No LLM call (cost = 0, instant), so
  * this can run on an unauthenticated, rate-limited endpoint. The full experience
  * (Claude ranking, drafts, attribution) lives behind signup.
  *
@@ -43,8 +46,12 @@ export type PublicPlanInput = {
     description?: string | null;
     url?: string | null;
     githubRepo?: string | null;
+    /** GitHub topics — the owner's own tags; the strongest structured fit signal. */
+    topics?: string[];
+    /** Primary language — a light additional fit signal. */
+    language?: string | null;
   };
-  /** Latest release/commit turned into a ship; null when the repo has neither. */
+  /** Latest RELEASE turned into a ship; null → project-level plan (no raw commits). */
   ship?: PublicShip | null;
 };
 
@@ -72,10 +79,16 @@ export function buildPublicPlan(
     summary: input.project.description ?? null,
   };
 
+  // GitHub topics are hyphenated ("machine-learning"); normalize to spaces so
+  // they match the catalog's keyword→tag map ("machine learning").
+  const topicsText = (input.project.topics ?? [])
+    .map((t) => t.replace(/-/g, " "))
+    .join(" ");
+
   const scored = matchChannels(
     catalog,
     {
-      projectText: `${input.project.name} ${input.project.description ?? ""} ${input.project.url ?? ""}`,
+      projectText: `${input.project.name} ${input.project.description ?? ""} ${topicsText} ${input.project.language ?? ""} ${input.project.url ?? ""}`,
       shipText: `${ship.title} ${ship.summary ?? ""}`,
       shipType: ship.type,
     },
