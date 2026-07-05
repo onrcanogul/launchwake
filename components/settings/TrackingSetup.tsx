@@ -80,9 +80,9 @@ export function TrackingSetup({
 })();
 </script>`;
 
-  const signupPrompt = `Add LaunchWake signup attribution to my web app.
+  const signupPrompt = `Add LaunchWake signup attribution to my web app. First detect the framework this repo uses (Next.js, Nuxt, SvelteKit, Rails, plain HTML, etc.) and fit the integration to how it already injects site-wide scripts and renders pages — don't assume my stack. The one exception: the browser snippet below stays JS, since it runs in the page.
 
-1. Site-wide (in the root layout / <head> so it runs on every page): read the \`lw_ref\` query parameter from the URL and, if present, save it to localStorage under the key \`lw_ref\`. Then define a global function \`window.launchwakeSignup()\` that reads \`lw_ref\` from localStorage and, if present, sends a POST beacon to \`${base}/api/track/signup\` with the JSON body \`{ "ref": <the stored lw_ref> }\` using \`navigator.sendBeacon\`. Wrap the localStorage calls in try/catch so private-mode browsers don't throw.
+1. Site-wide (wherever my framework runs a script on every page — e.g. the root layout or <head>): read the \`lw_ref\` query parameter from the URL and, if present, save it to localStorage under the key \`lw_ref\`. Then define a global function \`window.launchwakeSignup()\` that reads \`lw_ref\` from localStorage and, if present, sends a POST beacon to \`${base}/api/track/signup\` with the JSON body \`{ "ref": <the stored lw_ref> }\` using \`navigator.sendBeacon\`. Wrap the localStorage calls in try/catch so private-mode browsers don't throw.
 2. On my signup-success page, call \`launchwakeSignup()\` once the signup has succeeded.
 
 Clicks are tracked automatically; a signup only counts once launchwakeSignup() runs. This credits each signup to the channel that drove the click.`;
@@ -100,7 +100,7 @@ await fetch('${base}/api/track/revenue', {
   })
 });`;
 
-  const revenuePrompt = `Add server-side revenue attribution to LaunchWake.
+  const revenuePrompt = `Add server-side revenue attribution to LaunchWake. Implement this in whatever language and framework my backend already uses — detect the stack from the codebase; the example is illustrative, only the HTTP request shape below is fixed.
 
 After a successful payment on my backend, send a POST to \`${base}/api/track/revenue\` with a JSON body:
 - \`ref\`: the \`lw_ref\` value captured and stored for this user at signup,
@@ -117,7 +117,7 @@ stripe.checkout.sessions.create({
   metadata: { lw_ref: lwRef }   // the value you captured at signup
 });`;
 
-  const stripePrompt = `Wire up LaunchWake's turnkey Stripe revenue tracking.
+  const stripePrompt = `Wire up LaunchWake's turnkey Stripe revenue tracking. Use my project's existing Stripe SDK and language — detect them from the codebase rather than assuming Node/JS.
 
 1. Wherever I create a Stripe Checkout Session, add \`metadata: { lw_ref: <the lw_ref captured at signup> }\` so LaunchWake knows which channel to credit.
 2. In Stripe → Developers → Webhooks, add the endpoint \`${stripeUrl}\` and subscribe it to the events \`checkout.session.completed\` and \`invoice.paid\`.
