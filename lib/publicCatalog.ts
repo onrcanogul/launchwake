@@ -10,6 +10,7 @@
 
 import { db } from "./db";
 import type { BanRisk, Channel, Platform } from "@prisma/client";
+import type { AccountRequirements } from "./accountReadiness";
 
 export type BanRiskLevel = "LOW" | "MEDIUM" | "HIGH";
 
@@ -252,6 +253,190 @@ export function seoQuestion(channel: PublicChannelLike): string {
   return `Can I post my startup on ${channel.name}?`;
 }
 
+// ── FAQ (FAQPage schema + on-page section) ─────────────────
+
+export type FaqItem = { question: string; answer: string };
+
+/**
+ * Deterministic FAQ for a channel page, composed entirely from seeded catalog
+ * data (risk explainer, checklist, best time, account requirements) — the same
+ * grounding rule as the rest of the public surface: never an LLM guess.
+ * Analysis content, so it stays in English like the risk factors/checklist.
+ */
+export function channelFaq(
+  channel: PublicChannelLike,
+  requirements: AccountRequirements | null = null,
+): FaqItem[] {
+  const risk = explainBanRisk(channel);
+  const checklist = postingChecklist(channel);
+  const items: FaqItem[] = [];
+
+  items.push({
+    question: seoQuestion(channel),
+    answer: `${risk.headline}. ${risk.summary}`,
+  });
+
+  items.push({
+    question: `What gets posts removed on ${channel.name}?`,
+    answer: `${risk.factors.join(" ")} In short: ${checklist.donts[0] ?? "don't post an undisclosed promotion."}`,
+  });
+
+  if (channel.bestTime) {
+    items.push({
+      question: `When is the best time to post on ${channel.name}?`,
+      answer: `${channel.bestTime}. Timing helps, but fit and format matter more — a rule-breaking post fails at any hour.`,
+    });
+  }
+
+  const accountQuestion = `Do I need an established account to post on ${channel.name}?`;
+  if (requirements) {
+    const needs: string[] = [];
+    if (requirements.minAccountAgeDays)
+      needs.push(`an account at least ${requirements.minAccountAgeDays} days old`);
+    if (requirements.minKarmaOrReputation)
+      needs.push(
+        `${requirements.minKarmaOrReputation.value}+ ${requirements.minKarmaOrReputation.unit}`,
+      );
+    const gate =
+      requirements.level === "required"
+        ? `Yes — ${channel.name} gates posting on`
+        : `There's no hard rule, but ${channel.name} works best with`;
+    const tip = requirements.profileTips?.[0]
+      ? ` Tip: ${requirements.profileTips[0]}`
+      : "";
+    items.push({
+      question: accountQuestion,
+      answer: needs.length > 0
+        ? `${gate} ${needs.join(" and ")}. (Source: ${requirements.sourceNote})${tip}`
+        : `${gate} a warmed-up, credible profile. (Source: ${requirements.sourceNote})${tip}`,
+    });
+  } else {
+    items.push({
+      question: accountQuestion,
+      answer:
+        channel.defaultBanRisk === "LOW"
+          ? "No formal requirement. A complete profile still helps — people click through to see who's behind the post."
+          : "There's no hard gate, but a fresh, empty account posting a launch is the classic removal trigger here. Comment and contribute for a week or two first.",
+    });
+  }
+
+  return items;
+}
+
+// ── Related channels (internal linking) ────────────────────
+
+/**
+ * Channels most similar to `channel`, scored by shared tags (weight 2) and
+ * same platform (weight 1). Powers the "related channels" block that stitches
+ * the 100+ SEO pages together for crawlers and readers alike.
+ */
+export function relatedChannels(
+  channel: PublicChannelLike,
+  all: PublicChannelLike[],
+  limit = 4,
+): PublicChannelLike[] {
+  const tags = new Set(channel.tags);
+  return all
+    .filter((c) => c.slug !== channel.slug)
+    .map((c) => ({
+      c,
+      score:
+        c.tags.filter((t) => tags.has(t)).length * 2 +
+        (c.platform === channel.platform ? 1 : 0),
+    }))
+    .filter((x) => x.score > 0)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        RISK_ORDER[a.c.defaultBanRisk] - RISK_ORDER[b.c.defaultBanRisk] ||
+        a.c.name.localeCompare(b.c.name),
+    )
+    .slice(0, limit)
+    .map((x) => x.c);
+}
+
+// ── Tag hubs (/channels/for/[tag]) ─────────────────────────
+
+/**
+ * Curated hub pages — one per high-intent launch category. Each maps to a real
+ * seeded tag and a query founders actually search ("best places to launch a
+ * devtool"). Kept curated (not auto-generated from every tag) so every hub has
+ * enough channels and a real search audience; copy lives in messages/*.json
+ * under `ForTag.hubs.<tag>`.
+ */
+export const TAG_HUBS = [
+  "devtools",
+  "saas",
+  "ai",
+  "opensource",
+  "webdev",
+  "indie",
+  "startup",
+  "directory",
+  "newsletter",
+  "security",
+] as const;
+
+export type TagHub = (typeof TAG_HUBS)[number];
+
+export function isTagHub(value: string): value is TagHub {
+  return (TAG_HUBS as readonly string[]).includes(value);
+}
+
+// ── Comparisons (/channels/compare/[pair]) ─────────────────
+
+/**
+ * Curated head-to-head pairs — channels founders genuinely weigh against each
+ * other. Curated so every page answers a real query; slugs must exist in the
+ * seeded catalog (the test asserts this).
+ */
+export const COMPARISON_PAIRS: readonly { a: string; b: string }[] = [
+  { a: "hn-show", b: "product-hunt" },
+  { a: "r-saas", b: "r-startups" },
+  { a: "r-sideproject", b: "indie-hackers" },
+  { a: "dev-to", b: "hashnode" },
+  { a: "hn-show", b: "lobsters" },
+  { a: "product-hunt", b: "betalist" },
+  { a: "r-webdev", b: "r-programming" },
+  { a: "x", b: "linkedin" },
+] as const;
+
+export function comparisonSlug(pair: { a: string; b: string }): string {
+  return `${pair.a}-vs-${pair.b}`;
+}
+
+/** Resolve a URL slug back to its curated pair, or null (404). */
+export function parseComparisonSlug(
+  slug: string,
+): { a: string; b: string } | null {
+  return COMPARISON_PAIRS.find((p) => comparisonSlug(p) === slug) ?? null;
+}
+
+/**
+ * Deterministic one-paragraph verdict for a comparison page, grounded in the
+ * two channels' seeded risk levels and audiences. English analysis content.
+ */
+export function comparisonVerdict(
+  a: PublicChannelLike,
+  b: PublicChannelLike,
+): string {
+  const label: Record<BanRiskLevel, string> = {
+    LOW: "low",
+    MEDIUM: "medium",
+    HIGH: "high",
+  };
+  if (RISK_ORDER[a.defaultBanRisk] !== RISK_ORDER[b.defaultBanRisk]) {
+    const [safer, riskier] =
+      RISK_ORDER[a.defaultBanRisk] < RISK_ORDER[b.defaultBanRisk]
+        ? [a, b]
+        : [b, a];
+    return `${safer.name} is the safer start (${label[safer.defaultBanRisk]} vs ${label[riskier.defaultBanRisk]} ban risk) — a first launch is unlikely to get pulled if you follow the format. ${riskier.name} can pay off too, but only when your post fits its rules exactly; read them before you press publish.`;
+  }
+  const aAud = a.audienceDesc ?? "its own community";
+  const bAud = b.audienceDesc ?? "its own community";
+  return `Both carry ${label[a.defaultBanRisk]} ban risk, so choose by audience: ${a.name} reaches ${aAud}, while ${b.name} reaches ${bAud}. If your product speaks to both, post to each — with a native angle per channel, never the same text twice.`;
+}
+
 // ── DB fetchers ────────────────────────────────────────────
 
 export type PublicChannelRow = {
@@ -291,4 +476,53 @@ export async function listPublicChannelSlugs(): Promise<string[]> {
 /** A single channel by slug, or null. */
 export async function getPublicChannel(slug: string): Promise<Channel | null> {
   return db.channel.findUnique({ where: { slug } });
+}
+
+/** Map a DB row to the pure-helper shape. */
+export function toPublicChannelLike(c: Channel): PublicChannelLike {
+  return {
+    slug: c.slug,
+    name: c.name,
+    platform: c.platform,
+    url: c.url,
+    audienceDesc: c.audienceDesc,
+    rules: c.rules,
+    defaultBanRisk: c.defaultBanRisk as BanRiskLevel,
+    bestTime: c.bestTime,
+    tags: c.tags,
+  };
+}
+
+/** Full catalog in pure-helper shape — for related-channel scoring. */
+export async function listPublicChannelLikes(): Promise<PublicChannelLike[]> {
+  const rows = await db.channel.findMany();
+  return rows.map(toPublicChannelLike);
+}
+
+/** Channels carrying a tag, safest-first then by name — for hub pages. */
+export async function listChannelsByTag(
+  tag: string,
+): Promise<PublicChannelLike[]> {
+  const rows = await db.channel.findMany({ where: { tags: { has: tag } } });
+  return rows
+    .map(toPublicChannelLike)
+    .sort(
+      (a, b) =>
+        RISK_ORDER[a.defaultBanRisk] - RISK_ORDER[b.defaultBanRisk] ||
+        a.name.localeCompare(b.name),
+    );
+}
+
+/** Both channels of a curated comparison, or null if either is missing. */
+export async function getComparisonChannels(
+  slug: string,
+): Promise<{ a: Channel; b: Channel } | null> {
+  const pair = parseComparisonSlug(slug);
+  if (!pair) return null;
+  const [a, b] = await Promise.all([
+    db.channel.findUnique({ where: { slug: pair.a } }),
+    db.channel.findUnique({ where: { slug: pair.b } }),
+  ]);
+  if (!a || !b) return null;
+  return { a, b };
 }

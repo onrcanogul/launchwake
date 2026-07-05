@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { listPublicChannels } from "@/lib/publicCatalog";
+import { listPublicChannels, TAG_HUBS } from "@/lib/publicCatalog";
 import { Link } from "@/i18n/navigation";
 import { alternatesFor, type Locale } from "@/i18n/paths";
 import { PublicShell } from "@/components/public/PublicShell";
@@ -30,6 +30,7 @@ export default async function PublicChannelsPage(props: {
   setRequestLocale(locale);
   const t = await getTranslations("Channels");
   const tr = await getTranslations("Risk");
+  const tf = await getTranslations("ForTag");
   const channels = await listPublicChannels();
 
   return (
@@ -40,6 +41,21 @@ export default async function PublicChannelsPage(props: {
       </div>
       <h1 className="pub-h1">{t("title")}</h1>
       <p className="pub-lede">{t("lede")}</p>
+
+      {/* Curated launch guides — internal links so the hub pages are never
+          orphaned and crawlers discover them from the catalog root. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "0 0 22px" }}>
+        {TAG_HUBS.map((tag) => (
+          <Link
+            key={tag}
+            href={`/channels/for/${tag}`}
+            className="btn btn-s"
+            style={{ fontSize: 12.5 }}
+          >
+            {tf(`hubs.${tag}.title`)}
+          </Link>
+        ))}
+      </div>
 
       <div className="ch-grid">
         {channels.map((c) => (

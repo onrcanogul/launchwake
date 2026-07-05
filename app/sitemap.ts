@@ -1,6 +1,11 @@
 import type { MetadataRoute } from "next";
 import { env } from "@/lib/env";
-import { listPublicChannelSlugs } from "@/lib/publicCatalog";
+import {
+  listPublicChannelSlugs,
+  TAG_HUBS,
+  COMPARISON_PAIRS,
+  comparisonSlug,
+} from "@/lib/publicCatalog";
 import { routing } from "@/i18n/routing";
 import { localizedPath } from "@/i18n/paths";
 
@@ -65,5 +70,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entriesFor(`/channels/${slug}`, 0.7, "monthly"),
   );
 
-  return [...staticEntries, ...channelEntries];
+  // Curated hub + comparison pages — the "best places to launch X" and
+  // "A vs B" long-tail. Constant lists, so no DB round-trip needed.
+  const hubEntries = TAG_HUBS.flatMap((tag) =>
+    entriesFor(`/channels/for/${tag}`, 0.8, "weekly"),
+  );
+  const compareEntries = COMPARISON_PAIRS.flatMap((pair) =>
+    entriesFor(`/channels/compare/${comparisonSlug(pair)}`, 0.7, "monthly"),
+  );
+
+  return [...staticEntries, ...channelEntries, ...hubEntries, ...compareEntries];
 }

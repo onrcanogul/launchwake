@@ -226,7 +226,18 @@
     "dont": "Don't",
     "gateTitle": "Is {name} even the right channel for your launch?",
     "gateBody": "Paste your GitHub repo into the free Launch Checker and get a ranked plan — which channels fit your product, their ban risk, and how to post in each. No account needed.",
-    "visit": "Visit {name}"
+    "visit": "Visit {name}",
+    "accountHeading": "Account requirements",
+    "accountLevel": "Level",
+    "accountLevelRequired": "Required to post",
+    "accountLevelRecommended": "Recommended",
+    "accountMinAge": "Account age",
+    "accountMinAgeValue": "{days}+ days",
+    "accountKarma": "Reputation",
+    "accountSource": "Source",
+    "faqHeading": "Frequently asked",
+    "relatedHeading": "Related channels",
+    "appearsIn": "Appears in:"
   },
   "LaunchCheckerPage": {
     "metaTitle": "Launch Checker — where should you post your GitHub project? | LaunchWake",
@@ -318,5 +329,74 @@
     "noProviders": "No OAuth providers are configured. Set AUTH_GITHUB_ID / EMAIL_SERVER in your env to enable sign-in.",
     "demo": "demo",
     "continueDemo": "Continue as demo (Hookline)"
+  },
+  "ForTag": {
+    "metaTitleSuffix": "Ranked by ban risk | LaunchWake",
+    "metaDescription": "{title} — {count} curated communities ranked safest-first, each with its real rules, ban risk and best time to post.",
+    "notFound": "Guide not found — LaunchWake",
+    "eyebrow": "Launch guide",
+    "breadcrumb": "Channels",
+    "countLabel": "{count} channels, safest first",
+    "gateTitle": "Which of these actually fit YOUR product?",
+    "gateBody": "Paste your GitHub repo into the free Launch Checker and get a ranked plan — which of these channels fit your product, their ban risk, and how to post in each. No account needed.",
+    "hubs": {
+      "devtools": {
+        "title": "Best places to launch a developer tool",
+        "lede": "The communities, directories and newsletters where devtools actually find users — ranked safest-first, with each one's rules and ban risk."
+      },
+      "saas": {
+        "title": "Best communities to launch a SaaS",
+        "lede": "Where SaaS founders share launches without getting banned — each channel with its self-promo rules, ban risk and best posting time."
+      },
+      "ai": {
+        "title": "Where to launch an AI product",
+        "lede": "AI launches are everywhere, so moderation is strict. These are the communities that still welcome them — and the rules that keep your post up."
+      },
+      "opensource": {
+        "title": "Where to share an open-source project",
+        "lede": "The places that celebrate open-source launches — and the disclosure norms each expects from maintainers sharing their own work."
+      },
+      "webdev": {
+        "title": "Where to launch a web-dev tool or library",
+        "lede": "Frontend and web-dev communities ranked by fit for launches — with the self-promo rules that decide whether your post survives."
+      },
+      "indie": {
+        "title": "Best communities for indie hackers to launch",
+        "lede": "Where solo founders and indie hackers share what they built — transparent, numbers-friendly communities and their posting norms."
+      },
+      "startup": {
+        "title": "Best places to announce your startup",
+        "lede": "From Show HN to startup directories: where to announce a new startup, ranked safest-first with each channel's rules and ban risk."
+      },
+      "directory": {
+        "title": "Startup directories worth submitting to",
+        "lede": "Evergreen directories that send steady referral traffic and backlinks — with each one's submission rules and review process."
+      },
+      "newsletter": {
+        "title": "Developer newsletters that feature new tools",
+        "lede": "Editor-curated newsletters that feature new developer tools — how each one takes submissions and what makes the cut."
+      },
+      "security": {
+        "title": "Where to launch a security product",
+        "lede": "Security communities are allergic to marketing. These are the venues that accept vendor posts — and the strict rules each enforces."
+      }
+    }
+  },
+  "Compare": {
+    "metaTitle": "{a} vs {b} — where should you launch? | LaunchWake",
+    "metaDescription": "{a} or {b}? Ban risk, rules, audience and best posting time compared — and which one to start with.",
+    "notFound": "Comparison not found — LaunchWake",
+    "eyebrow": "Head to head",
+    "breadcrumb": "Channels",
+    "title": "{a} vs {b}",
+    "lede": "Which is the better place to launch your product — and what does it take to post safely in each?",
+    "verdictHeading": "The short answer",
+    "factBanRisk": "Ban risk",
+    "factBestTime": "Best time to post",
+    "factAudience": "Audience",
+    "rulesHeading": "The rules, side by side",
+    "readMore": "Full guide: {name} →",
+    "gateTitle": "Or skip the guesswork entirely.",
+    "gateBody": "Paste your GitHub repo into the free Launch Checker and get a ranked plan across 100+ channels — fit, ban risk, and how to post in each. No account needed."
   }
 }

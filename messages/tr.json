@@ -226,7 +226,18 @@
     "dont": "Yapma",
     "gateTitle": "{name} lansmanın için gerçekten doğru kanal mı?",
     "gateBody": "GitHub deponu ücretsiz Launch Checker'a yapıştır ve sıralı bir plan al — hangi kanallar ürününe uygun, ban riskleri ne ve her birinde nasıl paylaşacağın. Hesap gerekmez.",
-    "visit": "{name} adresine git"
+    "visit": "{name} adresine git",
+    "accountHeading": "Hesap gereksinimleri",
+    "accountLevel": "Düzey",
+    "accountLevelRequired": "Paylaşım için zorunlu",
+    "accountLevelRecommended": "Tavsiye edilen",
+    "accountMinAge": "Hesap yaşı",
+    "accountMinAgeValue": "{days}+ gün",
+    "accountKarma": "İtibar",
+    "accountSource": "Kaynak",
+    "faqHeading": "Sık sorulanlar",
+    "relatedHeading": "İlgili kanallar",
+    "appearsIn": "Şu rehberlerde:"
   },
   "LaunchCheckerPage": {
     "metaTitle": "Launch Checker — GitHub projeni nereye paylaşmalısın? | LaunchWake",
@@ -318,5 +329,74 @@
     "noProviders": "Yapılandırılmış OAuth sağlayıcısı yok. Girişi etkinleştirmek için env'inde AUTH_GITHUB_ID / EMAIL_SERVER değerlerini ayarla.",
     "demo": "demo",
     "continueDemo": "Demo olarak devam et (Hookline)"
+  },
+  "ForTag": {
+    "metaTitleSuffix": "Ban riskine göre sıralı | LaunchWake",
+    "metaDescription": "{title} — güvenliden riskliye sıralı {count} seçilmiş topluluk; her biri gerçek kuralları, ban riski ve en iyi paylaşım zamanıyla.",
+    "notFound": "Rehber bulunamadı — LaunchWake",
+    "eyebrow": "Lansman rehberi",
+    "breadcrumb": "Kanallar",
+    "countLabel": "{count} kanal, en güvenlisi önce",
+    "gateTitle": "Bunlardan hangileri gerçekten SENİN ürününe uygun?",
+    "gateBody": "GitHub deponu ücretsiz Launch Checker'a yapıştır ve sıralı bir plan al — bu kanallardan hangileri ürününe uygun, ban riskleri ne ve her birinde nasıl paylaşacağın. Hesap gerekmez.",
+    "hubs": {
+      "devtools": {
+        "title": "Bir geliştirici aracını lanse etmek için en iyi yerler",
+        "lede": "Devtool'ların gerçekten kullanıcı bulduğu topluluklar, dizinler ve bültenler — en güvenlisi önce, her birinin kuralları ve ban riskiyle."
+      },
+      "saas": {
+        "title": "Bir SaaS lansmanı için en iyi topluluklar",
+        "lede": "SaaS kurucularının ban yemeden lansman paylaştığı yerler — her kanal self-promo kuralları, ban riski ve en iyi paylaşım zamanıyla."
+      },
+      "ai": {
+        "title": "Bir AI ürünü nerede lanse edilir",
+        "lede": "AI lansmanı her yerde, bu yüzden moderasyon sert. Bunlar hâlâ AI ürünlerini hoş karşılayan topluluklar — ve postunu yayında tutan kurallar."
+      },
+      "opensource": {
+        "title": "Açık kaynak projeni nerede paylaşmalısın",
+        "lede": "Açık kaynak lansmanlarını kutlayan yerler — ve her birinin kendi işini paylaşan maintainer'lardan beklediği şeffaflık normları."
+      },
+      "webdev": {
+        "title": "Bir web geliştirme aracı ya da kütüphanesi nerede lanse edilir",
+        "lede": "Lansmanlar için uygunluğa göre sıralı frontend ve web-dev toplulukları — postunun hayatta kalıp kalmayacağını belirleyen kurallarla."
+      },
+      "indie": {
+        "title": "Indie hacker'ların lansman yaptığı en iyi topluluklar",
+        "lede": "Solo kurucuların yaptıklarını paylaştığı yerler — şeffaf, rakam-dostu topluluklar ve paylaşım normları."
+      },
+      "startup": {
+        "title": "Startup'ını duyurmak için en iyi yerler",
+        "lede": "Show HN'den startup dizinlerine: yeni bir startup nerede duyurulur — en güvenlisi önce, her kanalın kuralları ve ban riskiyle."
+      },
+      "directory": {
+        "title": "Başvurmaya değer startup dizinleri",
+        "lede": "Düzenli referans trafiği ve backlink getiren kalıcı dizinler — her birinin başvuru kuralları ve inceleme süreciyle."
+      },
+      "newsletter": {
+        "title": "Yeni araçlara yer veren geliştirici bültenleri",
+        "lede": "Yeni geliştirici araçlarına yer veren editör seçkili bültenler — her biri başvuruyu nasıl alıyor ve neler seçiliyor."
+      },
+      "security": {
+        "title": "Bir güvenlik ürünü nerede lanse edilir",
+        "lede": "Güvenlik toplulukları pazarlamaya alerjiktir. Bunlar vendor paylaşımı kabul eden mecralar — ve her birinin uyguladığı katı kurallar."
+      }
+    }
+  },
+  "Compare": {
+    "metaTitle": "{a} vs {b} — lansmanı nerede yapmalısın? | LaunchWake",
+    "metaDescription": "{a} mı {b} mi? Ban riski, kurallar, kitle ve en iyi paylaşım zamanı karşılaştırıldı — ve hangisiyle başlamalısın.",
+    "notFound": "Karşılaştırma bulunamadı — LaunchWake",
+    "eyebrow": "Karşı karşıya",
+    "breadcrumb": "Kanallar",
+    "title": "{a} vs {b}",
+    "lede": "Ürününü lanse etmek için hangisi daha iyi — ve her birinde güvenle paylaşmak ne gerektiriyor?",
+    "verdictHeading": "Kısa cevap",
+    "factBanRisk": "Ban riski",
+    "factBestTime": "En iyi paylaşım zamanı",
+    "factAudience": "Kitle",
+    "rulesHeading": "Kurallar, yan yana",
+    "readMore": "Tam rehber: {name} →",
+    "gateTitle": "Ya da tahmin işini tamamen atla.",
+    "gateBody": "GitHub deponu ücretsiz Launch Checker'a yapıştır ve 100+ kanalda sıralı bir plan al — uygunluk, ban riski ve her birinde nasıl paylaşacağın. Hesap gerekmez."
   }
 }

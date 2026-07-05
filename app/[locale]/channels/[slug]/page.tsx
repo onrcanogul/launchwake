@@ -4,11 +4,19 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import {
   getPublicChannel,
   listPublicChannelSlugs,
+  listPublicChannelLikes,
   explainBanRisk,
   postingChecklist,
+  channelFaq,
+  relatedChannels,
+  isTagHub,
 } from "@/lib/publicCatalog";
+import { parseAccountRequirements } from "@/lib/accountReadiness";
+import { faqPageJsonLd, breadcrumbJsonLd } from "@/lib/seoSchema";
+import { JsonLd } from "@/components/public/JsonLd";
+import { env } from "@/lib/env";
 import { Link } from "@/i18n/navigation";
-import { alternatesFor, type Locale } from "@/i18n/paths";
+import { alternatesFor, localizedPath, type Locale } from "@/i18n/paths";
 import { PublicShell } from "@/components/public/PublicShell";
 import { Icon } from "@/components/Icon";
 import { platformIcon } from "@/components/ui/platform";
@@ -60,16 +68,33 @@ export default async function ChannelPage(props: {
     tags: channel.tags,
   };
 
-  // Note: the risk summary/factors and posting checklist are generated from the
-  // seeded catalog rules (analysis content, not UI chrome) and stay in English.
+  // Note: the risk summary/factors, posting checklist and FAQ are generated
+  // from the seeded catalog rules (analysis content, not UI chrome) and stay
+  // in English.
   const risk = explainBanRisk(like);
   const checklist = postingChecklist(like);
   const riskValue = channel.defaultBanRisk as BanRiskValue;
   const riskMeta = RISK[riskValue];
   const riskLabel = tr(riskValue);
 
+  const requirements = parseAccountRequirements(channel.accountRequirements);
+  const faq = channelFaq(like, requirements);
+  const related = relatedChannels(like, await listPublicChannelLikes());
+  const hubs = channel.tags.filter(isTagHub);
+  const tf = await getTranslations("ForTag");
+
+  const base = env.APP_URL.replace(/\/$/, "");
+  const abs = (cleanPath: string) => `${base}${localizedPath(cleanPath, locale)}`;
+
   return (
     <PublicShell locale={locale}>
+      <JsonLd data={faqPageJsonLd(faq)} />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: t("breadcrumb"), url: abs("/channels") },
+          { name: channel.name, url: abs(`/channels/${channel.slug}`) },
+        ])}
+      />
       <div style={{ marginBottom: 18, fontSize: 12, color: "var(--tx3)" }}>
         <Link href="/channels" style={{ color: "var(--tx2)" }}>
           {t("breadcrumb")}
@@ -150,6 +175,110 @@ export default async function ChannelPage(props: {
           </div>
         </div>
       </section>
+
+      {requirements && (
+        <section className="cd-sec">
+          <h2>
+            <Icon name="check" />
+            {t("accountHeading")}
+          </h2>
+          <div className="cd-facts">
+            {requirements.minAccountAgeDays != null && (
+              <div className="cd-fact">
+                <div className="l">{t("accountMinAge")}</div>
+                <div className="v">
+                  {t("accountMinAgeValue", { days: requirements.minAccountAgeDays })}
+                </div>
+              </div>
+            )}
+            {requirements.minKarmaOrReputation && (
+              <div className="cd-fact">
+                <div className="l">{t("accountKarma")}</div>
+                <div className="v">
+                  {requirements.minKarmaOrReputation.value}+{" "}
+                  {requirements.minKarmaOrReputation.unit}
+                </div>
+              </div>
+            )}
+            <div className="cd-fact">
+              <div className="l">{t("accountLevel")}</div>
+              <div className="v">
+                {requirements.level === "required"
+                  ? t("accountLevelRequired")
+                  : t("accountLevelRecommended")}
+              </div>
+            </div>
+          </div>
+          {requirements.profileTips && requirements.profileTips.length > 0 && (
+            <ul className="cd-factors" style={{ marginTop: 12 }}>
+              {requirements.profileTips.map((tip, i) => (
+                <li key={i}>{tip}</li>
+              ))}
+            </ul>
+          )}
+          <p style={{ marginTop: 10, fontSize: 12, color: "var(--tx3)" }}>
+            {t("accountSource")}: {requirements.sourceNote}
+          </p>
+        </section>
+      )}
+
+      <section className="cd-sec">
+        <h2>
+          <Icon name="rules" />
+          {t("faqHeading")}
+        </h2>
+        {faq.map((f, i) => (
+          <div key={i} style={{ marginBottom: 14 }}>
+            <h3 style={{ fontSize: 14, marginBottom: 4 }}>{f.question}</h3>
+            <p style={{ fontSize: 13.5, color: "var(--tx2)", lineHeight: 1.55 }}>
+              {f.answer}
+            </p>
+          </div>
+        ))}
+      </section>
+
+      {(related.length > 0 || hubs.length > 0) && (
+        <section className="cd-sec">
+          <h2>
+            <Icon name="target" />
+            {t("relatedHeading")}
+          </h2>
+          {related.length > 0 && (
+            <div className="ch-grid">
+              {related.map((c) => (
+                <Link key={c.slug} href={`/channels/${c.slug}`} className="ch-card">
+                  <div className="top">
+                    <Icon name={platformIcon(c.platform)} />
+                    <span className="nm">{c.name}</span>
+                  </div>
+                  {c.audienceDesc && <div className="aud">{c.audienceDesc}</div>}
+                  <div className="ft">
+                    <span
+                      className="dot"
+                      style={{ background: RISK[c.defaultBanRisk].color }}
+                      aria-hidden
+                    />
+                    {tr(c.defaultBanRisk)}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+          {hubs.length > 0 && (
+            <p style={{ marginTop: 14, fontSize: 13, color: "var(--tx2)" }}>
+              {t("appearsIn")}{" "}
+              {hubs.map((hub, i) => (
+                <span key={hub}>
+                  {i > 0 && " · "}
+                  <Link href={`/channels/for/${hub}`} style={{ color: "var(--tx1)" }}>
+                    {tf(`hubs.${hub}.title`)}
+                  </Link>
+                </span>
+              ))}
+            </p>
+          )}
+        </section>
+      )}
 
       <div className="gate">
         <h3>{t("gateTitle", { name: channel.name })}</h3>
