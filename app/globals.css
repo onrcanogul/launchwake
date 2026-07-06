@@ -672,6 +672,9 @@ button.ws {
   border: 0;
   font-family: inherit;
   color: inherit;
+  /* A <button> defaults to text-align:center, which would center the project
+     name inside .nm and read as a left gap. Keep it flush-left like the div. */
+  text-align: left;
 }
 .pswitch-menu {
   top: 100%;
