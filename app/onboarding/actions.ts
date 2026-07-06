@@ -110,8 +110,8 @@ export async function createProject(
         sourceUrl: parsed.data.url || null,
       },
     });
-    revalidatePath("/app", "layout");
-    redirect(`/app/ships/${ship.id}/readiness`);
+    revalidatePath("/app/[project]", "layout");
+    redirect(`/app/${project.id}/ships/${ship.id}/readiness`);
   }
 
   // LAUNCHED → Growth Mode (existing behaviour): create the first ship from the
@@ -151,9 +151,13 @@ export async function createProject(
     console.warn("[onboarding] first-ship analysis failed (page will retry):", err);
   }
 
-  revalidatePath("/app", "layout");
+  revalidatePath("/app/[project]", "layout");
   // Land on the first plan (aha) when we have a ship; else the new-ship form.
-  redirect(firstShipId ? `/app/ships/${firstShipId}/plan` : "/app/ships/new");
+  redirect(
+    firstShipId
+      ? `/app/${project.id}/ships/${firstShipId}/plan`
+      : `/app/${project.id}/ships/new`,
+  );
 }
 
 /**

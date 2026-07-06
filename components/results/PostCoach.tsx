@@ -19,17 +19,33 @@ export type CoachRowData = {
 
 const SEV_COLOR = { high: "var(--bad)", medium: "var(--warn)", low: "var(--ok)" } as const;
 
-export function PostCoachList({ rows, canCoach }: { rows: CoachRowData[]; canCoach: boolean }) {
+export function PostCoachList({
+  projectId,
+  rows,
+  canCoach,
+}: {
+  projectId: string;
+  rows: CoachRowData[];
+  canCoach: boolean;
+}) {
   return (
     <div className="coach-list">
       {rows.map((r) => (
-        <CoachRow key={r.postId} row={r} canCoach={canCoach} />
+        <CoachRow key={r.postId} projectId={projectId} row={r} canCoach={canCoach} />
       ))}
     </div>
   );
 }
 
-function CoachRow({ row, canCoach }: { row: CoachRowData; canCoach: boolean }) {
+function CoachRow({
+  projectId,
+  row,
+  canCoach,
+}: {
+  projectId: string;
+  row: CoachRowData;
+  canCoach: boolean;
+}) {
   const { toast } = useToast();
   const [pending, start] = useTransition();
   const [result, setResult] = useState<CoachResult | null>(row.coaching);
@@ -59,7 +75,7 @@ function CoachRow({ row, canCoach }: { row: CoachRowData; canCoach: boolean }) {
           </span>
         </div>
         {!canCoach ? (
-          <Link href="/app/settings" className="btn btn-s">
+          <Link href={`/app/${projectId}/settings`} className="btn btn-s">
             <Icon name="lock" /> Pro
           </Link>
         ) : result ? (

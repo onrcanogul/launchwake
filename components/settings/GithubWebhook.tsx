@@ -18,11 +18,13 @@ function ago(date: Date): string {
 }
 
 export function GithubWebhook({
+  projectId,
   repo,
   webhookUrl,
   initialSecret,
   status,
 }: {
+  projectId: string;
   repo: string | null;
   webhookUrl: string;
   initialSecret: string | null;
@@ -41,7 +43,7 @@ export function GithubWebhook({
 
   const generate = () =>
     start(async () => {
-      const res = await generateWebhookSecret();
+      const res = await generateWebhookSecret(projectId);
       if (res.ok) {
         setSecret(res.secret);
         toast(initialSecret ? "Secret rotated" : "Secret generated");

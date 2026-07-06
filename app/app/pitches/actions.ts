@@ -16,8 +16,8 @@ async function requireAccount(): Promise<string> {
 }
 
 function refresh() {
-  revalidatePath("/app/ships/[id]/pitches", "page");
-  revalidatePath("/app/pitches");
+  revalidatePath("/app/[project]/ships/[id]/pitches", "page");
+  revalidatePath("/app/[project]/pitches", "page");
 }
 
 export type PitchState = { ok: boolean; subject?: string; body?: string; error?: string };

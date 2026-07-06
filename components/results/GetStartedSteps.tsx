@@ -73,8 +73,10 @@ function StepRow({
 }
 
 export function GetStartedSteps({
+  projectId,
   pixelVerifiedAt,
 }: {
+  projectId: string;
   pixelVerifiedAt: Date | null;
 }) {
   const pixelLive = Boolean(pixelVerifiedAt);
@@ -87,7 +89,7 @@ export function GetStartedSteps({
         n={1}
         title="Mint a tracked link"
         right={
-          <Button variant="primary" icon="where" href="/app/plan">
+          <Button variant="primary" icon="where" href={`/app/${projectId}/plan`}>
             Go to a plan
           </Button>
         }
@@ -110,7 +112,7 @@ export function GetStartedSteps({
           pixelLive ? (
             <Badge dotColor="var(--ok)">Pixel detected</Badge>
           ) : (
-            <Button variant="secondary" icon="settings" href="/app/settings">
+            <Button variant="secondary" icon="settings" href={`/app/${projectId}/settings`}>
               Set up tracking
             </Button>
           )

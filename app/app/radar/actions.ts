@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -17,14 +17,16 @@ async function requireAccount(): Promise<string> {
   return accountId;
 }
 
-async function requireProject(): Promise<{ accountId: string; projectId: string }> {
+/** Verify the route's project belongs to the caller (else 404). */
+async function requireOwnedProject(
+  projectId: string,
+): Promise<{ accountId: string; projectId: string }> {
   const accountId = await requireAccount();
   const project = await db.project.findFirst({
-    where: { userId: accountId },
-    orderBy: { createdAt: "asc" },
+    where: { id: projectId, userId: accountId },
     select: { id: true },
   });
-  if (!project) redirect("/onboarding");
+  if (!project) notFound();
   return { accountId, projectId: project.id };
 }
 
@@ -49,10 +51,11 @@ export type IntentQueryState = { error?: string; ok?: boolean };
 
 /** Create a saved Intent Radar query (gated by plan entitlement). */
 export async function createIntentQuery(
+  routeProjectId: string,
   _prev: IntentQueryState,
   formData: FormData,
 ): Promise<IntentQueryState> {
-  const { accountId, projectId } = await requireProject();
+  const { accountId, projectId } = await requireOwnedProject(routeProjectId);
 
   try {
     await assertEntitlement(accountId, "create_intent_query");
@@ -76,7 +79,7 @@ export async function createIntentQuery(
   await db.intentQuery.create({
     data: { projectId, ...parsed.data },
   });
-  revalidatePath("/app/radar");
+  revalidatePath("/app/[project]/radar", "page");
   return { ok: true };
 }
 
@@ -85,7 +88,7 @@ export async function toggleIntentQuery(queryId: string, active: boolean): Promi
   const accountId = await requireAccount();
   await assertQueryOwned(queryId, accountId);
   await db.intentQuery.update({ where: { id: queryId }, data: { active } });
-  revalidatePath("/app/radar");
+  revalidatePath("/app/[project]/radar", "page");
 }
 
 /** Delete a query and all its matches. */
@@ -93,7 +96,7 @@ export async function deleteIntentQuery(queryId: string): Promise<void> {
   const accountId = await requireAccount();
   await assertQueryOwned(queryId, accountId);
   await db.intentQuery.delete({ where: { id: queryId } });
-  revalidatePath("/app/radar");
+  revalidatePath("/app/[project]/radar", "page");
 }
 
 /** Hide a match from the feed. */
@@ -101,7 +104,7 @@ export async function dismissMatch(matchId: string): Promise<void> {
   const accountId = await requireAccount();
   await assertMatchOwned(matchId, accountId);
   await db.intentMatch.update({ where: { id: matchId }, data: { status: "DISMISSED" } });
-  revalidatePath("/app/radar");
+  revalidatePath("/app/[project]/radar", "page");
 }
 
 /** Star a match (kept, not dismissed). */
@@ -109,7 +112,7 @@ export async function saveMatch(matchId: string): Promise<void> {
   const accountId = await requireAccount();
   await assertMatchOwned(matchId, accountId);
   await db.intentMatch.update({ where: { id: matchId }, data: { status: "SAVED" } });
-  revalidatePath("/app/radar");
+  revalidatePath("/app/[project]/radar", "page");
 }
 
 export type ReplyState = { ok: boolean; body?: string; safetyNote?: string; error?: string };
@@ -120,7 +123,7 @@ export async function generateReply(matchId: string): Promise<ReplyState> {
   await assertMatchOwned(matchId, accountId);
   try {
     const res = await generateIntentReply(matchId);
-    revalidatePath("/app/radar");
+    revalidatePath("/app/[project]/radar", "page");
     return { ok: true, body: res.body, safetyNote: res.safetyNote ?? undefined };
   } catch (err) {
     return { ok: false, error: (err as Error).message };

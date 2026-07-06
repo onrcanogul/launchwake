@@ -17,9 +17,11 @@ export type SwitcherShip = {
  * cookie), so the ship-scoped nav follows it from anywhere.
  */
 export function SidebarShipSwitcher({
+  projectId,
   ships,
   activeId,
 }: {
+  projectId: string;
   ships: SwitcherShip[];
   activeId: string | null;
 }) {
@@ -32,7 +34,9 @@ export function SidebarShipSwitcher({
 
   // On a ship page the URL is the source of truth; elsewhere use the cookie-
   // resolved activeId. This stays correct even though the shell layout is cached.
-  const urlShipId = pathname.match(/^\/app\/ships\/([^/]+)\/(?:plan|kit)/)?.[1];
+  const urlShipId = pathname.match(
+    /^\/app\/[^/]+\/ships\/([^/]+)\/(?:plan|kit)/,
+  )?.[1];
   const currentId = pendingId ?? urlShipId ?? activeId;
   const active = ships.find((s) => s.id === currentId);
 
@@ -57,7 +61,7 @@ export function SidebarShipSwitcher({
   const pick = (id: string) => {
     setOpen(false);
     setPendingId(id);
-    startTransition(() => router.push(`/app/ships/${id}/plan`));
+    startTransition(() => router.push(`/app/${projectId}/ships/${id}/plan`));
   };
 
   return (

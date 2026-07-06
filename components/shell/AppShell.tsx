@@ -5,27 +5,36 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
+import { sectionRest } from "@/lib/appRoutes";
 import { NavProgress } from "@/components/shell/NavProgress";
 import {
   SidebarShipSwitcher,
   type SwitcherShip,
 } from "@/components/shell/SidebarShipSwitcher";
+import {
+  ProjectSwitcher,
+  type ProjectOption,
+} from "@/components/shell/ProjectSwitcher";
 
 type NavItem = {
   href: string;
   label: string;
   icon: IconName;
   count?: number;
-  /** exact-match only (used for the /app root) */
+  /** exact-match only (used for the project root/feed) */
   exact?: boolean;
-  /** custom active predicate (used for bare + id-scoped ship routes) */
-  match?: (pathname: string) => boolean;
+  /** custom active predicate over the path AFTER the /app/[project] prefix */
+  match?: (rest: string) => boolean;
 };
 
 export type AppShellProps = {
+  /** The project named in the URL — every nav href is scoped to it. */
+  projectId: string;
   project: { name: string; subtitle?: string | null };
+  /** All of the account's projects (drives the switcher when there are 2+). */
+  projects: ProjectOption[];
   user: { name: string; plan: "FREE" | "PRO" | "TEAM" };
-  /** All ships (for the sidebar switcher). */
+  /** This project's ships (for the sidebar ship switcher). */
   ships: SwitcherShip[];
   /** The ship in context — the URL ship on ship pages, else the cookie's. */
   activeShip: { id: string; title: string } | null;
@@ -33,28 +42,28 @@ export type AppShellProps = {
   children: ReactNode;
 };
 
-function crumbFor(pathname: string): string {
-  if (pathname === "/app") return "Ship feed";
-  if (pathname.startsWith("/app/ships/new")) return "New ship";
-  if (pathname.startsWith("/app/channels")) return "Channels";
-  if (pathname.startsWith("/app/radar")) return "Intent Radar";
-  if (pathname.startsWith("/app/results")) return "Results";
-  if (pathname.startsWith("/app/settings")) return "Settings";
-  if (pathname === "/app/plan" || pathname.endsWith("/plan"))
-    return "Where to post";
-  if (pathname === "/app/kit" || pathname.endsWith("/kit")) return "Launch kit";
-  if (pathname === "/app/queue" || pathname.endsWith("/queue")) return "Queue";
-  if (pathname === "/app/pitches" || pathname.endsWith("/pitches")) return "Newsletters";
-  if (pathname.endsWith("/readiness")) return "Launch readiness";
-  if (pathname.endsWith("/schedule")) return "Schedule";
-  if (pathname.endsWith("/retro")) return "Launch retro";
-  if (pathname === "/app/launch" || pathname.endsWith("/launch"))
-    return "Launch day";
+function crumbFor(rest: string): string {
+  if (rest === "") return "Ship feed";
+  if (rest.startsWith("/ships/new")) return "New ship";
+  if (rest.startsWith("/channels")) return "Channels";
+  if (rest.startsWith("/radar")) return "Intent Radar";
+  if (rest.startsWith("/results")) return "Results";
+  if (rest.startsWith("/settings")) return "Settings";
+  if (rest === "/plan" || rest.endsWith("/plan")) return "Where to post";
+  if (rest === "/kit" || rest.endsWith("/kit")) return "Launch kit";
+  if (rest === "/queue" || rest.endsWith("/queue")) return "Queue";
+  if (rest === "/pitches" || rest.endsWith("/pitches")) return "Newsletters";
+  if (rest.endsWith("/readiness")) return "Launch readiness";
+  if (rest.endsWith("/schedule")) return "Schedule";
+  if (rest.endsWith("/retro")) return "Launch retro";
+  if (rest === "/launch" || rest.endsWith("/launch")) return "Launch day";
   return "";
 }
 
 export function AppShell({
+  projectId,
   project,
+  projects,
   user,
   ships,
   activeShip,
@@ -63,71 +72,72 @@ export function AppShell({
 }: AppShellProps) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const crumb = crumbFor(pathname);
+  const rest = sectionRest(pathname);
+  const crumb = crumbFor(rest);
+  const base = `/app/${projectId}`;
 
-  // The shell is persistent now, so close the mobile drawer whenever the route
-  // changes (nav link, ship switcher, back/forward — anything).
+  // The shell is persistent, so close the mobile drawer whenever the route
+  // changes (nav link, switcher, back/forward — anything).
   useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
 
   // Workspace = project-wide screens (unaffected by the active ship).
   const workspaceNav: NavItem[] = [
-    { href: "/app", label: "Ship feed", icon: "grid", exact: true },
-    { href: "/app/ships/new", label: "New ship", icon: "plus" },
+    { href: base, label: "Ship feed", icon: "grid", exact: true },
+    { href: `${base}/ships/new`, label: "New ship", icon: "plus" },
     {
-      href: "/app/channels",
+      href: `${base}/channels`,
       label: "Channels",
       icon: "channels",
       count: channelsCount,
     },
-    { href: "/app/radar", label: "Intent Radar", icon: "target" },
-    { href: "/app/results", label: "Results", icon: "results" },
+    { href: `${base}/radar`, label: "Intent Radar", icon: "target" },
+    { href: `${base}/results`, label: "Results", icon: "results" },
   ];
 
   // Ship-scoped screens. When a ship is in context we link STRAIGHT to its
-  // id-scoped route (e.g. /app/ships/xyz/plan) so the click is a single soft
-  // navigation that Next can prefetch — instead of routing through the bare
-  // /app/plan page, which server-redirects (an extra, un-prefetchable round
-  // trip on every click). With no active ship we fall back to the bare route,
-  // which renders the "select a ship" prompt.
-  const shipBase = activeShip ? `/app/ships/${activeShip.id}` : null;
+  // id-scoped route (e.g. /app/<proj>/ships/xyz/plan) so the click is a single
+  // soft navigation Next can prefetch — instead of the bare /app/<proj>/plan
+  // page, which server-redirects (an extra, un-prefetchable round trip). With no
+  // active ship we fall back to the bare route (the "select a ship" prompt).
+  const shipBase = activeShip ? `${base}/ships/${activeShip.id}` : null;
   const shipNavItems: NavItem[] = [
     {
-      href: shipBase ? `${shipBase}/plan` : "/app/plan",
+      href: shipBase ? `${shipBase}/plan` : `${base}/plan`,
       label: "Where to post",
       icon: "where",
-      match: (p) => p === "/app/plan" || p.endsWith("/plan"),
+      match: (r) => r === "/plan" || r.endsWith("/plan"),
     },
     {
-      href: shipBase ? `${shipBase}/kit` : "/app/kit",
+      href: shipBase ? `${shipBase}/kit` : `${base}/kit`,
       label: "Launch kit",
       icon: "kit",
-      match: (p) => p === "/app/kit" || p.endsWith("/kit"),
+      match: (r) => r === "/kit" || r.endsWith("/kit"),
     },
     {
-      href: shipBase ? `${shipBase}/queue` : "/app/queue",
+      href: shipBase ? `${shipBase}/queue` : `${base}/queue`,
       label: "Queue",
       icon: "calendar",
-      match: (p) => p === "/app/queue" || p.endsWith("/queue"),
+      match: (r) => r === "/queue" || r.endsWith("/queue"),
     },
     {
-      href: shipBase ? `${shipBase}/pitches` : "/app/pitches",
+      href: shipBase ? `${shipBase}/pitches` : `${base}/pitches`,
       label: "Newsletters",
       icon: "mail",
-      match: (p) => p === "/app/pitches" || p.endsWith("/pitches"),
+      match: (r) => r === "/pitches" || r.endsWith("/pitches"),
     },
     {
-      href: shipBase ? `${shipBase}/launch` : "/app/launch",
+      href: shipBase ? `${shipBase}/launch` : `${base}/launch`,
       label: "Launch day",
       icon: "rocket",
-      match: (p) => p === "/app/launch" || p.endsWith("/launch"),
+      match: (r) => r === "/launch" || r.endsWith("/launch"),
     },
   ];
 
   const isActive = (item: NavItem) =>
     item.match
-      ? item.match(pathname)
+      ? item.match(rest)
       : item.exact
         ? pathname === item.href
         : pathname.startsWith(item.href);
@@ -170,14 +180,11 @@ export function AppShell({
           LaunchWake
         </div>
 
-        <div className="ws">
-          <div className="sq">{project.name.charAt(0).toUpperCase()}</div>
-          <div className="nm">
-            <b>{project.name}</b>
-            {project.subtitle && <span>{project.subtitle}</span>}
-          </div>
-          <Icon name="chevronUpDown" size={13} style={{ stroke: "var(--tx3)" }} />
-        </div>
+        <ProjectSwitcher
+          projects={projects}
+          currentId={projectId}
+          current={project}
+        />
 
         <div className="grp">Workspace</div>
         {workspaceNav.map(renderNav)}
@@ -185,6 +192,7 @@ export function AppShell({
         {ships.length > 0 && (
           <>
             <SidebarShipSwitcher
+              projectId={projectId}
               ships={ships}
               activeId={activeShip?.id ?? null}
             />
@@ -193,7 +201,7 @@ export function AppShell({
         )}
 
         <div className="sp" />
-        {renderNav({ href: "/app/settings", label: "Settings", icon: "settings" })}
+        {renderNav({ href: `${base}/settings`, label: "Settings", icon: "settings" })}
         <div className="usr">
           <div className="av">{user.name.charAt(0).toUpperCase()}</div>
           <div className="nm">
@@ -205,7 +213,7 @@ export function AppShell({
                   ? "Pro plan"
                   : "Free plan"}{" "}
               ·{" "}
-              <Link href="/app/settings" style={{ color: "var(--ac)" }}>
+              <Link href={`${base}/settings`} style={{ color: "var(--ac)" }}>
                 {user.plan === "FREE" ? "Upgrade" : "Manage"}
               </Link>
             </span>

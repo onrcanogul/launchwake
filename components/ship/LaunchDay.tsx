@@ -15,11 +15,13 @@ import type { LaunchWindow, TimelineStep } from "@/lib/launchday";
 type Group = { window: LaunchWindow; label: string; steps: TimelineStep<LaunchStep>[] };
 
 export function LaunchDay({
+  projectId,
   shipId,
   groups,
   emailAvailable,
   slackAvailable,
 }: {
+  projectId: string;
   shipId: string;
   groups: Group[];
   emailAvailable: boolean;
@@ -40,7 +42,7 @@ export function LaunchDay({
             <span className="ld-of"> / {total} posted</span>
           </span>
           {complete ? (
-            <Link href="/app/results" className="btn btn-p">
+            <Link href={`/app/${projectId}/results`} className="btn btn-p">
               <Icon name="results" /> See results
             </Link>
           ) : (
@@ -71,6 +73,7 @@ export function LaunchDay({
             <StepRow
               key={step.rec.id}
               step={step}
+              projectId={projectId}
               shipId={shipId}
               emailAvailable={emailAvailable}
               slackAvailable={slackAvailable}
@@ -84,11 +87,13 @@ export function LaunchDay({
 
 function StepRow({
   step,
+  projectId,
   shipId,
   emailAvailable,
   slackAvailable,
 }: {
   step: TimelineStep<LaunchStep>;
+  projectId: string;
   shipId: string;
   emailAvailable: boolean;
   slackAvailable: boolean;
@@ -171,7 +176,7 @@ function StepRow({
                 <Icon name="copy" /> {copied === "draft" ? "Copied" : "Copy draft"}
               </button>
               <Link
-                href={`/app/ships/${shipId}/kit?rec=${rec.id}`}
+                href={`/app/${projectId}/ships/${shipId}/kit?rec=${rec.id}`}
                 className="btn btn-gh"
               >
                 <Icon name="kit" /> Edit

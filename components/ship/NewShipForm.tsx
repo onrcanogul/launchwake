@@ -27,14 +27,16 @@ const TYPES = ["LAUNCH", "FEATURE", "BLOG", "OTHER"] as const;
 const FIELD_ORDER = ["title", "sourceUrl", "summary"] as const;
 
 export function NewShipForm({
+  projectId,
   githubRepo,
   plansLeft,
 }: {
+  projectId: string;
   githubRepo: string | null;
   plansLeft: number | null;
 }) {
   const [state, formAction, pending] = useActionState<CreateShipState, FormData>(
-    createShipAndPlan,
+    createShipAndPlan.bind(null, projectId),
     {},
   );
   const [mode, setMode] = useState<Mode>(githubRepo ? "github" : "describe");
@@ -62,7 +64,7 @@ export function NewShipForm({
   const doPull = () => {
     setPullMsg(null);
     startPull(async () => {
-      const res = await pullLatestShip();
+      const res = await pullLatestShip(projectId);
       if (res.ok) {
         setType(res.type as (typeof TYPES)[number]);
         setTitle(res.title);
@@ -263,7 +265,7 @@ export function NewShipForm({
         (plansLeft > 0 ? (
           <div className="fhint" style={{ marginTop: 14 }}>
             {plansLeft} of 2 distribution plans left this month on Free.{" "}
-            <Link href="/app/settings" style={{ color: "var(--ac)" }}>
+            <Link href={`/app/${projectId}/settings`} style={{ color: "var(--ac)" }}>
               Upgrade to Pro
             </Link>{" "}
             for unlimited.
@@ -276,7 +278,7 @@ export function NewShipForm({
             <Icon name="target" />
             <span>
               You&apos;ve used both Free plans this month.{" "}
-              <Link href="/app/settings" style={{ fontWeight: 550 }}>
+              <Link href={`/app/${projectId}/settings`} style={{ fontWeight: 550 }}>
                 Upgrade to Pro — $29/mo
               </Link>{" "}
               for unlimited distribution plans.

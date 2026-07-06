@@ -42,8 +42,12 @@ export function isLaunchMode(launchStage: LaunchStage): boolean {
   return launchStage !== "LAUNCHED";
 }
 
-/** Route for a stage of a given ship. */
-export function launchStagePath(shipId: string, key: LaunchStageKey): string {
+/** Project-scoped route for a stage of a given ship. */
+export function launchStagePath(
+  projectId: string,
+  shipId: string,
+  key: LaunchStageKey,
+): string {
   const suffix: Record<LaunchStageKey, string> = {
     readiness: "readiness",
     plan: "plan",
@@ -52,7 +56,7 @@ export function launchStagePath(shipId: string, key: LaunchStageKey): string {
     launch: "launch",
     retro: "retro",
   };
-  return `/app/ships/${shipId}/${suffix[key]}`;
+  return `/app/${projectId}/ships/${shipId}/${suffix[key]}`;
 }
 
 export type StageState = LaunchModeStageMeta & {
@@ -173,7 +177,7 @@ export async function getLaunchModeState(
 
   const stages: StageState[] = LAUNCH_MODE_STAGES.map((s) => ({
     ...s,
-    href: launchStagePath(shipId, s.key),
+    href: launchStagePath(ship.project.id, shipId, s.key),
     done: done[s.key],
     current: s.key === current,
   }));

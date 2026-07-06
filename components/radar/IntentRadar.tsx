@@ -31,12 +31,14 @@ function scoreTone(score: number): string {
 }
 
 export function IntentRadar({
+  projectId,
   queries,
   canAdd,
   limit,
   used,
   projectName,
 }: {
+  projectId: string;
   queries: IntentQueryView[];
   canAdd: boolean;
   limit: number | null;
@@ -49,6 +51,7 @@ export function IntentRadar({
     <div className="stack-lg">
       {(adding || queries.length === 0) && canAdd ? (
         <QueryForm
+          projectId={projectId}
           projectName={projectName}
           cancellable={queries.length > 0}
           onDone={() => setAdding(false)}
@@ -67,7 +70,7 @@ export function IntentRadar({
               New watch
             </Button>
           ) : (
-            <Button variant="secondary" href="/app/settings" icon="rocket">
+            <Button variant="secondary" href={`/app/${projectId}/settings`} icon="rocket">
               Upgrade for more
             </Button>
           )}
@@ -84,16 +87,18 @@ export function IntentRadar({
 // ── The add-a-watch form ───────────────────────────────────
 
 function QueryForm({
+  projectId,
   projectName,
   cancellable,
   onDone,
 }: {
+  projectId: string;
   projectName: string;
   cancellable: boolean;
   onDone: () => void;
 }) {
   const [state, formAction, pending] = useActionState<IntentQueryState, FormData>(
-    createIntentQuery,
+    createIntentQuery.bind(null, projectId),
     {},
   );
   const { toast } = useToast();

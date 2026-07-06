@@ -5,14 +5,20 @@ import { Icon } from "@/components/Icon";
 import { useToast } from "@/components/ui/toast";
 import { saveSlackWebhook } from "@/app/app/settings/actions";
 
-export function SlackConnect({ current }: { current: string | null }) {
+export function SlackConnect({
+  projectId,
+  current,
+}: {
+  projectId: string;
+  current: string | null;
+}) {
   const { toast } = useToast();
   const [url, setUrl] = useState(current ?? "");
   const [pending, start] = useTransition();
 
   const save = () =>
     start(async () => {
-      const res = await saveSlackWebhook(url);
+      const res = await saveSlackWebhook(projectId, url);
       if (res.ok) toast(url ? "Slack webhook saved" : "Slack webhook removed");
       else toast(res.error ?? "Could not save", "error");
     });

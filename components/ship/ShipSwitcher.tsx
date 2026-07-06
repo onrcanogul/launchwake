@@ -13,10 +13,12 @@ export type SwitcherShip = {
 
 /** In-header dropdown to switch which ship the plan/kit screen is scoped to. */
 export function ShipSwitcher({
+  projectId,
   ships,
   currentId,
   mode,
 }: {
+  projectId: string;
   ships: SwitcherShip[];
   currentId: string;
   mode: "plan" | "kit" | "launch" | "queue" | "pitches";
@@ -55,7 +57,7 @@ export function ShipSwitcher({
     setOpen(false);
     if (id === currentId) return;
     setPendingId(id); // instant dropdown feedback
-    startTransition(() => router.push(`/app/ships/${id}/${mode}`));
+    startTransition(() => router.push(`/app/${projectId}/ships/${id}/${mode}`));
   };
 
   return (

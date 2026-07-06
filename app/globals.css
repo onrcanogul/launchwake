@@ -301,6 +301,49 @@ svg {
   letter-spacing: -0.02em;
   margin-bottom: 8px;
 }
+/* Over-limit "add another project" prompt (progressive upgrade, not an error). */
+.ob-upgrade {
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  background: var(--bg1);
+  padding: 30px 28px;
+  text-align: center;
+}
+.ob-upgrade-ico {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 16px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--acd);
+  border: 1px solid var(--acb);
+}
+.ob-upgrade-ico svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--ac);
+  stroke-width: 1.6;
+  fill: none;
+}
+.ob-upgrade h1 {
+  font-size: 19px;
+  margin-bottom: 8px;
+}
+.ob-upgrade p {
+  color: var(--tx2);
+  font-size: 13px;
+  line-height: 1.6;
+  max-width: 440px;
+  margin: 0 auto 20px;
+}
+.ob-upgrade-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
 .ob .lead {
   color: var(--tx2);
   font-size: 14px;
@@ -619,6 +662,51 @@ svg {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Project switcher — the .ws header becomes an interactive dropdown with 2+
+   projects. Single-project stays a plain .ws div (unchanged). */
+.pswitch {
+  position: relative;
+}
+button.ws {
+  width: 100%;
+  border: 0;
+  font-family: inherit;
+  color: inherit;
+}
+.pswitch-menu {
+  top: 100%;
+}
+.pswitch-menu .sq-sm {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, #1c8f80, #2a5bd7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 10px;
+  color: #fff;
+  flex-shrink: 0;
+}
+.pswitch-sep {
+  height: 1px;
+  background: var(--line);
+  margin: 5px 4px;
+}
+.pswitch-new {
+  color: var(--tx2);
+  text-decoration: none;
+}
+.pswitch-new svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  fill: none;
+  flex-shrink: 0;
+}
+
 .grp {
   font-size: 10.5px;
   font-weight: 600;

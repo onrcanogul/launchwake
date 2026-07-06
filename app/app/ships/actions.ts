@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { auth } from "@/lib/auth";
@@ -26,15 +26,26 @@ import { normalizeHttpUrl } from "@/lib/url";
 import { fieldErrorsFromZod } from "@/lib/formErrors";
 import { captureUser, EVENTS } from "@/lib/analytics";
 
-async function requireProject() {
+/** The signed-in account id (owner's id for a Team member). */
+async function requireAccount(): Promise<string> {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const { accountId } = await resolveAccount(session.user.id);
+  return accountId;
+}
+
+/**
+ * The project named by the route, verified owned by the caller. 404s (not 403)
+ * when the project belongs to someone else — indistinguishable from nonexistent.
+ * projectId always comes from the route param, never a "the user's only project"
+ * lookup, so this is correct once a user has more than one project.
+ */
+async function requireOwnedProject(projectId: string) {
+  const accountId = await requireAccount();
   const project = await db.project.findFirst({
-    where: { userId: accountId },
-    orderBy: { createdAt: "asc" },
+    where: { id: projectId, userId: accountId },
   });
-  if (!project) redirect("/onboarding");
+  if (!project) notFound();
   return project;
 }
 
@@ -68,10 +79,11 @@ export type CreateShipState = {
 
 /** Create a ship, build its distribution plan, then land on the plan (the aha). */
 export async function createShipAndPlan(
+  projectId: string,
   _prev: CreateShipState,
   formData: FormData,
 ): Promise<CreateShipState> {
-  const project = await requireProject();
+  const project = await requireOwnedProject(projectId);
 
   const parsed = CreateSchema.safeParse({
     type: formData.get("type"),
@@ -109,15 +121,20 @@ export async function createShipAndPlan(
     return { error: `Could not build a plan: ${(err as Error).message}` };
   }
 
-  revalidatePath("/app", "layout"); // refresh the cached shell (ship switcher list)
-  redirect(`/app/ships/${shipId}/plan`);
+  revalidatePath(`/app/${project.id}`, "layout"); // refresh the shell (ship switcher)
+  redirect(`/app/${project.id}/ships/${shipId}/plan`);
 }
 
-/** Re-run analysis for an existing ship. */
+/** Re-run analysis for an existing ship (owned by the caller). */
 export async function rerunPlan(shipId: string): Promise<void> {
-  await requireProject();
+  const accountId = await requireAccount();
+  const ship = await db.ship.findFirst({
+    where: { id: shipId, project: { userId: accountId } },
+    select: { id: true },
+  });
+  if (!ship) notFound();
   await buildPlan(shipId);
-  revalidatePath(`/app/ships/${shipId}/plan`);
+  revalidatePath("/app/[project]/ships/[id]/plan", "page");
 }
 
 /**
@@ -127,16 +144,16 @@ export async function rerunPlan(shipId: string): Promise<void> {
 export async function ensurePlan(
   shipId: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const project = await requireProject();
+  const accountId = await requireAccount();
   const ship = await db.ship.findFirst({
-    where: { id: shipId, projectId: project.id },
+    where: { id: shipId, project: { userId: accountId } },
     include: { plan: { select: { id: true } } },
   });
   if (!ship) return { ok: false, error: "Ship not found" };
   if (ship.plan) return { ok: true };
 
   try {
-    await assertEntitlement(project.userId, "create_plan");
+    await assertEntitlement(accountId, "create_plan");
   } catch (err) {
     if (err instanceof EntitlementError) return { ok: false, error: err.message };
     throw err;
@@ -147,7 +164,7 @@ export async function ensurePlan(
   } catch (err) {
     return { ok: false, error: `Could not build a plan: ${(err as Error).message}` };
   }
-  revalidatePath(`/app/ships/${shipId}/plan`);
+  revalidatePath("/app/[project]/ships/[id]/plan", "page");
   return { ok: true };
 }
 
@@ -156,8 +173,8 @@ export type PullState =
   | { ok: false; error: string };
 
 /** Pull the latest release/commit from the connected repo to prefill the form. */
-export async function pullLatestShip(): Promise<PullState> {
-  const project = await requireProject();
+export async function pullLatestShip(projectId: string): Promise<PullState> {
+  const project = await requireOwnedProject(projectId);
   if (!project.githubRepo) {
     return { ok: false, error: "No GitHub repo connected for this project." };
   }
@@ -189,13 +206,22 @@ export async function ensureDraft(
   recommendationId: string,
   tone?: string,
 ): Promise<void> {
-  const project = await requireProject();
+  const accountId = await requireAccount();
+  // Ownership: the recommendation must belong to this account's workspace.
+  const owned = await db.recommendation.findFirst({
+    where: {
+      id: recommendationId,
+      plan: { ship: { project: { userId: accountId } } },
+    },
+    select: { id: true },
+  });
+  if (!owned) return;
   // Drafting is the Pro-gated action in Launch Mode — a locked channel (past the
-  // Free cap) is skipped even if called directly. project.userId is the accountId.
-  if (await isLaunchChannelLocked(recommendationId, project.userId)) return;
+  // Free cap) is skipped even if called directly.
+  if (await isLaunchChannelLocked(recommendationId, accountId)) return;
   const t: DraftTone = isDraftTone(tone) ? tone : "founder";
   await generateDraft(recommendationId, t);
-  revalidatePath("/app/ships");
+  revalidatePath("/app/[project]/ships/[id]/kit", "page");
 }
 
 export type ScheduleReminderState =
@@ -337,8 +363,7 @@ export async function scheduleLaunch(
     reminderSet = true;
   }
 
-  revalidatePath("/app/ships");
-  revalidatePath("/app");
+  revalidatePath("/app/[project]", "layout");
   return { ok: true, launchAt: launchAt.toISOString(), reminderSet };
 }
 
@@ -367,7 +392,7 @@ export async function completeLaunch(
   });
   await db.ship.update({ where: { id: ship.id }, data: { status: "DONE" } });
 
-  revalidatePath("/app", "layout");
+  revalidatePath(`/app/${ship.projectId}`, "layout");
   return { ok: true };
 }
 
@@ -380,14 +405,22 @@ export async function markPosted(
   recommendationId: string,
   postedUrl?: string,
 ): Promise<MarkPostedState> {
-  const project = await requireProject();
+  const accountId = await requireAccount();
+  // Ownership: the recommendation must belong to this account's workspace.
+  const owned = await db.recommendation.findFirst({
+    where: {
+      id: recommendationId,
+      plan: { ship: { project: { userId: accountId } } },
+    },
+    select: { id: true },
+  });
+  if (!owned) return { ok: false, error: "Recommendation not found" };
   try {
     const res = await recordPostForRecommendation(recommendationId, postedUrl);
-    revalidatePath("/app");
-    revalidatePath("/app/results");
-    revalidatePath("/app/ships");
+    // Refresh the feed, results and ship pages for this project.
+    revalidatePath("/app/[project]", "layout");
     // Funnel: the human posted and got a tracked link — attribution can begin.
-    after(() => captureUser(project.userId, EVENTS.shipMarkedPosted));
+    after(() => captureUser(accountId, EVENTS.shipMarkedPosted));
     return { ok: true, trackedUrl: res.trackedUrl };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
@@ -396,11 +429,11 @@ export async function markPosted(
 
 // ── Public launch report (viral loop) ──────────────────────
 
-/** Load a ship owned by the current user, or throw. */
+/** Load a ship owned by the current account, or throw. */
 async function requireOwnedShip(shipId: string) {
-  const project = await requireProject();
+  const accountId = await requireAccount();
   const ship = await db.ship.findFirst({
-    where: { id: shipId, projectId: project.id },
+    where: { id: shipId, project: { userId: accountId } },
     select: { id: true, publicToken: true, publicShowRevenue: true },
   });
   if (!ship) throw new Error("Ship not found");
@@ -426,7 +459,8 @@ export async function setPublicReport(
       await db.ship.update({ where: { id: shipId }, data: { publicToken: null } });
       token = null;
     }
-    revalidatePath(`/app/ships/${shipId}/launch`);
+    revalidatePath("/app/[project]/ships/[id]/launch", "page");
+    revalidatePath("/app/[project]/ships/[id]/retro", "page");
     return {
       ok: true,
       token,
@@ -446,7 +480,8 @@ export async function setReportRevenue(
   try {
     const ship = await requireOwnedShip(shipId);
     await db.ship.update({ where: { id: shipId }, data: { publicShowRevenue: showRevenue } });
-    revalidatePath(`/app/ships/${shipId}/launch`);
+    revalidatePath("/app/[project]/ships/[id]/launch", "page");
+    revalidatePath("/app/[project]/ships/[id]/retro", "page");
     return {
       ok: true,
       token: ship.publicToken,
@@ -488,7 +523,7 @@ export async function coachPostAction(postId: string): Promise<CoachState> {
 
   try {
     const result = await coachPost(postId);
-    revalidatePath("/app/results");
+    revalidatePath("/app/[project]/results", "page");
     return { ok: true, result };
   } catch (err) {
     return { ok: false, error: (err as Error).message };

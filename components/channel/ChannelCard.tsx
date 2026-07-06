@@ -37,12 +37,15 @@ export type BenchmarkCardData = {
 export function ChannelCard({
   data,
   draftHref,
+  settingsHref,
   remind,
   benchmark,
   accountReadiness,
 }: {
   data: ChannelCardData;
   draftHref: string;
+  /** Project-scoped Settings link (the Pro upgrade target on locked benchmarks). */
+  settingsHref: string;
   remind?: RemindProps;
   benchmark?: BenchmarkCardData | null;
   /** Launch-mode account-readiness detail; omit outside launch mode. */
@@ -80,7 +83,7 @@ export function ChannelCard({
           <span className="bench-label">{benchmark.label}</span>
           <b className="bench-val">{benchmark.value}</b>
           {benchmark.locked ? (
-            <Link className="bench-lock" href="/app/settings" title="Unlock category benchmarks with Pro">
+            <Link className="bench-lock" href={settingsHref} title="Unlock category benchmarks with Pro">
               <Icon name="lock" /> Pro
             </Link>
           ) : (

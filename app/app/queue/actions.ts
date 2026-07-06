@@ -14,8 +14,8 @@ async function requireAccount(): Promise<string> {
 }
 
 function refresh() {
-  revalidatePath("/app/ships/[id]/queue", "page");
-  revalidatePath("/app/queue");
+  revalidatePath("/app/[project]/ships/[id]/queue", "page");
+  revalidatePath("/app/[project]/queue", "page");
 }
 
 /** Mark a queue task done. */

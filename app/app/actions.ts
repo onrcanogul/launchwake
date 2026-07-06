@@ -33,5 +33,5 @@ export async function setActiveShip(shipId: string): Promise<void> {
   });
   // The shell layout is cached; refresh it so the sidebar reflects the new
   // active ship on project-wide pages too.
-  revalidatePath("/app", "layout");
+  revalidatePath("/app/[project]", "layout");
 }

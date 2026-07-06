@@ -10,9 +10,11 @@ type Ship = { id: string; title: string; type: ShipTypeValue };
  * selected. Lets the user pick one, or create their first.
  */
 export function SelectShipPrompt({
+  projectId,
   ships,
   mode,
 }: {
+  projectId: string;
   ships: Ship[];
   mode: "plan" | "kit" | "launch" | "queue" | "pitches";
 }) {
@@ -23,7 +25,7 @@ export function SelectShipPrompt({
         title="No ships yet"
         message="Create your first ship — a release, feature or post worth talking about — and we'll build its distribution plan."
         actions={
-          <Button variant="primary" icon="plus" href="/app/ships/new">
+          <Button variant="primary" icon="plus" href={`/app/${projectId}/ships/new`}>
             New ship
           </Button>
         }
@@ -46,7 +48,7 @@ export function SelectShipPrompt({
         {ships.map((s) => (
           <Link
             key={s.id}
-            href={`/app/ships/${s.id}/${mode}`}
+            href={`/app/${projectId}/ships/${s.id}/${mode}`}
             className="li"
             style={{ color: "inherit" }}
           >

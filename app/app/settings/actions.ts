@@ -106,7 +106,7 @@ export async function saveAgencyBrand(
       logoUrl: parsed.data.logoUrl,
       accentColor: parsed.data.accentColor,
     });
-    revalidatePath("/app/settings");
+    revalidatePath("/app/[project]/settings", "page");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
@@ -121,7 +121,7 @@ export async function toggleClientReport(
   try {
     const accountId = await requireTeamOwner();
     const { token } = await setReportEnabled(projectId, accountId, enabled);
-    revalidatePath("/app/settings");
+    revalidatePath("/app/[project]/settings", "page");
     return { ok: true, token };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
@@ -139,7 +139,7 @@ export async function inviteTeamMember(email: string): Promise<InviteResult> {
       return { ok: false, error: "Enter a valid email address." };
     }
     const res = await createInvite(ownerId, parsed.data);
-    if (res.ok) revalidatePath("/app/settings");
+    if (res.ok) revalidatePath("/app/[project]/settings", "page");
     return res;
   } catch (err) {
     return { ok: false, error: (err as Error).message };
@@ -151,7 +151,7 @@ export async function revokeTeamInvite(inviteId: string): Promise<{ ok: boolean;
   try {
     const ownerId = await requireOwner();
     await revokeInvite(ownerId, inviteId);
-    revalidatePath("/app/settings");
+    revalidatePath("/app/[project]/settings", "page");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
@@ -163,7 +163,7 @@ export async function removeTeamMember(memberId: string): Promise<{ ok: boolean;
   try {
     const ownerId = await requireOwner();
     await removeMember(ownerId, memberId);
-    revalidatePath("/app/settings");
+    revalidatePath("/app/[project]/settings", "page");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
@@ -175,7 +175,7 @@ export async function leaveTeam(): Promise<{ ok: boolean; error?: string }> {
   try {
     const userId = await requireUserId();
     await db.teamMembership.deleteMany({ where: { memberId: userId } });
-    revalidatePath("/app", "layout");
+    revalidatePath("/app/[project]", "layout");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
@@ -218,72 +218,67 @@ export async function startTeamCheckout(
   }
 }
 
-/** Generate (or rotate) the project's GitHub webhook signing secret. */
-export async function generateWebhookSecret(): Promise<
-  { ok: true; secret: string } | { ok: false; error: string }
-> {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+/** The route's project, verified owned by the caller's account (else null). */
+async function ownedProjectId(projectId: string): Promise<string | null> {
+  const userId = await requireUserId();
+  const { accountId } = await resolveAccount(userId);
   const project = await db.project.findFirst({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "asc" },
+    where: { id: projectId, userId: accountId },
+    select: { id: true },
   });
-  if (!project) return { ok: false, error: "No project" };
+  return project?.id ?? null;
+}
+
+/** Generate (or rotate) the project's GitHub webhook signing secret. */
+export async function generateWebhookSecret(
+  projectId: string,
+): Promise<{ ok: true; secret: string } | { ok: false; error: string }> {
+  const id = await ownedProjectId(projectId);
+  if (!id) return { ok: false, error: "Project not found" };
 
   const secret = randomBytes(24).toString("hex");
-  await db.project.update({
-    where: { id: project.id },
-    data: { webhookSecret: secret },
-  });
-  revalidatePath("/app/settings");
+  await db.project.update({ where: { id }, data: { webhookSecret: secret } });
+  revalidatePath("/app/[project]/settings", "page");
   return { ok: true, secret };
 }
 
 /** Save (or clear) the project's Slack incoming-webhook URL for reminders. */
 export async function saveSlackWebhook(
+  projectId: string,
   url: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-  const project = await db.project.findFirst({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "asc" },
-  });
-  if (!project) return { ok: false, error: "No project" };
+  const id = await ownedProjectId(projectId);
+  if (!id) return { ok: false, error: "Project not found" };
 
   const trimmed = url.trim();
   if (trimmed && !/^https:\/\/hooks\.slack\.com\//.test(trimmed)) {
     return { ok: false, error: "Enter a valid Slack incoming-webhook URL." };
   }
   await db.project.update({
-    where: { id: project.id },
+    where: { id },
     data: { slackWebhookUrl: trimmed || null },
   });
-  revalidatePath("/app/settings");
+  revalidatePath("/app/[project]/settings", "page");
   return { ok: true };
 }
 
 /** Save (or clear) the project's Stripe endpoint signing secret for revenue attribution. */
 export async function saveStripeWebhookSecret(
+  projectId: string,
   secret: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-  const project = await db.project.findFirst({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "asc" },
-  });
-  if (!project) return { ok: false, error: "No project" };
+  const id = await ownedProjectId(projectId);
+  if (!id) return { ok: false, error: "Project not found" };
 
   const trimmed = secret.trim();
   if (trimmed && !/^whsec_/.test(trimmed)) {
     return { ok: false, error: "Paste the endpoint's signing secret (starts with whsec_)." };
   }
   await db.project.update({
-    where: { id: project.id },
+    where: { id },
     data: { stripeWebhookSecret: trimmed || null },
   });
-  revalidatePath("/app/settings");
+  revalidatePath("/app/[project]/settings", "page");
   return { ok: true };
 }
 
@@ -295,7 +290,7 @@ export async function setEmailPreference(
   if (!session?.user?.id) redirect("/login");
   const ok = await setEmailNotifications(session.user.id, Boolean(enabled));
   if (!ok) return { ok: false, error: "Couldn't save your preference." };
-  revalidatePath("/app/settings");
+  revalidatePath("/app/[project]/settings", "page");
   return { ok: true };
 }
 

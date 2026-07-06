@@ -142,7 +142,7 @@ This attributes Stripe revenue automatically — no custom payment-handling code
   const [saving, startSave] = useTransition();
   const save = () =>
     startSave(async () => {
-      const res = await saveStripeWebhookSecret(secret);
+      const res = await saveStripeWebhookSecret(projectId, secret);
       if (res.ok) {
         setSecret("");
         toast(secret.trim() ? "Stripe revenue tracking connected" : "Stripe secret cleared");
