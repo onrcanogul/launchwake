@@ -1,4 +1,5 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, createSign, timingSafeEqual } from "crypto";
+import { z } from "zod";
 import { env } from "./env";
 import { db } from "./db";
 import type { ShipType } from "@prisma/client";
@@ -40,6 +41,8 @@ export type GithubRepo = {
   description: string | null;
   htmlUrl: string;
   private: boolean;
+  /** ISO timestamp of the last push, for "most recently active first" sorting. */
+  pushedAt?: string | null;
 };
 
 /**
@@ -225,6 +228,22 @@ export function verifyWebhookSignature(
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/**
+ * Verify against any of several candidate secrets — a manual webhook signs with
+ * the per-project secret, while a GitHub App installation signs with the App's
+ * webhook secret, and both can hit the same endpoint. Passes if any non-empty
+ * secret matches (each check is constant-time).
+ */
+export function verifyWebhookSignatureAny(
+  rawBody: string,
+  signatureHeader: string | null,
+  secrets: Array<string | null | undefined>,
+): boolean {
+  return secrets.some(
+    (s) => !!s && verifyWebhookSignature(rawBody, signatureHeader, s),
+  );
+}
+
 export type GithubStatus = {
   connected: boolean;
   hasSecret: boolean;
@@ -320,4 +339,187 @@ export function parseWebhookEvent(
   }
 
   return null;
+}
+
+/** Read the installation id off a webhook payload (present on App deliveries). */
+export function installationIdFromPayload(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const inst = (payload as { installation?: { id?: unknown } }).installation;
+  const id = inst?.id;
+  return typeof id === "number" || typeof id === "string" ? String(id) : null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// GitHub App — installation-based repo access (private repos)
+//
+// The login OAuth app stays profile+email only. Read-only repo access comes from
+// a separate GitHub App the user *installs* (choosing which repos to grant on
+// GitHub's own screen). We authenticate as the installation via a short-lived
+// app JWT → installation access token, and never request write scopes.
+// ─────────────────────────────────────────────────────────────
+
+/** httpOnly cookie bridging the install callback → the onboarding repo picker
+ *  (before a Project exists to hang the installation id on). */
+export const GH_INSTALLATION_COOKIE = "lw_gh_installation";
+
+/** All four App settings present → the App flow is usable. */
+export function githubAppConfigured(): boolean {
+  return Boolean(
+    env.GITHUB_APP_ID && env.GITHUB_APP_PRIVATE_KEY && env.GITHUB_APP_SLUG,
+  );
+}
+
+/** The GitHub App installation URL. `state` round-trips back to our callback. */
+export function appInstallUrl(state: string): string {
+  const slug = env.GITHUB_APP_SLUG ?? "";
+  return `https://github.com/apps/${slug}/installations/new?state=${encodeURIComponent(state)}`;
+}
+
+function base64url(input: Buffer | string): string {
+  return Buffer.from(input)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+/** PEMs pasted into single-line env vars carry literal "\n" — restore them. */
+function normalizePrivateKey(pem: string): string {
+  return pem.includes("\\n") ? pem.replace(/\\n/g, "\n") : pem;
+}
+
+/**
+ * A signed app JWT (RS256), valid ~10 min, used only to mint installation
+ * tokens. `now` is injectable for tests. Throws if the App isn't configured.
+ */
+export function generateAppJwt(now: number = Date.now()): string {
+  const appId = env.GITHUB_APP_ID;
+  const key = env.GITHUB_APP_PRIVATE_KEY;
+  if (!appId || !key) throw new Error("GitHub App is not configured.");
+  const iat = Math.floor(now / 1000) - 60; // clock-skew cushion
+  const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const payload = base64url(
+    JSON.stringify({ iat, exp: iat + 600, iss: appId }),
+  );
+  const data = `${header}.${payload}`;
+  const signature = createSign("RSA-SHA256")
+    .update(data)
+    .sign(normalizePrivateKey(key));
+  return `${data}.${base64url(signature)}`;
+}
+
+// Per-installation access-token cache. Tokens live ~1h; we refresh a minute
+// early. Module-level, so it survives across requests on a warm serverless
+// instance (and resets harmlessly on cold start).
+type CachedToken = { token: string; expiresAtMs: number };
+const installationTokenCache = new Map<string, CachedToken>();
+const TOKEN_SKEW_MS = 60_000;
+
+/** For tests: clear the installation-token cache. */
+export function __clearInstallationTokenCache(): void {
+  installationTokenCache.clear();
+}
+
+/**
+ * An installation access token, cached until shortly before it expires. Mints a
+ * fresh one via the app JWT on a miss. Read-only usage only (contents/metadata).
+ */
+export async function getInstallationToken(
+  installationId: string,
+  now: number = Date.now(),
+): Promise<string> {
+  const cached = installationTokenCache.get(installationId);
+  if (cached && cached.expiresAtMs - TOKEN_SKEW_MS > now) return cached.token;
+
+  const res = await fetch(
+    `${API}/app/installations/${installationId}/access_tokens`,
+    {
+      method: "POST",
+      headers: {
+        ...headers(generateAppJwt(now)),
+        Accept: "application/vnd.github+json",
+      },
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`GitHub installation token failed: ${res.status}`);
+  }
+  const data = (await res.json()) as { token: string; expires_at: string };
+  installationTokenCache.set(installationId, {
+    token: data.token,
+    expiresAtMs: new Date(data.expires_at).getTime(),
+  });
+  return data.token;
+}
+
+type InstallationRepoApi = {
+  full_name: string;
+  description: string | null;
+  html_url: string;
+  private: boolean;
+  pushed_at: string | null;
+};
+
+/** Pure: map + sort the installations API payload (newest push first). */
+export function mapInstallationRepoList(data: {
+  repositories?: InstallationRepoApi[];
+}): GithubRepo[] {
+  const repos = (data.repositories ?? []).map((r) => ({
+    fullName: r.full_name,
+    description: r.description,
+    htmlUrl: r.html_url,
+    private: r.private,
+    pushedAt: r.pushed_at,
+  }));
+  return repos.sort(
+    (a, b) =>
+      new Date(b.pushedAt ?? 0).getTime() - new Date(a.pushedAt ?? 0).getTime(),
+  );
+}
+
+/**
+ * List the repos an installation has granted us (private included), newest push
+ * first. Uses the cached installation token. Read-only.
+ */
+export async function listInstallationRepos(
+  installationId: string,
+): Promise<GithubRepo[]> {
+  const token = await getInstallationToken(installationId);
+  const res = await fetch(`${API}/installation/repositories?per_page=100`, {
+    headers: headers(token),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`GitHub listInstallationRepos failed: ${res.status}`);
+  }
+  return mapInstallationRepoList(
+    (await res.json()) as { repositories?: InstallationRepoApi[] },
+  );
+}
+
+/**
+ * Setup/callback params GitHub appends to our Setup URL after an install. `state`
+ * is what we round-tripped (where to return the user); `installation_id` is the
+ * new/confirmed installation. Zod-validated — never trust these raw.
+ */
+export const SetupCallbackSchema = z.object({
+  installation_id: z.coerce.number().int().positive(),
+  setup_action: z.string().optional(),
+  state: z.string().max(200).optional(),
+});
+export type SetupCallback = z.infer<typeof SetupCallbackSchema>;
+
+/** Validate the setup-callback query. Returns null on anything malformed. */
+export function parseSetupCallback(
+  params: URLSearchParams | Record<string, string | undefined>,
+): SetupCallback | null {
+  const get = (k: string) =>
+    params instanceof URLSearchParams ? params.get(k) ?? undefined : params[k];
+  const parsed = SetupCallbackSchema.safeParse({
+    installation_id: get("installation_id"),
+    setup_action: get("setup_action"),
+    state: get("state"),
+  });
+  return parsed.success ? parsed.data : null;
 }

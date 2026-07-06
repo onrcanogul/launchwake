@@ -32,6 +32,13 @@ const Schema = z.object({
       return normalized;
     }),
   githubRepo: z.string().trim().max(200).optional().or(z.literal("")),
+  // Set when the repo was picked from a GitHub App installation (else empty).
+  githubInstallationId: z
+    .string()
+    .trim()
+    .regex(/^\d+$/)
+    .optional()
+    .or(z.literal("")),
   description: z.string().trim().max(2000).optional().or(z.literal("")),
   // The branching question — required. Drives Launch Mode vs Growth Mode.
   launchStage: z.enum(["PRE_LAUNCH", "UNANNOUNCED", "LAUNCHED"]),
@@ -53,6 +60,7 @@ export async function createProject(
     name: formData.get("name"),
     url: formData.get("url") || undefined,
     githubRepo: formData.get("githubRepo") || undefined,
+    githubInstallationId: formData.get("githubInstallationId") || undefined,
     description: formData.get("description") || undefined,
     launchStage: formData.get("launchStage"),
   });
@@ -84,12 +92,19 @@ export async function createProject(
     githubRepo = `${ref.owner}/${ref.repo}`;
   }
 
+  // Only carry the installation id when a repo actually came from it.
+  const githubInstallationId =
+    githubRepo && parsed.data.githubInstallationId
+      ? parsed.data.githubInstallationId
+      : null;
+
   const project = await db.project.create({
     data: {
       userId: session.user.id,
       name: parsed.data.name,
       url: parsed.data.url || null,
       githubRepo,
+      githubInstallationId,
       description: parsed.data.description || null,
       launchStage,
     },

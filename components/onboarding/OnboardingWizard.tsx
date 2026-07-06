@@ -1,21 +1,11 @@
 "use client";
 
-import {
-  useActionState,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { FieldError } from "@/components/ui/FieldError";
 import { CharCounter } from "@/components/ui/CharCounter";
-import {
-  createProject,
-  registerPrivateRepoInterest,
-  type OnboardingState,
-} from "@/app/onboarding/actions";
+import { RepoPicker } from "@/components/github/RepoPicker";
+import { createProject, type OnboardingState } from "@/app/onboarding/actions";
 import type { GithubRepo } from "@/lib/github";
 
 // The first invalid one (in this order) is focused after a failed submit; the
@@ -55,17 +45,27 @@ function repoName(fullName: string): string {
 
 export function OnboardingWizard({
   repos,
-  githubConnected,
+  appConnected,
+  reposError,
+  installUrl,
+  installationId,
 }: {
+  /** Repos the GitHub App installation granted (private included). */
   repos: GithubRepo[];
-  githubConnected: boolean;
+  /** An installation exists and its repos loaded. */
+  appConnected: boolean;
+  /** An installation exists but listing its repos failed. */
+  reposError: boolean;
+  /** GitHub App install URL (null when the App isn't configured). */
+  installUrl: string | null;
+  /** The connected installation id, carried onto the created project. */
+  installationId: string | null;
 }) {
   const [step, setStep] = useState(0);
 
-  // Connection: either a picked GitHub repo, or manual product details.
-  const hasRepos = repos.length > 0;
-  const [manual, setManual] = useState(!hasRepos);
-  const [repoQuery, setRepoQuery] = useState("");
+  // Connection: pick a repo from the installation, or fill product details
+  // manually. Default to manual only when there's no App to connect to at all.
+  const [manual, setManual] = useState(!appConnected && !installUrl);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
 
   const [name, setName] = useState("");
@@ -113,18 +113,6 @@ export function OnboardingWizard({
     }
   }, [focusField, step, manual]);
 
-  const filteredRepos = useMemo(() => {
-    const q = repoQuery.trim().toLowerCase();
-    const list = q
-      ? repos.filter(
-          (r) =>
-            r.fullName.toLowerCase().includes(q) ||
-            (r.description ?? "").toLowerCase().includes(q),
-        )
-      : repos;
-    return list.slice(0, 8);
-  }, [repos, repoQuery]);
-
   function pickRepo(r: GithubRepo) {
     setSelectedRepo(r.fullName);
     setGithubRepo(r.fullName);
@@ -137,17 +125,27 @@ export function OnboardingWizard({
   function clearRepo() {
     setSelectedRepo(null);
     setGithubRepo("");
-    setRepoQuery("");
   }
 
   // Step 0 is satisfied when we have a repo, or a product name (manual path).
-  const canContinueConnect = selectedRepo
-    ? true
-    : name.trim().length > 0;
+  const canContinueConnect = selectedRepo ? true : name.trim().length > 0;
   const canContinueStage = stage !== "";
 
   const cta =
     stage === "LAUNCHED" ? "Analyze my first ship" : "Start my launch plan";
+
+  const manualLink = (
+    <button
+      type="button"
+      className="linklike"
+      onClick={() => {
+        setManual(true);
+        clearRepo();
+      }}
+    >
+      Can&apos;t find it? Enter details manually
+    </button>
+  );
 
   return (
     <>
@@ -166,7 +164,8 @@ export function OnboardingWizard({
             distribution plan. Point it at your product to get your first one.
           </p>
 
-          {hasRepos && !manual && (
+          {/* Connected → repo picker (private repos included). */}
+          {!manual && appConnected && (
             <div>
               <label className="fl">Your GitHub repos</label>
               {selectedRepo ? (
@@ -189,63 +188,48 @@ export function OnboardingWizard({
                     </button>
                   </div>
                 </div>
+              ) : repos.length === 0 ? (
+                <div className="repo-connect">
+                  <Icon name="github" />
+                  <span>
+                    No repos granted yet.{" "}
+                    {installUrl && <a href={installUrl}>Choose repos on GitHub</a>}{" "}
+                    to pick one here.
+                  </span>
+                </div>
               ) : (
-                <div className="repo-picker">
-                  <div className="repo-search">
-                    <Icon name="search" />
-                    <input
-                      className="inp"
-                      placeholder="Search your repositories…"
-                      value={repoQuery}
-                      onChange={(e) => setRepoQuery(e.target.value)}
-                      autoFocus
-                    />
-                  </div>
-                  <div className="repo-menu" role="listbox">
-                    {filteredRepos.length === 0 ? (
-                      <div className="repo-empty">No matching repos.</div>
-                    ) : (
-                      filteredRepos.map((r) => (
-                        <button
-                          key={r.fullName}
-                          type="button"
-                          className="repo-opt"
-                          role="option"
-                          aria-selected="false"
-                          onClick={() => pickRepo(r)}
-                        >
-                          <Icon name="github" />
-                          <span className="repo-opt-name">{r.fullName}</span>
-                          {r.description && (
-                            <span className="repo-opt-desc">{r.description}</span>
-                          )}
-                        </button>
-                      ))
-                    )}
-                  </div>
+                <RepoPicker repos={repos} onSelect={pickRepo} autoFocus />
+              )}
+              {manualLink}
+            </div>
+          )}
+
+          {/* Not connected → install CTA (App configured) + manual fallback. */}
+          {!manual && !appConnected && (
+            <div>
+              {reposError && (
+                <div className="form-msg" role="status" style={{ marginBottom: 12 }}>
+                  <Icon name="shield" />
+                  Couldn&apos;t load your repos — reconnect and try again.
                 </div>
               )}
-              <button
-                type="button"
-                className="linklike"
-                onClick={() => {
-                  setManual(true);
-                  clearRepo();
-                }}
-              >
-                Can&apos;t find it? Enter details manually
-              </button>
+              {installUrl ? (
+                <>
+                  <a href={installUrl} className="btn btn-p">
+                    <Icon name="github" /> Connect GitHub
+                  </a>
+                  <div className="fhint" style={{ marginTop: 10 }}>
+                    You pick which repos to grant on GitHub. LaunchWake gets{" "}
+                    <b>read-only</b> access — it never writes to your code.
+                  </div>
+                </>
+              ) : null}
+              {manualLink}
             </div>
           )}
 
           {manual && (
             <div>
-              {githubConnected && !hasRepos && (
-                <div className="fhint" style={{ marginBottom: 12 }}>
-                  No public repos found on your GitHub — enter your product
-                  details below.
-                </div>
-              )}
               <label className="fl">Product name</label>
               <input
                 className="inp"
@@ -329,19 +313,17 @@ export function OnboardingWizard({
                 message={fieldErrors.description}
               />
 
-              {hasRepos && (
+              {(appConnected || installUrl) && (
                 <button
                   type="button"
                   className="linklike"
                   onClick={() => setManual(false)}
                 >
-                  ← Back to repo picker
+                  ← Back to GitHub
                 </button>
               )}
             </div>
           )}
-
-          <PrivateRepoNote />
 
           <div style={{ display: "flex", gap: 9, marginTop: 22 }}>
             <button
@@ -392,11 +374,7 @@ export function OnboardingWizard({
           </div>
 
           <div style={{ display: "flex", gap: 9, marginTop: 22 }}>
-            <button
-              type="button"
-              className="btn btn-s"
-              onClick={() => setStep(0)}
-            >
+            <button type="button" className="btn btn-s" onClick={() => setStep(0)}>
               Back
             </button>
             <button
@@ -456,14 +434,16 @@ export function OnboardingWizard({
             }
           />
           <CharCounter value={description} max={2000} />
-          <FieldError
-            id="err-review-description"
-            message={fieldErrors.description}
-          />
+          <FieldError id="err-review-description" message={fieldErrors.description} />
 
           {/* Carried from earlier steps. */}
           <input type="hidden" name="url" value={url} />
           <input type="hidden" name="githubRepo" value={githubRepo} />
+          <input
+            type="hidden"
+            name="githubInstallationId"
+            value={selectedRepo && installationId ? installationId : ""}
+          />
           <input type="hidden" name="launchStage" value={stage} />
 
           <div className="ob-summary">
@@ -506,37 +486,5 @@ export function OnboardingWizard({
         </form>
       )}
     </>
-  );
-}
-
-/** "Private repo? Coming soon" note + one-click interest capture (Lead). */
-function PrivateRepoNote() {
-  const [done, setDone] = useState(false);
-  const [pending, startTransition] = useTransition();
-
-  return (
-    <div className="ob-private">
-      <Icon name="lock" />
-      <span>
-        Private repo? Private support is coming via a GitHub App.{" "}
-        {done ? (
-          <b style={{ color: "var(--ok)" }}>We&apos;ll let you know.</b>
-        ) : (
-          <button
-            type="button"
-            className="linklike"
-            disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                await registerPrivateRepoInterest();
-                setDone(true);
-              })
-            }
-          >
-            Notify me
-          </button>
-        )}
-      </span>
-    </div>
   );
 }

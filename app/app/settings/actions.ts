@@ -16,6 +16,7 @@ import {
 } from "@/lib/team";
 import { saveBrand, setReportEnabled } from "@/lib/clientReport";
 import { setEmailNotifications } from "@/lib/emailPrefs";
+import { parseRepo } from "@/lib/github";
 import { normalizeHttpUrl } from "@/lib/url";
 
 // White-label brand input. logoUrl is https-only (normalized, then required to be
@@ -227,6 +228,34 @@ async function ownedProjectId(projectId: string): Promise<string | null> {
     select: { id: true },
   });
   return project?.id ?? null;
+}
+
+/**
+ * Set (or clear) the project's connected repo. Used by both the App repo picker
+ * (passes the granted repo's full name) and the manual owner/repo fallback. The
+ * installation id itself is set by the App setup callback, not here.
+ */
+export async function saveProjectRepo(
+  projectId: string,
+  repoInput: string,
+): Promise<{ ok: boolean; repo?: string | null; error?: string }> {
+  const id = await ownedProjectId(projectId);
+  if (!id) return { ok: false, error: "Project not found" };
+
+  const trimmed = repoInput.trim();
+  if (!trimmed) {
+    await db.project.update({ where: { id }, data: { githubRepo: null } });
+    revalidatePath("/app/[project]/settings", "page");
+    return { ok: true, repo: null };
+  }
+  const ref = parseRepo(trimmed);
+  if (!ref) {
+    return { ok: false, error: "Enter it as owner/repo or a GitHub URL." };
+  }
+  const repo = `${ref.owner}/${ref.repo}`;
+  await db.project.update({ where: { id }, data: { githubRepo: repo } });
+  revalidatePath("/app/[project]/settings", "page");
+  return { ok: true, repo };
 }
 
 /** Generate (or rotate) the project's GitHub webhook signing secret. */

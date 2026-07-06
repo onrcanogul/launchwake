@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import {
-  getUserGithubToken,
-  listUserRepos,
+  githubAppConfigured,
+  appInstallUrl,
+  listInstallationRepos,
+  GH_INSTALLATION_COOKIE,
   type GithubRepo,
 } from "@/lib/github";
 import { resolveAccount } from "@/lib/team";
@@ -58,24 +61,33 @@ export default async function OnboardingPage() {
     );
   }
 
-  // Repo picker source: the user's own public repos. Private repos are filtered
-  // out (public-only for now; interest in private support is captured separately).
-  // Email-auth users have no token → the wizard falls back to manual entry.
+  // Repo picker source: the GitHub App installation (private repos included).
+  // The install callback stashed the installation id in a cookie; with it we
+  // list the granted repos. No installation → the wizard shows "Connect GitHub"
+  // (install) plus the de-emphasized manual owner/repo fallback.
+  const appConfigured = githubAppConfigured();
+  const installationId = appConfigured
+    ? ((await cookies()).get(GH_INSTALLATION_COOKIE)?.value ?? null)
+    : null;
   let repos: GithubRepo[] = [];
-  let githubConnected = false;
-  const token = await getUserGithubToken(userId);
-  if (token) {
-    githubConnected = true;
+  let reposError = false;
+  if (installationId) {
     try {
-      repos = (await listUserRepos(token)).filter((r) => !r.private);
+      repos = await listInstallationRepos(installationId);
     } catch {
-      repos = [];
+      reposError = true;
     }
   }
 
   return (
     <div className="ob">
-      <OnboardingWizard repos={repos} githubConnected={githubConnected} />
+      <OnboardingWizard
+        repos={repos}
+        appConnected={installationId !== null && !reposError}
+        reposError={reposError}
+        installUrl={appConfigured ? appInstallUrl("onboarding") : null}
+        installationId={installationId}
+      />
     </div>
   );
 }

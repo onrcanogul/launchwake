@@ -15,6 +15,7 @@ import { TeamPanel } from "@/components/settings/TeamPanel";
 import { BrandPanel } from "@/components/settings/BrandPanel";
 import { getBrand, clientReportUrl } from "@/lib/clientReport";
 import { GithubWebhook } from "@/components/settings/GithubWebhook";
+import { GithubConnect } from "@/components/github/GithubConnect";
 import { ReleaseAction } from "@/components/settings/ReleaseAction";
 import { SlackConnect } from "@/components/settings/SlackConnect";
 import { LeaveTeamButton } from "@/components/settings/LeaveTeamButton";
@@ -27,7 +28,13 @@ import {
 } from "@/lib/billing";
 import { getTeamView } from "@/lib/team";
 import { getTrackingStatus } from "@/lib/attribution";
-import { getGithubStatus } from "@/lib/github";
+import {
+  getGithubStatus,
+  githubAppConfigured,
+  appInstallUrl,
+  listInstallationRepos,
+  type GithubRepo,
+} from "@/lib/github";
 import { env } from "@/lib/env";
 
 export default async function SettingsPage({
@@ -46,6 +53,17 @@ export default async function SettingsPage({
   const github = await getGithubStatus(ws.project);
   const p = ws.project;
   const webhookUrl = `${env.APP_URL.replace(/\/$/, "")}/api/github/webhook`;
+
+  // GitHub App repo picker: list the installation's repos (private included).
+  // null = listing failed (surface a reconnect); [] = no App / no installation.
+  const appConfigured = githubAppConfigured();
+  let installationRepos: GithubRepo[] | null = [];
+  if (appConfigured && p.githubInstallationId) {
+    installationRepos = await listInstallationRepos(p.githubInstallationId).catch(
+      () => null,
+    );
+  }
+  const ghInstallUrl = appConfigured ? appInstallUrl(`project:${p.id}`) : null;
   const isOwner = ws.role === "OWNER";
   const isTeamOwner = isOwner && ws.plan === "TEAM";
   const team = isTeamOwner ? await getTeamView(ws.accountId, ws.user.id) : null;
@@ -74,7 +92,7 @@ export default async function SettingsPage({
           {p.githubRepo ? (
             <Badge dotColor="var(--ok)">Connected</Badge>
           ) : (
-            <Button variant="secondary">Connect</Button>
+            <Badge>Set up below</Badge>
           )}
         </div>
         <div className="setrow">
@@ -107,6 +125,17 @@ export default async function SettingsPage({
           )}
         </div>
         <SlackConnect projectId={p.id} current={p.slackWebhookUrl} />
+      </Panel>
+
+      <Panel title="Connect your repository" right="private repos supported">
+        <GithubConnect
+          projectId={p.id}
+          currentRepo={p.githubRepo}
+          connected={Boolean(p.githubInstallationId)}
+          repos={installationRepos ?? []}
+          reposError={installationRepos === null}
+          installUrl={ghInstallUrl}
+        />
       </Panel>
 
       <Panel title="GitHub auto-detect" right="ships land in your feed">

@@ -55,6 +55,16 @@ const schema = z.object({
   // Shared secret for verifying inbound GitHub webhooks (ship auto-detect).
   GITHUB_WEBHOOK_SECRET: OptionalString,
 
+  // ── GitHub App (installation-based repo access) ───────
+  // A GitHub App (separate from the login OAuth app) grants read-only repo
+  // access — contents:read, metadata:read, webhooks — so the repo picker can
+  // include PRIVATE repos without widening the sign-in scope. All optional to
+  // boot; the picker degrades to the manual owner/repo fallback when unset.
+  GITHUB_APP_ID: OptionalString, // numeric App ID (the JWT issuer)
+  GITHUB_APP_PRIVATE_KEY: OptionalString, // PEM; literal "\n" newlines are normalized
+  GITHUB_APP_SLUG: OptionalString, // the app's URL slug, for the install link
+  GITHUB_APP_WEBHOOK_SECRET: OptionalString, // the App's webhook signing secret
+
   // ── Stripe (later) ────────────────────────────────────
   STRIPE_SECRET_KEY: OptionalString,
   STRIPE_WEBHOOK_SECRET: OptionalString,

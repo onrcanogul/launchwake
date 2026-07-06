@@ -531,6 +531,28 @@ svg {
   color: var(--tx3);
   font-size: 12px;
 }
+.repo-opt-desc {
+  flex: 1;
+}
+/* Private badge (SVG line icon, no emoji) — sits between name and description. */
+.repo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--tx3);
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  padding: 1px 5px 1px 4px;
+  flex: none;
+}
+.repo-opt .repo-badge svg {
+  width: 11px;
+  height: 11px;
+  stroke: var(--tx3);
+}
 
 /* Private-repo interest note. */
 .ob-private {

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
-import { verifyWebhookSignature } from "@/lib/github";
+import {
+  verifyWebhookSignatureAny,
+  installationIdFromPayload,
+} from "@/lib/github";
 import { runWebhookShipJob } from "@/lib/jobs";
 import { captureError } from "@/lib/observability";
 import { hashPayload, recordDelivery, processDelivery } from "@/lib/webhookDelivery";
@@ -32,24 +35,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, ignored: "no repository" });
   }
 
-  const project = await db.project.findFirst({
-    where: { githubRepo: { equals: repoFullName, mode: "insensitive" } },
-  });
+  // App-installation deliveries carry an installation id. Prefer the project that
+  // matches BOTH repo + installation (disambiguates the same repo across
+  // accounts); fall back to repo-only for manual-webhook projects.
+  const installationId = installationIdFromPayload(payload);
+  const repoWhere = {
+    githubRepo: { equals: repoFullName, mode: "insensitive" as const },
+  };
+  const project =
+    (installationId
+      ? await db.project.findFirst({
+          where: { ...repoWhere, githubInstallationId: installationId },
+        })
+      : null) ?? (await db.project.findFirst({ where: repoWhere }));
   if (!project) {
     return NextResponse.json({ ok: true, ignored: "no matching project" });
   }
 
-  // Verify against the project's secret (or the deployment-wide fallback).
-  const secret = project.webhookSecret ?? env.GITHUB_WEBHOOK_SECRET;
-  if (secret) {
-    if (!verifyWebhookSignature(rawBody, signature, secret)) {
+  // Verify against any applicable secret: the project's manual secret, the App's
+  // webhook secret (installation deliveries), or the deployment-wide fallback.
+  const secrets = [
+    project.webhookSecret,
+    env.GITHUB_APP_WEBHOOK_SECRET,
+    env.GITHUB_WEBHOOK_SECRET,
+  ];
+  if (secrets.some(Boolean)) {
+    if (!verifyWebhookSignatureAny(rawBody, signature, secrets)) {
       return NextResponse.json({ error: "Bad signature" }, { status: 401 });
     }
   } else if (env.NODE_ENV === "production") {
     // Never accept an unsigned webhook in production — that's a forged-Ship hole.
     // (In dev we allow it so you can curl the endpoint without a secret.)
     return NextResponse.json(
-      { error: "Webhook signature required (configure GITHUB_WEBHOOK_SECRET)" },
+      { error: "Webhook signature required (configure a webhook secret)" },
       { status: 401 },
     );
   }

@@ -147,8 +147,8 @@ export function NewShipForm({
               <Icon name="github" />
               <span>
                 No repo connected yet.{" "}
-                <Link href="/onboarding">Connect GitHub</Link> to pull ships
-                straight from your releases and commits.
+                <Link href={`/app/${projectId}/settings`}>Connect GitHub</Link> to
+                pull ships straight from your releases and commits.
               </span>
             </div>
           )}
