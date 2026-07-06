@@ -13,10 +13,11 @@ export type ProjectOption = {
 };
 
 /**
- * Sidebar workspace header. With a single project it's a static label — exactly
- * today's markup, no interactivity (progressive disclosure: solo users get zero
- * switcher UI). With 2+ projects the same element becomes a keyboard-accessible
- * dropdown to switch projects (preserving the section) or start a new one.
+ * Sidebar workspace header — a keyboard-accessible dropdown. The header markup
+ * is unchanged (avatar + name + chevron); clicking it opens a menu listing the
+ * account's projects (switching preserves the current section) plus a
+ * "New project" action. Shown even with a single project so there's always an
+ * entry point to add another (the chevron already implied it was clickable).
  */
 export function ProjectSwitcher({
   projects,
@@ -62,11 +63,6 @@ export function ProjectSwitcher({
       <Icon name="chevronUpDown" size={13} style={{ stroke: "var(--tx3)" }} />
     </>
   );
-
-  // Single project → static, non-interactive label (unchanged from before).
-  if (projects.length <= 1) {
-    return <div className="ws">{inner}</div>;
-  }
 
   const pick = (id: string) => {
     setOpen(false);
