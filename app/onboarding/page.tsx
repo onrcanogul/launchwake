@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { auth } from "@/lib/auth";
+import { requireSessionUser } from "@/lib/session";
 import {
   githubAppConfigured,
   appInstallUrl,
@@ -22,9 +21,7 @@ import { Icon } from "@/components/Icon";
  * not the gate.
  */
 export default async function OnboardingPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-  const userId = session.user.id;
+  const { id: userId } = await requireSessionUser();
 
   const { accountId } = await resolveAccount(userId);
   const usage = await getPlanUsage(userId);

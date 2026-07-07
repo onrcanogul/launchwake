@@ -32,6 +32,25 @@ export type Workspace = {
 };
 
 /**
+ * Resolve the signed-in user to their live DB record, or bounce them out:
+ *  - No session at all → /login (they simply need to sign in).
+ *  - A valid session JWT whose user no longer exists — a "ghost session", e.g.
+ *    after a DB reset — → /reauth, which clears the stale cookie first. Going
+ *    straight to /login would loop, because middleware bounces every
+ *    "authenticated" /login request back into the app.
+ *
+ * Cached per request, so every guard in a single render (layout + page + the
+ * bare-/app redirect) shares one lookup.
+ */
+export const requireSessionUser = cache(async (): Promise<User> => {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+  const user = await db.user.findUnique({ where: { id: session.user.id } });
+  if (!user) redirect("/reauth");
+  return user;
+});
+
+/**
  * Load the workspace scoped to the project named in the route (`/app/[project]`).
  * Redirects to /login if unauthenticated; 404s (notFound) when the project isn't
  * owned by the signed-in account — so another user's project is indistinguishable
@@ -43,17 +62,14 @@ export type Workspace = {
  */
 export const getWorkspace = cache(
   async (projectId: string): Promise<Workspace> => {
-    const session = await auth();
-    if (!session?.user?.id) redirect("/login");
-    const userId = session.user.id;
+    const user = await requireSessionUser();
+    const userId = user.id;
 
-    const [user, resolved, activeShipId, channelsCount] = await Promise.all([
-      db.user.findUnique({ where: { id: userId } }),
+    const [resolved, activeShipId, channelsCount] = await Promise.all([
       resolveAccount(userId),
       readActiveShipId(),
       db.channel.count(),
     ]);
-    if (!user) redirect("/login");
 
     const { accountId, role } = resolved;
 

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { requireSessionUser } from "@/lib/session";
 import { resolveAccount } from "@/lib/team";
 import { resolveActiveProjectId } from "@/lib/projects";
 
@@ -10,9 +10,8 @@ import { resolveActiveProjectId } from "@/lib/projects";
  * legacy flat-path stubs which 308.
  */
 export default async function AppIndex() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-  const { accountId } = await resolveAccount(session.user.id);
+  const user = await requireSessionUser();
+  const { accountId } = await resolveAccount(user.id);
 
   const projectId = await resolveActiveProjectId(accountId);
   if (!projectId) redirect("/onboarding");
