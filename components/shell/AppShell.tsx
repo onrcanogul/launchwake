@@ -15,6 +15,7 @@ import {
   ProjectSwitcher,
   type ProjectOption,
 } from "@/components/shell/ProjectSwitcher";
+import { CommandPalette } from "@/components/shell/CommandPalette";
 
 type NavItem = {
   href: string;
@@ -72,6 +73,7 @@ export function AppShell({
 }: AppShellProps) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const rest = sectionRest(pathname);
   const crumb = crumbFor(rest);
   const base = `/app/${projectId}`;
@@ -237,10 +239,24 @@ export function AppShell({
               <b id="crumb">{crumb}</b>
             </div>
           </div>
-          <div className="search">
+          <button
+            type="button"
+            className="search"
+            onClick={() => setPaletteOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={paletteOpen}
+          >
             <Icon name="search" /> Search<span className="kbd">⌘K</span>
-          </div>
+          </button>
         </div>
+
+        <CommandPalette
+          projectId={projectId}
+          ships={ships}
+          activeShipId={activeShip?.id ?? null}
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+        />
 
         <div className="content" id="main">
           {/* keyed on route → replays the entrance animation on each navigation */}

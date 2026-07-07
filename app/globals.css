@@ -882,6 +882,16 @@ button.ws {
   color: var(--tx3);
   font-size: 12px;
   width: 170px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.search:hover {
+  border-color: var(--line2);
+  color: var(--tx2);
 }
 .search svg {
   width: 13px;
@@ -897,6 +907,107 @@ button.ws {
   border-radius: 4px;
   padding: 1px 5px;
   color: var(--tx3);
+}
+
+/* ── Command palette (⌘K) ─────────────────────────────── */
+.cmdk-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(6, 7, 10, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+}
+.cmdk {
+  width: 100%;
+  max-width: 520px;
+  background: var(--bg1);
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+.cmdk-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 13px;
+  border-bottom: 1px solid var(--line);
+  color: var(--tx3);
+}
+.cmdk-head svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  fill: none;
+  flex: none;
+}
+.cmdk-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--tx);
+  font-family: inherit;
+  font-size: 13.5px;
+}
+.cmdk-input::placeholder {
+  color: var(--tx3);
+}
+.cmdk-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 5px;
+}
+.cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 9px;
+  background: none;
+  border: none;
+  border-radius: var(--r);
+  color: var(--tx2);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.cmdk-item svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  fill: none;
+  flex: none;
+  color: var(--tx3);
+}
+.cmdk-item.on {
+  background: var(--hover);
+  color: var(--tx);
+}
+.cmdk-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmdk-hint {
+  font-size: 10.5px;
+  color: var(--tx3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex: none;
+}
+.cmdk-empty {
+  padding: 18px 13px;
+  color: var(--tx3);
+  font-size: 12.5px;
 }
 
 .content {
