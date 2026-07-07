@@ -1,0 +1,33 @@
+flowchart TD
+    subgraph GIRIS["FAZ 0 — Giriş & Profil"]
+        A1[Repository bağla] -->|getRepoMeta: README, topics,<br/>homepage, release| P[Proje profili<br/>LLM: kategori + ICP + pitch]
+        A2[Açıklama + URL] -->|landing scrape +<br/>LLM zenginleştirme| P
+    end
+
+    P --> D{Proje yayında mı?<br/>otomatik tespit + onay}
+
+    D -->|HAYIR| PRE
+    subgraph PRE["FAZ A — PRE_LAUNCH ⭐ yeni"]
+        B1[Pre-launch plan:<br/>waitlist, PH Coming Soon,<br/>build-in-public, dizin ön kayıt]
+        B2[D-day countdown:<br/>T-14 pixel/landing · T-7 pitch<br/>T-3 taslaklar · T-1 son kontrol]
+        B3[Waitlist attribution:<br/>lansmandan önce kanıt]
+        B1 --> B2 --> B3
+    end
+    PRE -->|Launch Pass $19| T0
+
+    T0[LAUNCH_DAY<br/>saatlik run-sheet + cockpit<br/>canlı HN takibi + koçluk] --> REP[Launch Report<br/>paylaşılabilir / viral]
+    REP --> LIVE
+
+    D -->|EVET| LIVE
+    subgraph LIVE["FAZ B — LIVE (sürekli döngü)"]
+        C1[Ship tespiti<br/>webhook release/commit<br/>+ anlamlılık filtresi] --> C2[Distribution Plan<br/>fit · ban-risk · timing · why]
+        C2 --> C3[Launch Kit taslakları<br/>insan postlar — asla auto-post]
+        C3 --> C4[Tracked links → Results<br/>kanal bazlı attribution]
+        C4 -->|outcome re-ranking<br/>flywheel/moat| C2
+        C4 -.-> Q[Distribution Queue<br/>6 haftalık kampanya]
+        C4 -.-> R[Intent Radar<br/>sıcak lead uyarıları]
+        C4 -.-> N[Newsletter Pitch Engine]
+        C4 -.-> BM[Kategori benchmark<br/>Free: kilitli · Pro: açık]
+    end
+
+    Q & R & N & BM -->|haftalık digest:<br/>bu haftanın 3 görevi| C1
