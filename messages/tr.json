@@ -7,6 +7,8 @@
     "changelog": "Değişiklikler",
     "stateOfLaunches": "Lansman Durumu",
     "signIn": "Giriş yap",
+    "terms": "Koşullar",
+    "privacy": "Gizlilik",
     "footerTagline": "© LaunchWake — teknik kurucular için dağıtım zekâsı."
   },
   "LocaleSwitcher": {
@@ -316,6 +318,7 @@
     "metaDescription": "LaunchWake'e giriş yap — teknik kurucular için dağıtım yardımcısı.",
     "subtitle": "Kod yazmayı tercih eden kurucular için pazarlama zekâsı.",
     "footer": "GitHub önerilir — ileride lansman otomatik algılamayı etkinleştirir.",
+    "legal": "Devam ederek <terms>Kullanım Koşulları</terms> ve <privacy>Gizlilik Politikası</privacy>'nı kabul etmiş olursun.",
     "continueGithub": "GitHub ile devam et",
     "or": "veya",
     "magicLinkSent": "Sihirli bağlantı için gelen kutunu kontrol et.",

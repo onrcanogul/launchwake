@@ -7,6 +7,8 @@
     "changelog": "Changelog",
     "stateOfLaunches": "State of Launches",
     "signIn": "Sign in",
+    "terms": "Terms",
+    "privacy": "Privacy",
     "footerTagline": "© LaunchWake — distribution intelligence for technical founders."
   },
   "LocaleSwitcher": {
@@ -316,6 +318,7 @@
     "metaDescription": "Sign in to LaunchWake — the distribution co-pilot for technical founders.",
     "subtitle": "Marketing intel for founders who'd rather be coding.",
     "footer": "GitHub is recommended — it enables ship auto-detection later.",
+    "legal": "By continuing you agree to our <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
     "continueGithub": "Continue with GitHub",
     "or": "or",
     "magicLinkSent": "Check your inbox for a magic link.",

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import Image from "next/image";
 import { alternatesFor, type Locale } from "@/i18n/paths";
+import { Link } from "@/i18n/navigation";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { env } from "@/lib/env";
 
@@ -69,6 +70,12 @@ export default async function LoginPage({
         />
 
         <p className="authfoot">{t("footer")}</p>
+        <p className="authfoot" style={{ marginTop: 10 }}>
+          {t.rich("legal", {
+            terms: (chunks) => <Link href="/terms">{chunks}</Link>,
+            privacy: (chunks) => <Link href="/privacy">{chunks}</Link>,
+          })}
+        </p>
       </div>
 
       <svg

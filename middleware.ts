@@ -74,6 +74,8 @@ export const config = {
     "/tools/:path*",
     "/state-of-developer-launches",
     "/changelog",
+    "/terms",
+    "/privacy",
     "/login",
   ],
 };

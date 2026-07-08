@@ -68,6 +68,10 @@ export async function PublicShell({
           <Link href="/pricing">{t("pricing")}</Link>
           {" · "}
           <Link href="/changelog">{t("changelog")}</Link>
+          {" · "}
+          <Link href="/terms">{t("terms")}</Link>
+          {" · "}
+          <Link href="/privacy">{t("privacy")}</Link>
         </span>
       </footer>
     </div>
