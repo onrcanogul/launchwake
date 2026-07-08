@@ -17,6 +17,21 @@ Local repo yine origin/main'den 14 commit geride — taşımaya başlamadan `git
 5. **GitHub webhook'ları**: kullanıcı projelerine kayıtlı mevcut webhook'lar eski URL'i işaret ediyor olabilir — kayıtlı webhook URL'lerini güncelleyen küçük bir migration/script gerekir (şimdilik kullanıcı sayısı azken elle de olur).
 6. **GitHub Action**: action'ın çağırdığı API base URL'i yeni domaine güncelle + yeni sürüm tag'le.
 
+## 2.5 Veritabanı: schema migrate + katalog seed (ATLAMA — atlanınca "boş katalog" hatası verir)
+Prod DB'de migration'lar uygulanmış olsa bile **katalog seed'i ayrı bir adımdır** ve unutulursa onboarding sonrası "Build distribution plan" şu hatayı verir: *"The channel catalog is empty — run `pnpm db:seed`"*.
+
+1. **Migrate**: `pnpm db:migrate:deploy` (`prisma migrate deploy`) — yalnızca uygulanmamış migration'ları uygular, idempotent.
+2. **Katalog seed'i (kritik)**: `Channel` tablosu ürünün intelligence asset'i (fixture değil). `seed.ts` upsert kullanır → tekrar çalıştırmak güvenli.
+   ```bash
+   # Pooler (pgbouncer, port 6543) DEĞİL, direct connection (port 5432) kullan.
+   DATABASE_URL="<prod-direct-5432-url>" pnpm db:seed
+   ```
+   Not: seed'in Prisma client'ı `DATABASE_URL`'i okur (schema'daki `directUrl` yalnızca Prisma Migrate/CLI içindir), o yüzden **direct** URL'i doğrudan `DATABASE_URL`'e ver. ~105 kanal / 6 kategori yazar.
+3. **Doğrula**: prod DB'de `SELECT count(*) FROM "Channel";` > 0 (≈105, platformlara yayılmış).
+4. **Tek adım**: `pnpm db:release` = `prisma migrate deploy && tsx prisma/seed.ts`. Idempotent; her prod deploy'dan sonra elle çalıştırılabilir.
+
+> **Neden Vercel build adımına otomatik seed koymadık:** Production ve Preview aynı `DATABASE_URL`'i paylaşıyor — seed'i `build`'e koymak, her preview deploy'unun da prod DB'ye yazmasına ve deploy başarısının DB erişilebilirliğine bağlanmasına yol açardı. Ayrıca migration'lar bilinçli olarak manuel tutuluyor. Bu yüzden seed, kontrollü bir manuel release adımı (bu madde) olarak kalıyor.
+
 ## 3. E-posta (magic link auth için kritik)
 - Gönderimi kendi domaininden yap: `EMAIL_FROM` → `hello@<domain>`.
 - DNS'e SPF + DKIM + DMARC kayıtlarını ekle (sağlayıcın — Resend/SES/SMTP — hepsinin kaydını verir). Bunsuz magic link'ler ve Monday digest spam'e düşer; login e-postayla olduğu için bu doğrudan aktivasyon problemi.

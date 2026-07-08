@@ -77,5 +77,11 @@ and the landing at `/mock/launchwake.html`. Treat them as the visual source of t
 pnpm install
 cp .env.example .env.local   # fill in keys
 pnpm prisma migrate dev
+pnpm db:seed                  # REQUIRED: seed the channel catalog — the app can't build a plan without it
 pnpm dev
 ```
+
+> The channel catalog (`Channel` table) is the product's intelligence asset, not fixture
+> data. Skipping `db:seed` leaves it empty, and "Build distribution plan" fails with
+> _"The channel catalog is empty — run `pnpm db:seed`"_. `seed.ts` upserts, so re-running
+> is safe. For a prod deploy, seed the production DB too — see `docs/GO_LIVE.md` §2.5.
