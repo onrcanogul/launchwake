@@ -1,6 +1,8 @@
 import Stripe from "stripe";
 import { db } from "./db";
 import { env, requireEnv } from "./env";
+import { ingestRevenue } from "./attribution";
+import { captureError } from "./observability";
 import type { Plan } from "@prisma/client";
 
 /**
@@ -265,7 +267,20 @@ export async function createCheckoutUrl(
           },
         };
 
-  const meta = { userId, plan, seats: String(seats) };
+  const meta: Record<string, string> = { userId, plan, seats: String(seats) };
+  // Stamp the channel ref captured at signup onto the subscription. Attribution
+  // itself runs in-process on invoice.paid (see attributeInvoiceRevenue), which
+  // resolves the ref from User.lwRef — so this metadata records nothing on its
+  // own. It's a provider-native breadcrumb (visible in the Stripe dashboard, and
+  // what a turnkey /api/track/stripe webhook would read if one were ever wired
+  // for another account). Do NOT point such a webhook at THIS account's events,
+  // or the same payment would be counted twice.
+  const { lwRef } = await db.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { lwRef: true },
+  });
+  if (lwRef) meta.lw_ref = lwRef;
+
   const session = await getStripe().checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
@@ -342,8 +357,96 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
       }
       break;
     }
+    // Dogfood revenue attribution. We attribute on `invoice.paid` only — it fires
+    // for the first subscription invoice AND every renewal, so each paid invoice
+    // is credited exactly once (not double-counted against
+    // checkout.session.completed or invoice.payment_succeeded, which cover the
+    // same money). Idempotency across Stripe retries is guaranteed by
+    // processStripeEvent's per-event-id claim.
+    case "invoice.paid": {
+      await attributeInvoiceRevenue(event.data.object as StripeInvoiceish);
+      break;
+    }
     default:
       break;
+  }
+}
+
+// Minimal, version-agnostic view of a Stripe invoice — we only read the fields
+// we attribute on, so we don't couple to Stripe's shifting Invoice type across
+// API versions (`subscription` in particular has moved around).
+type SubRef = string | { id?: string } | null | undefined;
+type StripeInvoiceish = {
+  id?: string;
+  customer?: string | { id?: string } | null;
+  amount_paid?: number | null;
+  amount_due?: number | null;
+  currency?: string | null;
+  // How we tell a subscription invoice (→ MRR) from a one-off charge. Stripe
+  // moved this around: older API versions expose a top-level `subscription`;
+  // 2025+/2026-02-25.clover dropped it in favour of `parent.subscription_details`
+  // and per-line `subscription`. `billing_reason` (subscription_create/_cycle/…)
+  // is stable across all of them, so we check every signal.
+  subscription?: SubRef;
+  billing_reason?: string | null;
+  parent?: { subscription_details?: { subscription?: SubRef } | null } | null;
+  lines?: { data?: Array<{ subscription?: SubRef } | null> } | null;
+};
+
+/** Version-robust "is this a subscription invoice?" — see StripeInvoiceish. */
+function isRecurringInvoice(invoice: StripeInvoiceish): boolean {
+  if (invoice.subscription) return true;
+  if (invoice.parent?.subscription_details?.subscription) return true;
+  if (invoice.lines?.data?.some((l) => l?.subscription)) return true;
+  return (
+    typeof invoice.billing_reason === "string" &&
+    invoice.billing_reason.startsWith("subscription")
+  );
+}
+
+/**
+ * Dogfood: attribute LaunchWake's OWN subscription revenue back to the channel
+ * that drove the signup. The paying user's `lw_ref` (a tracked-link short code)
+ * is stored on their User row at signup, so we resolve it from the invoice's
+ * Stripe customer id — no `lw_ref` in Stripe metadata required. Records the
+ * revenue in-process via `ingestRevenue` (the same path /api/track/revenue uses).
+ *
+ * Best-effort: any failure is logged and swallowed so it never bubbles up to
+ * fail the webhook or the plan change (which would trigger a full Stripe retry
+ * and risk re-attributing). Returns whether the payment was attributed.
+ */
+export async function attributeInvoiceRevenue(
+  invoice: StripeInvoiceish,
+  client: Pick<typeof db, "user" | "trackedLink" | "event"> = db,
+): Promise<boolean> {
+  try {
+    const customerId =
+      typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+    if (!customerId) return false;
+
+    const amountCents = Number(invoice.amount_paid ?? invoice.amount_due);
+    if (!Number.isFinite(amountCents) || amountCents <= 0) return false;
+
+    const user = await client.user.findFirst({
+      where: { stripeCustomerId: customerId },
+      select: { lwRef: true },
+    });
+    const ref = user?.lwRef;
+    if (!ref) return false; // unknown customer or signup carried no channel ref
+
+    return await ingestRevenue(
+      ref,
+      {
+        amountCents,
+        currency: invoice.currency ?? "usd",
+        recurring: isRecurringInvoice(invoice),
+        meta: { via: "stripe-self", invoiceId: invoice.id },
+      },
+      client,
+    );
+  } catch (err) {
+    captureError(err, { at: "billing.attributeInvoiceRevenue", invoiceId: invoice.id });
+    return false;
   }
 }
 

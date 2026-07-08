@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { routing } from "@/i18n/routing";
 import { env } from "@/lib/env";
+import { pixelSrc } from "@/lib/pixel";
+import { PixelSignupPing } from "@/components/PixelSignupPing";
 import "./globals.css";
+
+// LaunchWake dogfoods its own attribution pixel: the project id of the
+// "LaunchWake" product in our own DB. The pixel captures lw_ref on tracked-link
+// landings, exposes launchwakeSignup() (fired once by PixelSignupPing right
+// after a new signup), and sends the "pixel detected" verification ping.
+const LW_PIXEL_PROJECT_ID = "cmrbrb3y50001jp045gkqyvy3";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -36,6 +45,12 @@ export default function RootLayout({
         {children}
         {/* First-party, cookieless page-view analytics — see which SEO pages land. */}
         <Analytics />
+        {/* LaunchWake's own attribution pixel (dogfood) + one-shot signup ping. */}
+        <Script
+          src={pixelSrc(env.APP_URL, LW_PIXEL_PROJECT_ID)}
+          strategy="afterInteractive"
+        />
+        <PixelSignupPing />
       </body>
     </html>
   );

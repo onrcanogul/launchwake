@@ -3,12 +3,14 @@ import type { Adapter } from "next-auth/adapters";
 import Nodemailer from "next-auth/providers/nodemailer";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { cookies } from "next/headers";
 import { db } from "./db";
 import { env } from "./env";
 import { authConfig } from "./auth.config";
 import { pickAccountColumns } from "./authAccount";
 import { ensureDemoUser, DEMO_EMAIL } from "./demo";
 import { captureUser, EVENTS } from "./analytics";
+import { captureSignupRef } from "./attribution";
 
 /**
  * Wrap the Prisma adapter so `linkAccount` only writes columns our `Account`
@@ -65,7 +67,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     // Funnel: a brand-new account (magic link or OAuth), not a repeat sign-in.
     async createUser({ user }) {
-      if (user.id) await captureUser(user.id, EVENTS.signup);
+      if (!user.id) return;
+      await captureUser(user.id, EVENTS.signup);
+      // Dogfood attribution: stash the lw_ref this visitor arrived with (dropped
+      // as a first-party cookie by /r/{code}) so their eventual payment credits
+      // the channel that drove the signup. Cookie read can throw outside a
+      // request scope — best-effort, never blocks account creation.
+      try {
+        const store = await cookies();
+        const ref = store.get("lw_ref")?.value;
+        if (ref) {
+          await captureSignupRef(user.id, ref);
+          // One-time, client-readable flag → PixelSignupPing fires
+          // launchwakeSignup() exactly once on the post-signup page, recording
+          // the SIGNUP event through the pixel (the client-pixel path, not a
+          // server-side ingest that would double-count it).
+          store.set("lw_signup_ping", "1", {
+            maxAge: 600,
+            path: "/",
+            sameSite: "lax",
+          });
+        }
+      } catch {
+        /* no request-scoped cookies (e.g. programmatic user creation) */
+      }
     },
   },
 });

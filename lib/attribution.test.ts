@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   generateShortCode,
   slugifyCampaign,
@@ -7,6 +7,8 @@ import {
   estimateEffortMinutes,
   formatEffort,
   formatMoney,
+  sanitizeRef,
+  captureSignupRef,
   type ResultRow,
 } from "./attribution";
 
@@ -114,5 +116,52 @@ describe("buildInsight", () => {
     expect(insight).toMatch(/Product Hunt/);
     expect(insight).toMatch(/\$340/);
     expect(insight).toMatch(/recurring/i);
+  });
+});
+
+describe("sanitizeRef", () => {
+  it("accepts a base62 short code", () => {
+    expect(sanitizeRef("aB3xZ0q")).toBe("aB3xZ0q");
+    expect(sanitizeRef("  aB3xZ0q  ")).toBe("aB3xZ0q"); // trims surrounding space
+  });
+  it("rejects empty, missing, or over-long values", () => {
+    expect(sanitizeRef("")).toBeNull();
+    expect(sanitizeRef("   ")).toBeNull();
+    expect(sanitizeRef(null)).toBeNull();
+    expect(sanitizeRef(undefined)).toBeNull();
+    expect(sanitizeRef("a".repeat(65))).toBeNull();
+  });
+  it("rejects anything that isn't a plain short code (injection guard)", () => {
+    expect(sanitizeRef("abc-123")).toBeNull();
+    expect(sanitizeRef("abc/../x")).toBeNull();
+    expect(sanitizeRef("<script>")).toBeNull();
+    expect(sanitizeRef("a b")).toBeNull();
+  });
+});
+
+describe("captureSignupRef", () => {
+  const clientWith = (update = vi.fn().mockResolvedValue({})) =>
+    ({ user: { update } }) as unknown as Parameters<typeof captureSignupRef>[2];
+
+  it("stores a valid ref on the user", async () => {
+    const update = vi.fn().mockResolvedValue({});
+    const ok = await captureSignupRef("user_1", "aB3xZ0q", clientWith(update));
+    expect(ok).toBe(true);
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "user_1" },
+      data: { lwRef: "aB3xZ0q" },
+    });
+  });
+
+  it("no-ops (no write) when the ref is absent or malformed", async () => {
+    const update = vi.fn().mockResolvedValue({});
+    expect(await captureSignupRef("user_1", undefined, clientWith(update))).toBe(false);
+    expect(await captureSignupRef("user_1", "bad/ref", clientWith(update))).toBe(false);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("swallows a write failure so sign-in never breaks", async () => {
+    const update = vi.fn().mockRejectedValue(new Error("db down"));
+    await expect(captureSignupRef("user_1", "aB3xZ0q", clientWith(update))).resolves.toBe(false);
   });
 });

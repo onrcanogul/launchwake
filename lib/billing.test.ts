@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   entitlementViolation,
   clampSeats,
@@ -6,6 +6,7 @@ import {
   isPaidPlan,
   launchChannelLimit,
   launchChannelPaywall,
+  attributeInvoiceRevenue,
   FREE_LAUNCH_CHANNELS,
   TEAM_MIN_SEATS,
   TEAM_MAX_SEATS,
@@ -116,5 +117,151 @@ describe("teamPriceCents", () => {
     expect(teamPriceCents(3)).toBe(3 * TEAM_PRICE_PER_SEAT_CENTS); // $87 at $29/seat
     expect(teamPriceCents(1)).toBe(TEAM_MIN_SEATS * TEAM_PRICE_PER_SEAT_CENTS); // floored to 3
     expect(teamPriceCents(10)).toBe(10 * TEAM_PRICE_PER_SEAT_CENTS);
+  });
+});
+
+describe("attributeInvoiceRevenue (dogfood)", () => {
+  type Invoice = Parameters<typeof attributeInvoiceRevenue>[0];
+  type Client = Parameters<typeof attributeInvoiceRevenue>[1];
+
+  function makeClient(opts: {
+    // customer id → the lwRef stored on that User (null = user exists, no ref;
+    // absent = no such customer).
+    lwRefByCustomer?: Record<string, string | null>;
+    // short codes that resolve to a real TrackedLink in the DB.
+    knownCodes?: string[];
+  }) {
+    const events: Array<Record<string, unknown>> = [];
+    const known = new Set(opts.knownCodes ?? []);
+    const client = {
+      user: {
+        findFirst: vi.fn(async ({ where }: { where: { stripeCustomerId: string } }) => {
+          const ref = opts.lwRefByCustomer?.[where.stripeCustomerId];
+          return ref === undefined ? null : { lwRef: ref };
+        }),
+      },
+      trackedLink: {
+        findUnique: vi.fn(async ({ where }: { where: { shortCode: string } }) =>
+          known.has(where.shortCode) ? { id: `link_${where.shortCode}` } : null,
+        ),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          events.push(data);
+          return data;
+        }),
+      },
+    };
+    return { client: client as unknown as Client, events };
+  }
+
+  it("attributes a paid subscription invoice as recurring revenue", async () => {
+    const { client, events } = makeClient({
+      lwRefByCustomer: { cus_1: "aB3xZ0q" },
+      knownCodes: ["aB3xZ0q"],
+    });
+    const invoice: Invoice = {
+      id: "in_1",
+      customer: "cus_1",
+      amount_paid: 2900,
+      currency: "usd",
+      subscription: "sub_1",
+    };
+    expect(await attributeInvoiceRevenue(invoice, client)).toBe(true);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      trackedLinkId: "link_aB3xZ0q",
+      type: "REVENUE",
+      amountCents: 2900,
+      currency: "usd",
+      recurring: true,
+    });
+  });
+
+  it("resolves the customer whether it's an id string or an expanded object", async () => {
+    const { client, events } = makeClient({
+      lwRefByCustomer: { cus_1: "aB3xZ0q" },
+      knownCodes: ["aB3xZ0q"],
+    });
+    const ok = await attributeInvoiceRevenue(
+      { id: "in_2", customer: { id: "cus_1" }, amount_paid: 4900, currency: "usd", subscription: "sub_1" },
+      client,
+    );
+    expect(ok).toBe(true);
+    expect(events[0]).toMatchObject({ amountCents: 4900 });
+  });
+
+  it("marks a one-off charge (no subscription) as non-recurring", async () => {
+    const { client, events } = makeClient({
+      lwRefByCustomer: { cus_1: "aB3xZ0q" },
+      knownCodes: ["aB3xZ0q"],
+    });
+    await attributeInvoiceRevenue({ id: "in_3", customer: "cus_1", amount_paid: 1500, currency: "usd" }, client);
+    expect(events[0]).toMatchObject({ recurring: false });
+  });
+
+  // 2026-02-25.clover (the webhook's API version) dropped the top-level
+  // `invoice.subscription`. Recurring must still be detected via the newer
+  // signals, or renewals wouldn't count toward MRR.
+  it("detects a subscription renewal via billing_reason (2026 API, no top-level subscription)", async () => {
+    const { client, events } = makeClient({
+      lwRefByCustomer: { cus_1: "aB3xZ0q" },
+      knownCodes: ["aB3xZ0q"],
+    });
+    await attributeInvoiceRevenue(
+      { id: "in_3b", customer: "cus_1", amount_paid: 2900, currency: "usd", billing_reason: "subscription_cycle" },
+      client,
+    );
+    expect(events[0]).toMatchObject({ recurring: true });
+  });
+
+  it("detects a subscription via parent.subscription_details (2026 API shape)", async () => {
+    const { client, events } = makeClient({
+      lwRefByCustomer: { cus_1: "aB3xZ0q" },
+      knownCodes: ["aB3xZ0q"],
+    });
+    await attributeInvoiceRevenue(
+      {
+        id: "in_3c",
+        customer: "cus_1",
+        amount_paid: 2900,
+        currency: "usd",
+        parent: { subscription_details: { subscription: "sub_9" } },
+      },
+      client,
+    );
+    expect(events[0]).toMatchObject({ recurring: true });
+  });
+
+  it("does nothing when the paying user carries no channel ref", async () => {
+    const { client, events } = makeClient({ lwRefByCustomer: { cus_1: null } });
+    expect(
+      await attributeInvoiceRevenue({ id: "in_4", customer: "cus_1", amount_paid: 2900, subscription: "sub_1" }, client),
+    ).toBe(false);
+    expect(events).toHaveLength(0);
+  });
+
+  it("does nothing for an unknown customer or a non-positive amount", async () => {
+    const unknown = makeClient({});
+    expect(
+      await attributeInvoiceRevenue({ id: "in_5", customer: "cus_x", amount_paid: 2900 }, unknown.client),
+    ).toBe(false);
+
+    const zero = makeClient({ lwRefByCustomer: { cus_1: "aB3xZ0q" }, knownCodes: ["aB3xZ0q"] });
+    expect(
+      await attributeInvoiceRevenue({ id: "in_6", customer: "cus_1", amount_paid: 0, subscription: "sub_1" }, zero.client),
+    ).toBe(false);
+    expect(zero.events).toHaveLength(0);
+  });
+
+  it("doesn't record when the stored ref no longer maps to a tracked link", async () => {
+    const { client, events } = makeClient({
+      lwRefByCustomer: { cus_1: "staleCode" },
+      knownCodes: [], // the link was deleted
+    });
+    expect(
+      await attributeInvoiceRevenue({ id: "in_7", customer: "cus_1", amount_paid: 2900, subscription: "sub_1" }, client),
+    ).toBe(false);
+    expect(events).toHaveLength(0);
   });
 });

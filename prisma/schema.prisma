@@ -27,6 +27,10 @@ model User {
   plan             Plan      @default(FREE)
   seats            Int       @default(1) // purchased seats (Team plan); billed per seat
   stripeCustomerId String?
+  // Channel ref (a tracked-link short code) captured from the lw_ref cookie at
+  // signup. LaunchWake dogfoods its own attribution: when this user pays, the
+  // Stripe webhook credits the channel that drove their signup. See lib/billing.
+  lwRef            String?
   projects         Project[]
   accounts         Account[]
   sessions         Session[]

@@ -28,6 +28,18 @@ export function generateShortCode(len = 7): string {
   return out;
 }
 
+/**
+ * Validate a raw `lw_ref` cookie value before we trust or store it. A ref is a
+ * tracked-link short code (base62), so anything else — empty, over-long, or
+ * carrying punctuation — is treated as absent rather than persisted. Returns the
+ * clean ref, or null if it isn't one.
+ */
+export function sanitizeRef(raw: string | null | undefined): string | null {
+  if (typeof raw !== "string") return null;
+  const ref = raw.trim();
+  return /^[0-9A-Za-z]{1,64}$/.test(ref) ? ref : null;
+}
+
 export function platformSource(platform: Platform | string): string {
   return String(platform).toLowerCase();
 }
@@ -192,6 +204,29 @@ export async function ingestSignup(
     return false;
   }
   return true;
+}
+
+/**
+ * Persist the channel ref captured at signup onto the user, so a later payment
+ * can be attributed to the channel that drove them here — LaunchWake dogfooding
+ * its own revenue attribution (see `attributeInvoiceRevenue` in lib/billing).
+ * No-op when the ref is missing or malformed. Best-effort: a write failure is
+ * logged, never surfaced to the sign-in flow. Returns whether a ref was stored.
+ */
+export async function captureSignupRef(
+  userId: string,
+  rawRef: string | null | undefined,
+  client: Pick<typeof db, "user"> = db,
+): Promise<boolean> {
+  const ref = sanitizeRef(rawRef);
+  if (!ref) return false;
+  try {
+    await client.user.update({ where: { id: userId }, data: { lwRef: ref } });
+    return true;
+  } catch (err) {
+    captureError(err, { at: "attribution.captureSignupRef", userId });
+    return false;
+  }
 }
 
 export type SignupContext = {
