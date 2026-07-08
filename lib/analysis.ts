@@ -11,6 +11,7 @@ import {
   type ChannelLike,
   type ScoredChannel,
 } from "./channels";
+import { parseChannelCost, costPromptLine } from "./channelCost";
 import {
   productTagFor,
   rollupAllChannelStats,
@@ -94,6 +95,7 @@ export function buildAnalysisPrompt(
     hasOutcomes
       ? "- Some candidates include a 'past results' line — REAL outcomes from posting similar products there. Weight it heavily: a channel that produced signups should rank higher; one that got clicks but ZERO signups, or had removals, should rank LOWER even if it looks topically relevant. When past results change the call, say so in 'why' (e.g. 'drove 4% signups for similar tools last time')."
       : "",
+    "- Some candidates include a 'cost' line (paid or freemium). Do NOT down-rank a channel because it costs money — rank on fit as usual. But when you recommend a paid or freemium channel, state the cost plainly in 'why' (e.g. 'submission starts at $39') so the founder can weigh spend against fit. Free channels need no cost mention.",
     "- Do NOT assign ban risk; that is computed separately.",
     "- Respond with ONLY a JSON object, no prose, no code fences.",
     "",
@@ -128,18 +130,20 @@ export function buildAnalysisPrompt(
     .join("\n");
 
   const candidateBlock = candidates
-    .map((c, i) =>
-      [
+    .map((c, i) => {
+      const costLine = costPromptLine(parseChannelCost(c.cost));
+      return [
         `${i + 1}. slug=${c.slug} — ${c.name} [${c.platform}]`,
         c.audienceDesc ? `   audience: ${c.audienceDesc}` : "",
         c.bestTime ? `   best time: ${c.bestTime}` : "",
         c.rules ? `   rules: ${c.rules}` : "",
         `   tags: ${c.tags.join(", ")}`,
+        costLine ? `   cost: ${costLine}` : "",
         outcomeContext?.get(c.slug) ? `   past results: ${outcomeContext.get(c.slug)}` : "",
       ]
         .filter(Boolean)
-        .join("\n"),
-    )
+        .join("\n");
+    })
     .join("\n\n");
 
   const prompt = [
@@ -176,10 +180,18 @@ export function heuristicRank(
         s.matchedTags.length > 0
           ? s.matchedTags.slice(0, 3).join(", ")
           : "your audience";
+      // Keep the offline path honest about spend too — surface any cost in 'why'.
+      const cost = parseChannelCost(s.channel.cost);
+      const costSentence =
+        cost.type === "paid"
+          ? ` Paid channel${cost.note ? ` (${cost.note})` : ""}.`
+          : cost.type === "freemium"
+            ? ` Free option with paid tiers${cost.note ? ` (${cost.note})` : ""}.`
+            : "";
       return {
         slug: s.channel.slug,
         fitScore,
-        why: `${input.ship.title} fits ${s.channel.name}'s audience (${matched}). Frame it around the problem it solves for ${input.project.name}'s users.`,
+        why: `${input.ship.title} fits ${s.channel.name}'s audience (${matched}). Frame it around the problem it solves for ${input.project.name}'s users.${costSentence}`,
         ruleNote: rule,
         bestTime: s.channel.bestTime ?? undefined,
       };

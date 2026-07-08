@@ -1509,6 +1509,23 @@ textarea.inp {
   color: var(--tx3);
   margin-top: 1px;
 }
+/* Cost badge: hairline pill, muted, tabular numbers — no accent, no emoji.
+   Only rendered for paid/freemium channels (free carries no badge). */
+.chan .cost-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 6px;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-weight: 550;
+  line-height: 1.5;
+  color: var(--tx2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
 .fit {
   margin-left: auto;
   text-align: right;

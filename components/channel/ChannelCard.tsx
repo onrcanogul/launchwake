@@ -6,6 +6,7 @@ import { platformIcon } from "@/components/ui/platform";
 import { RemindMenu, type RemindProps } from "@/components/channel/RemindMenu";
 import { AccountReadinessRow } from "@/components/channel/AccountReadinessRow";
 import type { AccountReadinessBlock } from "@/lib/accountReadiness";
+import { costBadge, type ChannelCost } from "@/lib/channelCost";
 
 export type ChannelCardData = {
   name: string;
@@ -17,6 +18,8 @@ export type ChannelCardData = {
   whyText: string;
   ruleNote?: string | null;
   outcomeNote?: string | null;
+  /** Cost to post here; a badge renders for paid/freemium (free shows nothing). */
+  cost?: ChannelCost | null;
 };
 
 /**
@@ -53,6 +56,7 @@ export function ChannelCard({
 }) {
   const risk = RISK[data.banRisk];
   const fit = Math.max(0, Math.min(100, data.fitScore));
+  const cost = data.cost ? costBadge(data.cost) : null;
 
   return (
     <div className="chan">
@@ -63,6 +67,11 @@ export function ChannelCard({
         <div>
           <h3>{data.name}</h3>
           {data.audienceDesc && <div className="aud">{data.audienceDesc}</div>}
+          {cost && (
+            <span className="cost-badge" title={cost.title}>
+              {cost.label}
+            </span>
+          )}
         </div>
         <div className="fit">
           <div className="fr">

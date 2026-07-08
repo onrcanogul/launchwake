@@ -190,6 +190,7 @@ export default async function PlanPage({
                   whyText: rec.whyText,
                   ruleNote: rec.ruleNote,
                   outcomeNote: rec.outcomeNote,
+                  cost: rec.cost,
                 }}
                 draftHref={`/app/${project}/ships/${ship.id}/kit?rec=${rec.id}`}
                 settingsHref={settingsHref}
@@ -228,6 +229,7 @@ export default async function PlanPage({
                       whyText: rec.whyText,
                       ruleNote: rec.ruleNote,
                       outcomeNote: rec.outcomeNote,
+                      cost: rec.cost,
                     }}
                     draftHref={settingsHref}
                     settingsHref={settingsHref}

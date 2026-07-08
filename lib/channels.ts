@@ -20,6 +20,8 @@ export type ChannelLike = {
   defaultBanRisk: BanRiskLike;
   bestTime?: string | null;
   tags: string[];
+  /** Raw seeded cost JSON ({ type, note? }); parsed by lib/channelCost. */
+  cost?: unknown;
 };
 
 export type MatchContext = {

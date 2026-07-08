@@ -4,6 +4,7 @@ import {
   parseAccountRequirements,
   type AccountRequirements,
 } from "./accountReadiness";
+import { parseChannelCost, type ChannelCost } from "./channelCost";
 import type { BanRisk, Platform, ShipType, ShipStatus } from "@prisma/client";
 
 export type RecView = {
@@ -21,6 +22,8 @@ export type RecView = {
   hasDraft: boolean;
   /** Seeded account-readiness data for this channel (null when none). */
   accountRequirements: AccountRequirements | null;
+  /** Normalized cost to post here (absent seed → free). Drives the cost badge. */
+  cost: ChannelCost;
 };
 
 export type ShipWithPlan = {
@@ -76,6 +79,7 @@ export async function getShipWithPlan(
       outcomeNote: r.outcomeNote,
       hasDraft: Boolean(r.draft),
       accountRequirements: parseAccountRequirements(r.channel.accountRequirements),
+      cost: parseChannelCost(r.channel.cost),
     })) ?? [];
 
   return {

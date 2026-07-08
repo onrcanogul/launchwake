@@ -30,6 +30,8 @@ async function main() {
     const accountRequirements = c.accountRequirements
       ? (c.accountRequirements as Prisma.InputJsonValue)
       : Prisma.DbNull;
+    // Absent cost = free; write DbNull so a re-seed clears any stale value.
+    const cost = c.cost ? (c.cost as Prisma.InputJsonValue) : Prisma.DbNull;
     const data = {
       name: c.name,
       platform: c.platform,
@@ -40,6 +42,7 @@ async function main() {
       bestTime: c.bestTime,
       tags: c.tags,
       accountRequirements,
+      cost,
     };
     await db.channel.upsert({
       where: { slug: c.slug },

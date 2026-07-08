@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { assembleCatalog, channelCatalog, CATEGORIES } from "./index";
+import { SeedSchema } from "./types";
 import { AccountRequirementsSchema } from "../../lib/accountReadiness";
+import { parseChannelCost } from "../../lib/channelCost";
 
 describe("channel catalog", () => {
   const { channels, issues, byCategory } = assembleCatalog();
@@ -103,5 +105,64 @@ describe("channel catalog", () => {
     expect(req("lobsters").level).toBe("required");
     expect(req("dir-alternativeto").minAccountAgeDays).toBe(7);
     expect(req("freecodecamp-news").minKarmaOrReputation?.value).toBe(3);
+  });
+});
+
+describe("channel cost", () => {
+  const { channels } = assembleCatalog();
+  const bySlug = new Map(channels.map((c) => [c.slug, c]));
+  const cost = (slug: string) => parseChannelCost(bySlug.get(slug)?.cost);
+
+  it("every channel resolves to a valid cost (absent → free)", () => {
+    for (const c of channels) {
+      expect(["free", "paid", "freemium"]).toContain(parseChannelCost(c.cost).type);
+    }
+  });
+
+  it("every paid/freemium channel carries a factual price note", () => {
+    for (const c of channels) {
+      const parsed = parseChannelCost(c.cost);
+      if (parsed.type !== "free") {
+        expect(parsed.note, `${c.slug} (${parsed.type}) needs a price note`).toBeTruthy();
+        expect((parsed.note ?? "").length).toBeGreaterThan(2);
+      }
+    }
+  });
+
+  it("BetaList is paid-only, from $39 (the dogfood finding)", () => {
+    expect(cost("betalist").type).toBe("paid");
+    expect(cost("betalist").note).toMatch(/\$39/);
+  });
+
+  it("directory venues with a free queue + paid tiers are freemium", () => {
+    for (const slug of [
+      "dir-uneed",
+      "dir-microlaunch",
+      "dir-fazier",
+      "dir-launching-next",
+    ]) {
+      expect(cost(slug).type, slug).toBe("freemium");
+    }
+  });
+
+  it("free venues (Peerlist, subreddits) default to free", () => {
+    expect(cost("dir-peerlist").type).toBe("free");
+    expect(cost("r-saas").type).toBe("free");
+  });
+
+  it("rejects an unknown cost type at the schema boundary", () => {
+    const parsed = SeedSchema.safeParse({
+      slug: "x-bad",
+      name: "Bad",
+      platform: "OTHER",
+      url: "https://example.com",
+      audienceDesc: "x",
+      rules: "some real rules here",
+      defaultBanRisk: "LOW",
+      bestTime: "Anytime",
+      tags: ["x"],
+      cost: { type: "sponsored" },
+    });
+    expect(parsed.success).toBe(false);
   });
 });

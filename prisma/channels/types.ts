@@ -6,6 +6,7 @@ import {
   AccountRequirementsSchema,
   type AccountRequirementsInput,
 } from "../../lib/accountReadiness";
+import { ChannelCostSchema, type ChannelCostInput } from "../../lib/channelCost";
 
 /**
  * One seeded channel. The catalog is the intelligence asset — every entry is a
@@ -28,6 +29,12 @@ export type Seed = {
    * tips, source). Drives launch-mode "account readiness" tips + at-risk warnings.
    */
   accountRequirements?: AccountRequirementsInput;
+  /**
+   * Optional cost to submit/list here. Absent = free (the default for the vast
+   * majority of the catalog); only paid/freemium venues carry an explicit entry.
+   * Shape: lib/channelCost.ts. Surfaces a plan-card badge + a prompt cost note.
+   */
+  cost?: ChannelCostInput;
 };
 
 /** Boot-time validation so a malformed entry fails the seed loudly, not silently. */
@@ -47,4 +54,5 @@ export const SeedSchema = z.object({
     .array(z.string().regex(/^[a-z0-9+.-]+$/, "tags must be lowercase"))
     .min(1),
   accountRequirements: AccountRequirementsSchema.optional(),
+  cost: ChannelCostSchema.optional(),
 });

@@ -354,10 +354,11 @@ export const core: Seed[] = [
     url: "https://betalist.com",
     audienceDesc: "early-adopter directory for pre-launch startups",
     rules:
-      "For early-stage startups seeking first users. Submit for a feature; queue can take weeks. One-time exposure — best for an initial launch, not every ship.",
+      "For early-stage startups seeking first users. Submission is paid-only (from $39; the $99 tier also features you by Monday and includes the ~70k-subscriber newsletter). Cheapest tier is featured within ~2 weeks; full refund if you're not selected. One-time exposure — best for an initial launch, not every ship.",
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Anytime (queued)",
     tags: ["launch", "startup", "saas", "product", "b2b"],
     accountRequirements: BETALIST_READINESS,
+    cost: { type: "paid", note: "from $39" },
   },
 ];

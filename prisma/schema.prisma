@@ -240,6 +240,9 @@ model Channel {
   // Optional account-readiness data (age/karma thresholds, profile tips, source).
   // Shape: lib/accountReadiness.ts AccountRequirementsSchema. Drives launch-mode tips.
   accountRequirements Json?
+  // Optional cost to submit/list here ({ type: free|paid|freemium, note? }).
+  // Absent = free. Shape: lib/channelCost.ts. Drives the plan-card cost badge.
+  cost           Json?
   recs           Recommendation[]
   posts          Post[]
   stats          ChannelStat[]
