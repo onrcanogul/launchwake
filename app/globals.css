@@ -1509,12 +1509,19 @@ textarea.inp {
   color: var(--tx3);
   margin-top: 1px;
 }
-/* Cost badge: hairline pill, muted, tabular numbers — no accent, no emoji.
-   Only rendered for paid/freemium channels (free carries no badge). */
+/* Cost row: a hairline "Paid"/"Freemium" pill that plainly reads as not-free,
+   plus the full price note shown VISIBLY beside it (never a tooltip-only detail).
+   No accent, no emoji; tabular numbers on the note. Free channels render nothing. */
+.chan .cost-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
 .chan .cost-badge {
   display: inline-flex;
   align-items: center;
-  margin-top: 6px;
   padding: 1px 7px;
   font-size: 10.5px;
   font-weight: 550;
@@ -1522,9 +1529,14 @@ textarea.inp {
   color: var(--tx2);
   border: 1px solid var(--line);
   border-radius: 999px;
-  font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
   white-space: nowrap;
+}
+.chan .cost-note {
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--tx3);
+  font-variant-numeric: tabular-nums;
 }
 .fit {
   margin-left: auto;

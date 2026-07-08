@@ -43,27 +43,37 @@ export function parseChannelCost(value: unknown): ChannelCost {
   return parsed.success ? parsed.data : FREE;
 }
 
-export type CostBadge = { label: string; title: string };
+export type CostBadge = {
+  /** The pill word — the unmistakable not-free signal. "Paid" | "Freemium". */
+  label: string;
+  /** The full price note, shown VISIBLY next to the pill (not hidden in a tooltip). */
+  detail: string | null;
+  /** Accessible/hover title. */
+  title: string;
+};
 
 /**
- * Small badge for a channel's cost — `null` for free (free channels carry no
- * badge, so the plan stays uncluttered). Paid shows the price inline
- * ("Paid · from $39"); freemium reads "Free + paid" with the detail in the
- * tooltip. Label/title only — the design-system pill styling lives in CSS.
+ * Badge for a channel's cost — `null` for free (free channels carry no badge,
+ * so the plan stays uncluttered). Non-free channels get a pill that plainly says
+ * it's not free ("Paid" / "Freemium") plus the full note shown VISIBLY beside it
+ * ("from $39", "free launch; Pro from $39") — never buried in a tooltip, so the
+ * founder sees the whole cost story up front. Styling lives in CSS.
  */
 export function costBadge(cost: ChannelCost): CostBadge | null {
   if (cost.type === "paid") {
     return {
-      label: cost.note ? `Paid · ${cost.note}` : "Paid",
-      title: cost.note ? `Paid submission — ${cost.note}` : "Paid submission",
+      label: "Paid",
+      detail: cost.note ?? null,
+      title: cost.note ? `Paid — ${cost.note}` : "Paid submission",
     };
   }
   if (cost.type === "freemium") {
     return {
-      label: "Free + paid",
+      label: "Freemium",
+      detail: cost.note ?? null,
       title: cost.note
-        ? `Free option with paid tiers — ${cost.note}`
-        : "Free option with paid tiers",
+        ? `Freemium (free tier + paid options) — ${cost.note}`
+        : "Free tier with paid options",
     };
   }
   return null;

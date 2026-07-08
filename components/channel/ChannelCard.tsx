@@ -68,9 +68,10 @@ export function ChannelCard({
           <h3>{data.name}</h3>
           {data.audienceDesc && <div className="aud">{data.audienceDesc}</div>}
           {cost && (
-            <span className="cost-badge" title={cost.title}>
-              {cost.label}
-            </span>
+            <div className="cost-row" title={cost.title}>
+              <span className="cost-badge">{cost.label}</span>
+              {cost.detail && <span className="cost-note">{cost.detail}</span>}
+            </div>
           )}
         </div>
         <div className="fit">

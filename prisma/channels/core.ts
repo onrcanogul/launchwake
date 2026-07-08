@@ -341,11 +341,12 @@ export const core: Seed[] = [
     url: "https://wip.co",
     audienceDesc: "maker community shipping in public",
     rules:
-      "Log what you shipped as a completed todo; makers follow along. Friendly to frequent small updates. Value-first, low pressure — a good home for every ship.",
+      "Access is gated: WIP is invite-only — join free with an invite from an existing member, or pay for membership otherwise (price shown at Stripe checkout). Once in: log what you shipped as a completed todo; makers follow along. Friendly to frequent small updates. Value-first, low pressure.",
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Any day",
     tags: ["makers", "indie", "founders", "product", "startup", "launch"],
     accountRequirements: WIP_READINESS,
+    cost: { type: "freemium", note: "invite-only; free with an invite, else paid membership" },
   },
   {
     slug: "betalist",

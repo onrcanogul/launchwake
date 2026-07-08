@@ -145,6 +145,11 @@ describe("channel cost", () => {
     }
   });
 
+  it("WIP is not free — invite-only + paid membership (dogfood finding)", () => {
+    expect(cost("wip").type).toBe("freemium");
+    expect(cost("wip").note).toMatch(/invite|paid/i);
+  });
+
   it("free venues (Peerlist, subreddits) default to free", () => {
     expect(cost("dir-peerlist").type).toBe("free");
     expect(cost("r-saas").type).toBe("free");

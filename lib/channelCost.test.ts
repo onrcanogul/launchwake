@@ -27,24 +27,28 @@ describe("parseChannelCost", () => {
 });
 
 describe("costBadge", () => {
-  it("renders 'Paid · from $39' for a paid channel (the BetaList case)", () => {
+  it("labels a paid channel 'Paid' with the price shown visibly (the BetaList case)", () => {
     const badge = costBadge({ type: "paid", note: "from $39" });
-    expect(badge?.label).toBe("Paid · from $39");
+    expect(badge?.label).toBe("Paid");
+    expect(badge?.detail).toBe("from $39"); // visible, not tooltip-only
     expect(badge?.title).toContain("from $39");
   });
 
-  it("renders 'Free + paid' for freemium, with the detail in the tooltip", () => {
+  it("labels freemium 'Freemium' (not 'Free') with the full note shown visibly", () => {
     const badge = costBadge({ type: "freemium", note: "free queue; skip-the-line from $29.99" });
-    expect(badge?.label).toBe("Free + paid");
-    expect(badge?.title).toContain("$29.99");
+    expect(badge?.label).toBe("Freemium");
+    expect(badge?.label).not.toMatch(/^Free\b(?! )/); // never leads with a bare "Free"
+    expect(badge?.detail).toBe("free queue; skip-the-line from $29.99");
   });
 
   it("renders no badge for free channels", () => {
     expect(costBadge({ type: "free" })).toBeNull();
   });
 
-  it("falls back to a bare 'Paid' when there is no note", () => {
-    expect(costBadge({ type: "paid" })?.label).toBe("Paid");
+  it("still labels 'Paid' with no detail when there is no note", () => {
+    const badge = costBadge({ type: "paid" });
+    expect(badge?.label).toBe("Paid");
+    expect(badge?.detail).toBeNull();
   });
 });
 
