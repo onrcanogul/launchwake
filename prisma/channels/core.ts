@@ -90,7 +90,7 @@ export const core: Seed[] = [
     url: "https://www.indiehackers.com",
     audienceDesc: "warm founder & bootstrapper community",
     rules:
-      "Value-first. Share what you built, why, and the numbers (revenue, users, lessons). Transparency is rewarded; pure promotion is ignored. Engage in the comments.",
+      "Posting is gated: a fresh account can't create posts until IH grants privileges — earn them with authentic, effortful comments over a week or two first (or unlock via IH Plus). Once in: value-first, share what you built and the numbers (revenue, users, lessons). Transparency is rewarded; pure promotion is ignored. Engage in the comments.",
     defaultBanRisk: BanRisk.LOW,
     bestTime: "Weekday mornings",
     tags: [

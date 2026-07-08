@@ -78,15 +78,23 @@ export const PRODUCT_HUNT_READINESS: AccountRequirementsInput = {
     "Product Hunt maker guidance — no follower gate to launch, but a complete profile and an existing following materially improve launch-day reach; vote manipulation is bannable.",
 };
 
-/** Indie Hackers — value-first community, no gate; a real profile is what matters. */
+/**
+ * Indie Hackers — HARD gate on post creation. A fresh account literally can't
+ * post ("You can't create posts yet"); privileges are earned via authentic
+ * comments (moderator-granted) or bought via IH Plus. Non-numeric gate, so the
+ * readiness engine won't compute a lead-time penalty — the "required" level +
+ * tips carry it. (Observed while dogfooding LaunchWake's own launch.)
+ */
 export const INDIE_HACKERS_READINESS: AccountRequirementsInput = {
-  level: "recommended",
+  level: "required",
   profileTips: [
-    "Fill out your profile with your real name, product, and a link.",
-    "Share a couple of comments or a 'building' post before your launch post so you're a familiar face.",
+    "You can't post until IH grants post-creation privileges — a fresh account hits a 'You can't create posts yet' wall.",
+    "Earn it first: leave genuinely thoughtful, effortful comments over ~1–2 weeks; moderators grant lifelong posting access to accounts that contribute authentically.",
+    "Fill out your profile with your real name, product, and a link so you read as a real member.",
+    "The paid shortcut is Indie Hackers Plus, which unlocks posting immediately — otherwise hold your launch draft until access is granted.",
   ],
   sourceNote:
-    "Indie Hackers norms — no formal account requirement; transparency and prior participation are rewarded, pure promotion is ignored.",
+    "Observed 2026-07-08 on /new-post: IH gates post creation ('You can't create posts yet' — participate with effortful comments; moderators grant lifelong access, or unlock via Indie Hackers Plus). No fixed age/karma number — earned via authentic participation or IH Plus.",
 };
 
 // ── Verified July 2026 (web research against each channel's own pages) ──────
