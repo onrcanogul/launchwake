@@ -11,7 +11,13 @@ import { env } from "./env";
 
 export type HealthLevel = "green" | "amber" | "red";
 
-export type HealthItemKey = "pixel" | "clicks" | "github" | "stripe" | "deliveries";
+export type HealthItemKey =
+  | "pixel"
+  | "clicks"
+  | "darksocial"
+  | "github"
+  | "stripe"
+  | "deliveries";
 
 export type HealthItem = {
   key: HealthItemKey;
@@ -26,10 +32,17 @@ export type HealthItem = {
 };
 
 export type TrackingHealthSignals = {
+  /** Total signups (link-attributed + unattributed) — drives the pixel "receiving" state. */
   signups: number;
   clicks: number;
   lastSignupAt: Date | null;
   lastClickAt: Date | null;
+  /** Oldest click, to detect "clicks for 14+ days but still zero signups". */
+  firstClickAt?: Date | null;
+  /** Signups with no channel (no lw_ref, no email match) — the dark-social share. */
+  unattributedSignups?: number;
+  /** Whether the verification ping has ever arrived (Project.pixelVerifiedAt set). */
+  pixelEverFired?: boolean;
   githubConfigured: boolean;
   githubLastSuccessAt: Date | null;
   stripeConfigured: boolean;
@@ -57,7 +70,17 @@ export type TrackingHealth = {
 
 export const FAILED_DELIVERY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/** Clicks arriving this long with zero signups is a red flag, not "early days". */
+export const STALE_CLICKS_DAYS = 14;
+/** At/above this unattributed share, nudge the user to add a self-report survey. */
+export const HIGH_DARK_SOCIAL_PCT = 40;
+
 const RANK: Record<HealthLevel, number> = { green: 0, amber: 1, red: 2 };
+
+/** Whole days between two dates (floored, never negative). Pure. */
+function daysSince(date: Date, now: Date): number {
+  return Math.max(0, Math.floor((now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000)));
+}
 
 /** Compact relative time — pure, deterministic given (date, now). */
 export function relTime(date: Date, now: Date): string {
@@ -77,8 +100,12 @@ export function relTime(date: Date, now: Date): string {
 export function deriveTrackingHealth(s: TrackingHealthSignals): TrackingHealth {
   const items: HealthItem[] = [];
 
-  // 1 — Signup pixel: the classic silent failure. Clicks arriving with zero
-  // signups almost always means the pixel isn't on the thank-you page.
+  // 1 — Signup pixel: the classic silent failure. Distinguish three states so a
+  // plumbing problem never reads as a dead channel:
+  //   • clicks but zero signups (escalates to a hard flag at 14+ days),
+  //   • the pixel never fired at all (no verification ping),
+  //   • nothing yet (early days).
+  const pixelNeverFired = s.pixelEverFired === false;
   if (s.signups > 0) {
     items.push({
       key: "pixel",
@@ -90,13 +117,19 @@ export function deriveTrackingHealth(s: TrackingHealthSignals): TrackingHealth {
       }.`,
     });
   } else if (s.clicks > 0) {
+    const staleDays = s.firstClickAt ? daysSince(s.firstClickAt, s.now) : 0;
+    const stale = staleDays >= STALE_CLICKS_DAYS;
     items.push({
       key: "pixel",
       label: "Signup pixel",
       level: "red",
       status: "Action needed",
-      detail: `${s.clicks} click${s.clicks === 1 ? "" : "s"} tracked but no signups recorded.`,
-      fix: "No signup events yet — install the pixel on your thank-you page and call launchwakeSignup() there.",
+      detail: stale
+        ? `${s.clicks} click${s.clicks === 1 ? "" : "s"} tracked over ${staleDays} days but not one signup — the pixel likely isn't reporting.`
+        : `${s.clicks} click${s.clicks === 1 ? "" : "s"} tracked but no signups recorded.`,
+      fix: pixelNeverFired
+        ? "The pixel has never pinged us — add the one-line snippet site-wide, then call launchwakeSignup() on your success page."
+        : "The pixel is live but launchwakeSignup() isn't firing — call it once the signup completes on your thank-you page.",
     });
   } else {
     items.push({
@@ -104,8 +137,31 @@ export function deriveTrackingHealth(s: TrackingHealthSignals): TrackingHealth {
       label: "Signup pixel",
       level: "amber",
       status: "Waiting",
-      detail: "No signup events yet.",
-      fix: "Add the LaunchWake pixel to your site so signups get attributed to a channel.",
+      detail: pixelNeverFired
+        ? "No signup events yet, and the pixel has never pinged us."
+        : "No signup events yet.",
+      fix: pixelNeverFired
+        ? "Add the LaunchWake pixel to your site — it hasn't reported in once yet."
+        : "Add the LaunchWake pixel to your site so signups get attributed to a channel.",
+    });
+  }
+
+  // 1b — Dark social: signups arriving with no tracked link. Surfaced whenever any
+  // exist so the founder knows their real reach; nudged to add a survey when the
+  // untracked share is high (that's exactly what self-report is for).
+  const unattributed = s.unattributedSignups ?? 0;
+  if (s.signups > 0 && unattributed > 0) {
+    const pct = Math.round((unattributed / s.signups) * 100);
+    const high = pct >= HIGH_DARK_SOCIAL_PCT;
+    items.push({
+      key: "darksocial",
+      label: "Dark-social signups",
+      level: high ? "amber" : "green",
+      status: high ? "High share" : "Tracking",
+      detail: `${unattributed} of ${s.signups} signup${s.signups === 1 ? "" : "s"} (${pct}%) arrived with no tracked link.`,
+      fix: high
+        ? "A big share is untracked — add a “How did you hear about us?” survey to catch the podcasts, DMs, and word-of-mouth a link can’t see."
+        : undefined,
     });
   }
 
@@ -266,7 +322,12 @@ export async function getTrackingHealth(
 ): Promise<TrackingHealth> {
   const project = await db.project.findUnique({
     where: { id: projectId },
-    select: { githubRepo: true, webhookSecret: true, stripeWebhookSecret: true },
+    select: {
+      githubRepo: true,
+      webhookSecret: true,
+      stripeWebhookSecret: true,
+      pixelVerifiedAt: true,
+    },
   });
 
   const githubConfigured =
@@ -278,16 +339,20 @@ export async function getTrackingHealth(
   const since = new Date(now.getTime() - FAILED_DELIVERY_WINDOW_MS);
 
   const [
-    signups,
+    attributedSignups,
+    unattributedSignups,
     clicks,
     lastSignup,
     lastClick,
+    firstClick,
     githubSuccess,
     stripeSuccess,
     recentFailedGithub,
     recentFailedStripe,
   ] = await Promise.all([
     db.event.count({ where: { ...eventWhere, type: "SIGNUP" } }),
+    // Link-less (unattributed) signups roll up straight to the project — the dark-social slice.
+    db.event.count({ where: { projectId, trackedLinkId: null, type: "SIGNUP" } }),
     db.event.count({ where: { ...eventWhere, type: "CLICK" } }),
     db.event.findFirst({
       where: { ...eventWhere, type: "SIGNUP" },
@@ -297,6 +362,11 @@ export async function getTrackingHealth(
     db.event.findFirst({
       where: { ...eventWhere, type: "CLICK" },
       orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    }),
+    db.event.findFirst({
+      where: { ...eventWhere, type: "CLICK" },
+      orderBy: { createdAt: "asc" },
       select: { createdAt: true },
     }),
     db.webhookDelivery.findFirst({
@@ -318,10 +388,13 @@ export async function getTrackingHealth(
   ]);
 
   return deriveTrackingHealth({
-    signups,
+    signups: attributedSignups + unattributedSignups,
+    unattributedSignups,
     clicks,
     lastSignupAt: lastSignup?.createdAt ?? null,
     lastClickAt: lastClick?.createdAt ?? null,
+    firstClickAt: firstClick?.createdAt ?? null,
+    pixelEverFired: project?.pixelVerifiedAt != null,
     githubConfigured,
     githubLastSuccessAt: githubSuccess?.processedAt ?? null,
     stripeConfigured,

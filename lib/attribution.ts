@@ -104,6 +104,52 @@ export function signupDedupeKey(input: SignupDedupeInput): string {
   return clickDedupeKey(input);
 }
 
+/**
+ * sha256(lowercased email) — the stable identity key stored on events (never the
+ * raw email). A CLICK carrying it lets a later ref-less signup with the same email
+ * be recovered to that channel (cross-device); a SIGNUP records which identity
+ * converted. Distinct from signupDedupeKey (which is a per-link idempotency key).
+ */
+export function emailHash(email: string): string {
+  return sha256Hex(email.trim().toLowerCase());
+}
+
+// ── Multi-touch (last-3 lw_ref) ────────────────────────────
+// A signup is attributed last-touch (most recent lw_ref) but we keep up to the
+// last 3 distinct codes for future multi-touch modeling. These pure helpers are
+// shared server-side; the tracking snippet mirrors the same merge rule client-side.
+
+export const MAX_TOUCHES = 3;
+
+/**
+ * Sanitize an incoming list of lw_ref touch codes: keep only valid short codes,
+ * drop duplicates and blanks, cap at `max`, preserve order (most-recent first).
+ */
+export function sanitizeTouches(refs: unknown, max = MAX_TOUCHES): string[] {
+  const arr = Array.isArray(refs) ? refs : [];
+  const out: string[] = [];
+  for (const r of arr) {
+    const clean = typeof r === "string" ? sanitizeRef(r) : null;
+    if (clean && !out.includes(clean)) {
+      out.push(clean);
+      if (out.length >= max) break;
+    }
+  }
+  return out;
+}
+
+/**
+ * Prepend a newly-seen touch (most-recent first), remove an earlier occurrence of
+ * the same code, and cap at `max`. A no-op for an invalid code. Deterministic and
+ * pure — the client snippet applies the same rule to its stored list.
+ */
+export function mergeTouches(existing: string[], incoming: string, max = MAX_TOUCHES): string[] {
+  const base = sanitizeTouches(existing, max);
+  const clean = sanitizeRef(incoming);
+  if (!clean) return base;
+  return sanitizeTouches([clean, ...base], max);
+}
+
 // ── Revenue signature (HMAC) ───────────────────────────────
 
 /**
@@ -240,7 +286,7 @@ export async function recordPostForRecommendation(
 /** Log a CLICK and return the destination (with lw_ref appended). */
 export async function ingestClick(
   shortCode: string,
-  opts: { record?: boolean; dedupeKey?: string | null } = {},
+  opts: { record?: boolean; dedupeKey?: string | null; emailHash?: string | null } = {},
 ): Promise<string | null> {
   const link = await db.trackedLink.findUnique({ where: { shortCode } });
   if (!link) return null;
@@ -254,9 +300,17 @@ export async function ingestClick(
       // Single-query idempotent insert: createMany + skipDuplicates emits
       // INSERT … ON CONFLICT DO NOTHING, so a re-fire on the same dedupeKey is a
       // silent no-op (honors the partial unique index) and never adds a query to
-      // the redirect path.
+      // the redirect path. `emailHash` (present only when the link carried an
+      // email) enables later cross-device signup recovery.
       await db.event.createMany({
-        data: [{ trackedLinkId: link.id, type: "CLICK", dedupeKey: opts.dedupeKey ?? null }],
+        data: [
+          {
+            trackedLinkId: link.id,
+            type: "CLICK",
+            dedupeKey: opts.dedupeKey ?? null,
+            emailHash: opts.emailHash ?? null,
+          },
+        ],
         skipDuplicates: true,
       });
     } catch (err) {
@@ -272,6 +326,8 @@ export async function ingestClick(
 export type IngestSignupOptions = {
   /** Idempotency key (see signupDedupeKey). A re-fire on the same key is a no-op. */
   dedupeKey?: string | null;
+  /** sha256(email) captured at signup, stored for identity/modeling (never raw). */
+  emailHash?: string | null;
   /**
    * When set, enforce that the tracked link belongs to this project — for callers
    * that carry a *verified* project context (authenticated server actions). A
@@ -314,6 +370,7 @@ export async function ingestSignup(
           trackedLinkId: link.id,
           type: "SIGNUP",
           dedupeKey: opts?.dedupeKey ?? null,
+          emailHash: opts?.emailHash ?? null,
           meta: meta ? (meta as object) : undefined,
         },
       ],
@@ -326,6 +383,136 @@ export async function ingestSignup(
     captureError(err, { at: "attribution.ingestSignup", trackedLinkId: link.id });
     return false;
   }
+}
+
+/**
+ * Record a SIGNUP that couldn't be tied to a channel (no lw_ref present, no email
+ * match). Stored against the project directly (trackedLinkId = null, meta.channel =
+ * "unattributed") so a founder's total signups still reconcile — this is the dark-
+ * social slice a link/UTM can't see. Idempotent via the project-scoped partial
+ * unique index. Returns whether a NEW row was recorded.
+ */
+export async function recordUnattributedSignup(
+  projectId: string,
+  opts: { dedupeKey?: string | null; emailHash?: string | null; meta?: Record<string, unknown> } = {},
+): Promise<boolean> {
+  try {
+    const res = await db.event.createMany({
+      data: [
+        {
+          projectId,
+          trackedLinkId: null,
+          type: "SIGNUP",
+          dedupeKey: opts.dedupeKey ?? null,
+          emailHash: opts.emailHash ?? null,
+          meta: { channel: "unattributed", ...(opts.meta ?? {}) },
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return res.count > 0;
+  } catch (err) {
+    captureError(err, { at: "attribution.recordUnattributedSignup", projectId });
+    return false;
+  }
+}
+
+/**
+ * Cross-device recovery: find the most-recent CLICK in `projectId` whose stored
+ * emailHash matches, and return its tracked-link short code. This only finds
+ * something when the destination site passed an email at click time (optional) —
+ * e.g. a per-recipient newsletter link. Returns null when there's no such click.
+ */
+export async function findClickByEmailHash(
+  projectId: string,
+  emailHashValue: string,
+): Promise<string | null> {
+  const click = await db.event.findFirst({
+    where: {
+      type: "CLICK",
+      emailHash: emailHashValue,
+      trackedLink: { post: { ship: { projectId } } },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { trackedLink: { select: { shortCode: true } } },
+  });
+  return click?.trackedLink?.shortCode ?? null;
+}
+
+export type SignupCapture = {
+  /** Sanitized lw_ref touches, most-recent first (last-touch = touches[0]). */
+  touches: string[];
+  /** Email from the beacon, if any — hashed for recovery + dedup, never stored raw. */
+  email?: string | null;
+  /** Project the pixel belongs to — required for email-recovery + unattributed capture. */
+  projectId?: string | null;
+  /** Best-effort client IP + user-agent for the fallback (no-email) dedupe key. */
+  ip: string;
+  userAgent: string;
+  via: string;
+};
+
+export type SignupMode = "last-touch" | "email-recovery" | "unattributed" | "skipped";
+
+export type SignupOutcome = {
+  /** A NEW event was recorded (false on dedup, failure, or nothing to record). */
+  ok: boolean;
+  /** True when the signup was tied to a channel (last-touch or recovery). */
+  attributed: boolean;
+  mode: SignupMode;
+  /** The attributed link's short code (for the pixel-installed funnel), if any. */
+  shortCode: string | null;
+};
+
+/**
+ * Attribute and record a signup, preferring the strongest signal available:
+ *  1. last-touch — the most recent lw_ref; the other touches are kept in meta.touches;
+ *  2. email-recovery — no ref, but an earlier CLICK carried a matching emailHash
+ *     (cross-device); attribute to that channel;
+ *  3. unattributed — record against the project so the grand total still reconciles.
+ * Idempotent throughout via the per-signup dedupe key. Never throws.
+ */
+export async function recordSignup(cap: SignupCapture): Promise<SignupOutcome> {
+  const email = cap.email?.trim() || null;
+  const eh = email ? emailHash(email) : null;
+  const keyFor = (shortCode: string) =>
+    signupDedupeKey({ email, ip: cap.ip, userAgent: cap.userAgent, shortCode });
+
+  // 1 — last-touch attribution (stays global: the ref can belong to any project).
+  if (cap.touches.length > 0) {
+    const last = cap.touches[0];
+    const ok = await ingestSignup(
+      last,
+      { via: cap.via, touches: cap.touches },
+      { dedupeKey: keyFor(last), emailHash: eh },
+    );
+    return { ok, attributed: ok, mode: "last-touch", shortCode: ok ? last : null };
+  }
+
+  // 2 — cross-device recovery by email (scoped to the pixel's project).
+  if (eh && cap.projectId) {
+    const recovered = await findClickByEmailHash(cap.projectId, eh);
+    if (recovered) {
+      const ok = await ingestSignup(
+        recovered,
+        { via: cap.via, recovered: "cross-device-email" },
+        { dedupeKey: keyFor(recovered), emailHash: eh, projectId: cap.projectId },
+      );
+      return { ok, attributed: ok, mode: "email-recovery", shortCode: ok ? recovered : null };
+    }
+  }
+
+  // 3 — unattributed (needs a project to reconcile the total against).
+  if (cap.projectId) {
+    const ok = await recordUnattributedSignup(cap.projectId, {
+      dedupeKey: keyFor(""),
+      emailHash: eh,
+      meta: { via: cap.via },
+    });
+    return { ok, attributed: false, mode: "unattributed", shortCode: null };
+  }
+
+  return { ok: false, attributed: false, mode: "skipped", shortCode: null };
 }
 
 /**
@@ -675,6 +862,12 @@ export type ResultsRollup = {
   perChannel: ChannelRollup[];
   totalClicks: number;
   totalSignups: number;
+  /**
+   * SIGNUP events with no channel (arrived with no lw_ref and no email match) — the
+   * dark-social slice. Kept separate from `totalSignups` (which stays link-attributed)
+   * so per-channel math is unaffected, but the grand total reconciles as their sum.
+   */
+  unattributedSignups: number;
   conversion: number;
   totalRevenueCents: number;
   /** Sum of trusted (signature-verified) revenue only — the safe-to-quote figure. */
@@ -831,11 +1024,21 @@ export async function getResultsRollup(
 
   const topRev = perChannel.find((c) => c.revenueCents > 0) ?? null;
 
+  // Link-less signups (no lw_ref, no email match) roll up straight to the project,
+  // not to any post — so count them separately to reconcile the grand total. Scoped
+  // to project-wide Results only (a single ship has no unattributed bucket).
+  const unattributedSignups = opts?.shipId
+    ? 0
+    : await db.event.count({
+        where: { projectId, trackedLinkId: null, type: "SIGNUP" },
+      });
+
   return {
     perPost,
     perChannel,
     totalClicks,
     totalSignups,
+    unattributedSignups,
     conversion: totalClicks > 0 ? totalSignups / totalClicks : 0,
     totalRevenueCents,
     totalVerifiedRevenueCents,

@@ -2,20 +2,36 @@
  * The LaunchWake attribution pixel — served as a tiny hosted script so setup is
  * a copy-paste one-liner instead of a pasted inline block. The script:
  *
- *   1. captures `lw_ref` from tracked-link clicks into localStorage,
- *   2. defines `window.launchwakeSignup()` for the signup-success page,
+ *   1. captures `lw_ref` from tracked-link clicks into BOTH a first-party cookie
+ *      (90d, SameSite=Lax) and localStorage (90d), keeping the last 3 distinct
+ *      codes for multi-touch — two carriers survive more than one,
+ *   2. defines `window.launchwakeSignup(email)` for the signup-success page —
+ *      reads cookie-then-localStorage and always reports (so signups with no
+ *      tracked link still reconcile as dark social),
  *   3. sends a throttled verification ping so LaunchWake can show a
  *      "pixel detected" state (the biggest drop-off in tracking setup was
  *      never knowing whether the snippet actually went live).
  *
- * It only ever reads a query param and reports back to LaunchWake — it never
- * touches the host page's DOM or cookies.
+ * It only reads a query param + its own lw_ref cookie/localStorage and reports
+ * back to LaunchWake — it never injects into the host page's DOM.
  *
  * This module is pure (no db/env imports) so client components can render the
  * snippets; the ping-recording db side lives in lib/attribution.ts.
  */
 
 import { SELF_REPORT_OPTIONS } from "./selfReport";
+
+/**
+ * Single source of truth for the signup endpoint path, shared by the served pixel
+ * (browser) and the backend fetch one-liner (server) so the two can't drift.
+ */
+export const SIGNUP_PATH = "/api/track/signup";
+
+/** How many distinct lw_ref touches the snippet keeps for multi-touch (last-N). */
+export const MAX_TOUCHES = 3;
+
+/** localStorage/cookie persistence window for a captured lw_ref (90 days). */
+export const REF_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 /** cuid/cuid2-shaped ids only — the pixel route interpolates this into JS. */
 export function isValidProjectId(id: string): boolean {
@@ -66,32 +82,71 @@ export function buildPixelJs(appUrl: string, projectId: string): string {
   // LaunchWake attribution pixel — https://launchwake.com
   var BASE = ${JSON.stringify(base)};
   var PROJECT = ${JSON.stringify(projectId)};
+  var STORE = 'lw_ref';                 // localStorage key + cookie name
+  var MAX_TOUCHES = ${MAX_TOUCHES};     // keep the last N distinct codes (multi-touch)
+  var TTL = ${REF_TTL_MS};              // 90-day localStorage expiry (ms)
+  var CODE = /^[0-9A-Za-z]{1,64}$/;     // a tracked-link short code
   function beacon(path, body) {
     try {
       navigator.sendBeacon(BASE + path, new Blob([JSON.stringify(body)], { type: 'application/json' }));
     } catch (e) {}
   }
-  // 1. Capture lw_ref from a tracked-link click (any page).
+  // Read the stored touch list from localStorage, honoring the 90-day expiry.
+  function readTouches() {
+    try {
+      var raw = localStorage.getItem(STORE);
+      if (!raw) return [];
+      var o = JSON.parse(raw);
+      if (!o || !(o.e > Date.now()) || !o.t || !o.t.length) return [];
+      return o.t.filter(function (x) { return typeof x === 'string' && CODE.test(x); }).slice(0, MAX_TOUCHES);
+    } catch (e) { return []; }
+  }
+  function writeTouches(list) {
+    try { localStorage.setItem(STORE, JSON.stringify({ t: list.slice(0, MAX_TOUCHES), e: Date.now() + TTL })); } catch (e) {}
+  }
+  // Prepend a code (most-recent first), drop an earlier duplicate, cap at MAX_TOUCHES.
+  function merge(list, code) {
+    var out = [code];
+    for (var i = 0; i < list.length && out.length < MAX_TOUCHES; i++) {
+      if (list[i] !== code) out.push(list[i]);
+    }
+    return out;
+  }
+  function cookieRef() {
+    try {
+      var m = (document.cookie || '').match(/(?:^|; )lw_ref=([^;]+)/);
+      var v = m ? decodeURIComponent(m[1]) : null;
+      return v && CODE.test(v) ? v : null;
+    } catch (e) { return null; }
+  }
+  // 1. Capture lw_ref from a tracked-link click (any page). Mirror it into a
+  //    first-party cookie (90d, SameSite=Lax) AND the localStorage touch list.
   try {
     var ref = new URLSearchParams(location.search).get('lw_ref');
-    if (ref) localStorage.setItem('lw_ref', ref);
+    if (ref && CODE.test(ref)) {
+      writeTouches(merge(readTouches(), ref));
+      try { document.cookie = STORE + '=' + ref + '; max-age=' + (TTL / 1000) + '; path=/; SameSite=Lax'; } catch (e) {}
+    }
   } catch (e) {}
-  // 2. Call launchwakeSignup() on your signup-success page. Pass the new user's
-  //    email (optional) to strengthen dedup — it's hashed on our server for the
-  //    idempotency key and never stored.
+  // 2. Call launchwakeSignup(email) on your signup-success page. Reads
+  //    cookie-then-localStorage and ALWAYS reports (even with no ref) so signups
+  //    with no tracked link still reconcile as dark social. Email is optional and
+  //    hashed on our server for dedup + cross-device recovery — never stored raw.
   window.launchwakeSignup = function (email) {
-    var r; try { r = localStorage.getItem('lw_ref'); } catch (e) {}
-    if (r) beacon('/api/track/signup', { ref: r, email: email || undefined });
+    var list = readTouches();
+    var c = cookieRef();
+    if (c) list = merge(list, c);
+    beacon(${JSON.stringify(SIGNUP_PATH)}, { project: PROJECT, refs: list, email: email || undefined });
   };
   // 2b. Call launchwakeSurvey(answer) with the visitor's "how did you hear
   //     about us?" answer. This is the only signal that catches dark social —
-  //     the podcast/DM/word-of-mouth that a link or UTM can never see. The
-  //     stored lw_ref goes too, so LaunchWake can flag when the link disagrees
+  //     the podcast/DM/word-of-mouth that a link or UTM can never see. The most
+  //     recent lw_ref goes too, so LaunchWake can flag when the link disagrees
   //     with what the human said.
   window.launchwakeSurvey = function (answer) {
     if (!answer) return;
-    var r; try { r = localStorage.getItem('lw_ref'); } catch (e) {}
-    beacon('/api/track/survey', { project: PROJECT, answer: String(answer), ref: r || null });
+    var list = readTouches();
+    beacon('/api/track/survey', { project: PROJECT, answer: String(answer), ref: list[0] || null });
   };
   // 3. Verification ping (throttled per browser) so LaunchWake can show
   //    "pixel detected". Skipped when localStorage is unavailable.
@@ -105,6 +160,26 @@ export function buildPixelJs(appUrl: string, projectId: string): string {
   } catch (e) {}
 })();
 `;
+}
+
+/**
+ * Backend (no-SDK) signup report — the npm-free counterpart to the browser pixel,
+ * for frameworks that record signups server-side. Built from the same `SIGNUP_PATH`
+ * as the pixel so the two never drift. Pass the `lw_ref` you stored at signup.
+ */
+export function pixelBackendSnippet(appUrl: string, projectId: string): string {
+  const base = baseUrl(appUrl);
+  return `// Backend / server-side (any language — this is just fetch, no SDK).
+// Report a signup with the lw_ref you stored for this user at click time.
+await fetch(${JSON.stringify(base + SIGNUP_PATH)}, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    project: ${JSON.stringify(projectId)},
+    ref: lwRef,           // the lw_ref you captured/stored for this user
+    email: userEmail      // optional — hashed server-side for cross-device recovery
+  })
+});`;
 }
 
 // ── Self-report survey snippet (dark-social attribution) ───────────────────

@@ -6,7 +6,10 @@ import {
   pixelNextjsSnippet,
   pixelScriptTag,
   pixelSrc,
+  pixelBackendSnippet,
   PIXEL_PING_THROTTLE_MS,
+  SIGNUP_PATH,
+  REF_TTL_MS,
   surveyDropInSnippet,
   surveyOptionsHtml,
   surveyReactSnippet,
@@ -53,11 +56,17 @@ describe("snippet builders", () => {
 describe("buildPixelJs", () => {
   const js = buildPixelJs(APP, PID);
 
-  it("captures lw_ref and defines launchwakeSignup", () => {
+  it("captures lw_ref into a 90d cookie + localStorage and defines launchwakeSignup", () => {
     expect(js).toContain("get('lw_ref')");
-    expect(js).toContain("localStorage.setItem('lw_ref', ref)");
+    // Two carriers: a first-party 90d SameSite=Lax cookie + a localStorage list.
+    expect(js).toContain("SameSite=Lax");
+    expect(js).toContain(String(REF_TTL_MS)); // 90-day localStorage expiry
+    expect(js).toContain("var MAX_TOUCHES = 3;"); // multi-touch: keep last 3
     expect(js).toContain("window.launchwakeSignup = function (email)");
-    expect(js).toContain("'/api/track/signup'");
+    expect(js).toContain(SIGNUP_PATH);
+    // Signup beacon carries the project id + the whole touch list.
+    expect(js).toContain("refs: list");
+    expect(js).toContain("project: PROJECT");
   });
 
   it("defines launchwakeSurvey that beacons the answer + stored ref to /api/track/survey", () => {
@@ -79,10 +88,35 @@ describe("buildPixelJs", () => {
     expect(buildPixelJs(`${APP}/`, PID)).toContain(`var BASE = "${APP}";`);
   });
 
-  it("never touches host-page cookies or DOM", () => {
-    expect(js).not.toContain("document.cookie");
+  it("mirrors lw_ref to a first-party cookie but never injects into the host DOM", () => {
+    // The cookie is a deliberate second carrier alongside localStorage.
+    expect(js).toContain("document.cookie = STORE + '='");
+    expect(js).toContain("SameSite=Lax");
+    // Still no DOM injection into the host page.
     expect(js).not.toContain("appendChild");
     expect(js).not.toContain("innerHTML");
+  });
+
+  it("always reports the signup (even with no ref) so dark social reconciles", () => {
+    // No `if (r)` guard around the signup beacon anymore — it fires regardless,
+    // sending an empty refs list when nothing was captured.
+    expect(js).toContain("beacon(\"/api/track/signup\", { project: PROJECT, refs: list");
+  });
+});
+
+describe("pixelBackendSnippet (DX — npm-free backend)", () => {
+  it("posts to the same signup endpoint as the pixel, from one source path", () => {
+    const backend = pixelBackendSnippet(APP, PID);
+    expect(backend).toContain("fetch(");
+    expect(backend).toContain(`${APP}${SIGNUP_PATH}`);
+    expect(backend).toContain(`"${PID}"`);
+    // Browser pixel and backend snippet reference the SAME endpoint constant.
+    expect(buildPixelJs(APP, PID)).toContain(SIGNUP_PATH);
+    expect(backend).toContain(SIGNUP_PATH);
+  });
+
+  it("tolerates a trailing slash on the app url", () => {
+    expect(pixelBackendSnippet(`${APP}/`, PID)).toContain(`${APP}${SIGNUP_PATH}`);
   });
 });
 

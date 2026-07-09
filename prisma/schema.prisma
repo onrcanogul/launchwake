@@ -173,6 +173,7 @@ model Project {
   slackWebhookUrl      String? // Slack incoming webhook for reminders / new-ship pings
   ships                Ship[]
   selfReports          SelfReport[] // self-reported "how did you hear" answers from the survey snippet
+  events               Event[] // link-less attribution events (unattributed signups) for reconciliation
   intentQueries        IntentQuery[] // Intent Radar: saved "people looking for us" watches
   // White-label client report: a stable, branded link at /report/c/{token}.
   reportToken          String?  @unique
@@ -357,29 +358,47 @@ model TrackedLink {
 }
 
 model Event {
-  id            String      @id @default(cuid())
-  trackedLinkId String
-  trackedLink   TrackedLink @relation(fields: [trackedLinkId], references: [id], onDelete: Cascade)
+  id            String       @id @default(cuid())
+  // Nullable: a link-attributed CLICK/SIGNUP/REVENUE sets this; an *unattributed*
+  // SIGNUP (arrived with no lw_ref and no email match) has no link and instead
+  // carries `projectId`, so a founder's total signups still reconcile (dark social).
+  trackedLinkId String?
+  trackedLink   TrackedLink? @relation(fields: [trackedLinkId], references: [id], onDelete: Cascade)
+  // Set only for link-less events (unattributed signups) so they roll up to a
+  // project without a channel. Null for link-attributed events.
+  projectId     String?
+  project       Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   type          EventType
   // Revenue events carry an amount (smallest currency unit) + currency, and
   // whether it recurs (subscription) so we can attribute MRR to a channel.
   amountCents   Int?
   currency      String?
-  recurring     Boolean     @default(false)
+  recurring     Boolean      @default(false)
   // Idempotency key for CLICK/SIGNUP dedup (see lib/attribution.clickDedupeKey /
-  // signupDedupeKey). Null for legacy rows and REVENUE events. A *partial* unique
-  // index on (trackedLinkId, type, dedupeKey) WHERE dedupeKey IS NOT NULL enforces
-  // "record each click/signup at most once" without constraining the null rows.
-  // Prisma Migrate can't express a partial index, so it's created by hand in the
-  // migration; inserts use ON CONFLICT DO NOTHING (createMany skipDuplicates).
+  // signupDedupeKey). Null for legacy rows and REVENUE events. Partial unique
+  // indexes — (trackedLinkId, type, dedupeKey) for link-attributed rows and
+  // (projectId, type, dedupeKey) for link-less rows, both WHERE dedupeKey IS NOT
+  // NULL — enforce "record each click/signup at most once". Prisma Migrate can't
+  // express partial indexes, so they're created by hand in the migration; inserts
+  // use ON CONFLICT DO NOTHING (createMany skipDuplicates).
   dedupeKey     String?
+  // sha256(lowercased email), when the click/signup carried one — never the raw
+  // email. On a CLICK it powers cross-device recovery (match a later ref-less
+  // signup to the channel by email); on a SIGNUP it records which identity converted.
+  emailHash     String?
   // Trust flag for REVENUE: true when the amount came from a signature-verified
   // source (the Stripe webhook, LaunchWake's own billing) or an HMAC-signed
   // /api/track/revenue call; false when a public caller supplied an unsigned
   // amount we can't vouch for. Results sums verified revenue separately.
-  verified      Boolean     @default(true)
+  verified      Boolean      @default(true)
+  // Multi-touch: SIGNUP events store the last-3 distinct lw_ref codes seen at
+  // conversion in `meta.touches` (most-recent first); the row itself is attributed
+  // to touches[0] (last-touch). The rest are kept for future multi-touch modeling.
   meta          Json?
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime     @default(now())
+
+  @@index([emailHash])
+  @@index([projectId, type])
 }
 
 enum EventType {

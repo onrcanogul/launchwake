@@ -6,7 +6,7 @@ import { createHmac } from "crypto";
 // injectable client and is tested with a local fake instead.
 const dbMock = vi.hoisted(() => ({
   trackedLink: { findUnique: vi.fn() },
-  event: { createMany: vi.fn() },
+  event: { createMany: vi.fn(), findFirst: vi.fn() },
 }));
 vi.mock("./db", () => ({ db: dbMock }));
 const captureErrorMock = vi.hoisted(() => vi.fn());
@@ -25,15 +25,20 @@ import {
   utcDayStamp,
   clickDedupeKey,
   signupDedupeKey,
+  emailHash,
+  mergeTouches,
+  sanitizeTouches,
   verifyRevenueSignature,
   ingestSignup,
   ingestRevenue,
+  recordSignup,
   type ResultRow,
 } from "./attribution";
 
 beforeEach(() => {
   dbMock.trackedLink.findUnique.mockReset();
   dbMock.event.createMany.mockReset();
+  dbMock.event.findFirst.mockReset();
   captureErrorMock.mockReset();
 });
 
@@ -270,7 +275,7 @@ describe("ingestSignup (dedup + tenant scope)", () => {
     const ok = await ingestSignup("aB3xZ0q", { via: "pixel" }, { dedupeKey: "k1" });
     expect(ok).toBe(true);
     expect(dbMock.event.createMany).toHaveBeenCalledWith({
-      data: [{ trackedLinkId: "link_1", type: "SIGNUP", dedupeKey: "k1", meta: { via: "pixel" } }],
+      data: [{ trackedLinkId: "link_1", type: "SIGNUP", dedupeKey: "k1", emailHash: null, meta: { via: "pixel" } }],
       skipDuplicates: true,
     });
   });
@@ -364,5 +369,104 @@ describe("ingestRevenue (tenant scope + verified flag)", () => {
     const { client, events } = makeClient(link());
     expect(await ingestRevenue("aB3xZ0q", { amountCents: 0 }, client, { verified: true })).toBe(false);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe("emailHash", () => {
+  it("is a deterministic, case/whitespace-insensitive 64-hex digest", () => {
+    const a = emailHash("Founder@Example.com");
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
+    expect(emailHash("  founder@example.com ")).toBe(a);
+  });
+  it("differs for different emails", () => {
+    expect(emailHash("a@b.com")).not.toBe(emailHash("c@d.com"));
+  });
+});
+
+describe("sanitizeTouches", () => {
+  it("keeps valid short codes, deduped, order preserved, capped at 3", () => {
+    expect(sanitizeTouches(["c1", "c2", "c1", "c3", "c4"])).toEqual(["c1", "c2", "c3"]);
+  });
+  it("drops blanks, non-strings, and injection-y values", () => {
+    expect(sanitizeTouches(["c1", "", "a/b", 5, null, "<script>", "c2"])).toEqual(["c1", "c2"]);
+  });
+  it("returns [] for non-arrays", () => {
+    expect(sanitizeTouches(undefined)).toEqual([]);
+    expect(sanitizeTouches("c1")).toEqual([]);
+    expect(sanitizeTouches(null)).toEqual([]);
+  });
+});
+
+describe("mergeTouches", () => {
+  it("prepends the newest touch (most-recent first)", () => {
+    expect(mergeTouches(["c1", "c2"], "c3")).toEqual(["c3", "c1", "c2"]);
+  });
+  it("moves an existing code to the front instead of duplicating", () => {
+    expect(mergeTouches(["c1", "c2", "c3"], "c2")).toEqual(["c2", "c1", "c3"]);
+  });
+  it("caps at 3, dropping the oldest", () => {
+    expect(mergeTouches(["c1", "c2", "c3"], "c4")).toEqual(["c4", "c1", "c2"]);
+  });
+  it("is a no-op for an invalid incoming code", () => {
+    expect(mergeTouches(["c1", "c2"], "a/b")).toEqual(["c1", "c2"]);
+    expect(mergeTouches(["c1"], "")).toEqual(["c1"]);
+  });
+});
+
+describe("recordSignup (attribution orchestration)", () => {
+  const cap = (over: Partial<Parameters<typeof recordSignup>[0]> = {}) => ({
+    touches: [],
+    ip: "203.0.113.7",
+    userAgent: "Mozilla/5.0",
+    via: "beacon",
+    ...over,
+  });
+  const link = (projectId = "proj_1") => ({ id: "link_1", post: { ship: { projectId } } });
+
+  it("attributes last-touch to touches[0] and persists all touches in meta", async () => {
+    dbMock.trackedLink.findUnique.mockResolvedValue(link());
+    dbMock.event.createMany.mockResolvedValue({ count: 1 });
+
+    const out = await recordSignup(cap({ touches: ["c1", "c2"], email: "u@x.com" }));
+    expect(out).toMatchObject({ ok: true, attributed: true, mode: "last-touch", shortCode: "c1" });
+    const data = dbMock.event.createMany.mock.calls[0][0].data[0];
+    expect(data).toMatchObject({ type: "SIGNUP", trackedLinkId: "link_1" });
+    expect(data.meta.touches).toEqual(["c1", "c2"]);
+    expect(data.emailHash).toBe(emailHash("u@x.com"));
+  });
+
+  it("recovers cross-device via a CLICK with a matching emailHash when no ref is present", async () => {
+    // findClickByEmailHash → shortCode, then ingestSignup resolves that link.
+    dbMock.event.findFirst.mockResolvedValue({ trackedLink: { shortCode: "c9" } });
+    dbMock.trackedLink.findUnique.mockResolvedValue(link("proj_1"));
+    dbMock.event.createMany.mockResolvedValue({ count: 1 });
+
+    const out = await recordSignup(cap({ touches: [], email: "u@x.com", projectId: "proj_1" }));
+    expect(out).toMatchObject({ ok: true, attributed: true, mode: "email-recovery", shortCode: "c9" });
+    expect(dbMock.event.findFirst).toHaveBeenCalled();
+  });
+
+  it("records an unattributed signup (link-less) when there's no ref and no email match", async () => {
+    dbMock.event.findFirst.mockResolvedValue(null); // no matching click
+    dbMock.event.createMany.mockResolvedValue({ count: 1 });
+
+    const out = await recordSignup(cap({ touches: [], email: "u@x.com", projectId: "proj_1" }));
+    expect(out).toMatchObject({ ok: true, attributed: false, mode: "unattributed", shortCode: null });
+    const data = dbMock.event.createMany.mock.calls[0][0].data[0];
+    expect(data).toMatchObject({ projectId: "proj_1", trackedLinkId: null, type: "SIGNUP" });
+    expect(data.meta.channel).toBe("unattributed");
+  });
+
+  it("records unattributed with no email at all (pure dark social) when a project is known", async () => {
+    dbMock.event.createMany.mockResolvedValue({ count: 1 });
+    const out = await recordSignup(cap({ touches: [], projectId: "proj_1" }));
+    expect(out.mode).toBe("unattributed");
+    expect(dbMock.event.findFirst).not.toHaveBeenCalled(); // no email → no recovery lookup
+  });
+
+  it("skips (records nothing) when there's no ref, no email, and no project", async () => {
+    const out = await recordSignup(cap({ touches: [] }));
+    expect(out).toMatchObject({ ok: false, attributed: false, mode: "skipped", shortCode: null });
+    expect(dbMock.event.createMany).not.toHaveBeenCalled();
   });
 });

@@ -8,6 +8,7 @@ import {
   pixelScriptTag,
   pixelNextjsSnippet,
   pixelHtmlSnippet,
+  pixelBackendSnippet,
 } from "@/lib/pixel";
 
 const promptStyle: React.CSSProperties = {
@@ -18,12 +19,13 @@ const promptStyle: React.CSSProperties = {
   whiteSpace: "pre-wrap",
 };
 
-type View = "oneliner" | "nextjs" | "html" | "prompt";
+type View = "oneliner" | "nextjs" | "html" | "backend" | "prompt";
 
 const TABS: { key: View; label: string }[] = [
   { key: "oneliner", label: "One-liner" },
   { key: "nextjs", label: "Next.js" },
   { key: "html", label: "Plain HTML" },
+  { key: "backend", label: "Backend" },
   { key: "prompt", label: "Prompt" },
 ];
 
@@ -59,6 +61,8 @@ The script captures the \`lw_ref\` query parameter from LaunchWake tracked-link 
     oneliner: oneLiner,
     nextjs: pixelNextjsSnippet(base, projectId),
     html: pixelHtmlSnippet(base, projectId),
+    // No-SDK server-side signup report — same endpoint as the browser pixel.
+    backend: pixelBackendSnippet(base, projectId),
     prompt,
   };
   const isPrompt = view === "prompt";
@@ -94,6 +98,11 @@ The script captures the \`lw_ref\` query parameter from LaunchWake tracked-link 
       {isPrompt && (
         <p style={{ color: "var(--tx3)", fontSize: 11.5, marginBottom: 8 }}>
           Paste this into your AI coding assistant (Claude Code, Cursor, Copilot…) — it sets up the same thing from a plain description.
+        </p>
+      )}
+      {view === "backend" && (
+        <p style={{ color: "var(--tx3)", fontSize: 11.5, marginBottom: 8 }}>
+          No npm package — just one <code className="mono">fetch</code> from your server after signup, for backends that don&apos;t run the browser pixel. Reports to the same endpoint.
         </p>
       )}
       <pre className={isPrompt ? undefined : "mono"} style={isPrompt ? promptStyle : preStyle}>

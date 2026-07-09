@@ -74,8 +74,39 @@ Tracked link clicks ──> /r/[code] route ──> Event ingest ──> attribu
 - Each `Post` gets a `TrackedLink` (`/r/{shortCode}` → destUrl with UTM).
 - `/r/[code]` logs a CLICK then 302-redirects.
 - Signup attribution: lightweight — either a JS pixel on the product's thank-you page that
-  posts the `lw_ref` cookie back to `/api/track/signup`, or a server-side callback. Keep it
-  optional; clicks work without integration, signups require the pixel.
+  posts the `lw_ref` back to `/api/track/signup`, or a server-side `fetch` (the "Backend"
+  snippet, no SDK). Keep it optional; clicks work without integration, signups need the pixel.
+
+### Capture resilience (fewer lost conversions)
+
+The gap between a real conversion and an attributed one is where founders lose trust in the
+numbers. Four mechanisms close it; the pure parts (`mergeTouches`/`sanitizeTouches`, the health
+rules) are unit-tested.
+
+- **Persistence — two carriers, 90 days.** The `/r` redirect sets an `lw_ref` cookie (90d,
+  `SameSite=Lax`). The pixel mirrors the ref into a first-party cookie *and* localStorage (90d
+  expiry) on the product domain, and reads cookie-then-localStorage at signup — so clearing one
+  store doesn't lose the attribution.
+- **Multi-touch (last-3).** The pixel keeps up to the last 3 distinct `lw_ref` codes
+  (most-recent first) and sends them all. The SIGNUP is attributed **last-touch** (`touches[0]`);
+  the rest are kept in `Event.meta.touches` for future multi-touch modeling. `mergeTouches` (the
+  merge rule) is shared: the pure server helper and the inline snippet apply the same logic.
+- **Cross-device recovery (optional).** When a personalized link passes an email —
+  `/r/{code}?eh=<sha256>` (preferred) or `?email=` — the CLICK stores an `Event.emailHash`
+  (never the raw email). A later signup that arrives with **no** `lw_ref` but the same email is
+  recovered to that channel via `findClickByEmailHash`. Off unless the destination passes an email.
+- **Unattributed reconciliation.** A signup with no ref and no email match is still recorded —
+  `trackedLinkId = null`, `projectId` set, `meta.channel = "unattributed"` — so total signups
+  reconcile and the dark-social share is measurable rather than silently dropped. Link-less rows
+  dedupe via a second partial unique index `(projectId, type, dedupeKey) WHERE trackedLinkId IS NULL`.
+
+### Tracking health (`lib/trackingHealth.ts`)
+
+`deriveTrackingHealth` (pure) turns raw signals into per-item status + one-line fixes, surfaced
+in the Settings tracking-health panel. Beyond the webhook items it flags: **pixel never fired**
+(the verification ping never arrived), **clicks but zero signups for 14+ days** (a silent pixel
+failure, escalated by click age), and the **dark-social share** (unattributed ÷ total signups —
+amber past 40%, nudging the "How did you hear about us?" survey).
 
 ### Data-integrity guards (attribution)
 

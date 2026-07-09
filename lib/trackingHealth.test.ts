@@ -52,6 +52,67 @@ describe("deriveTrackingHealth — pixel", () => {
   });
 });
 
+describe("deriveTrackingHealth — pixel never fired / stale clicks", () => {
+  it("tells the user the pixel never pinged when clicks arrive but it never fired", () => {
+    const h = deriveTrackingHealth(base({ signups: 0, clicks: 8, pixelEverFired: false }));
+    const pixel = item(h, "pixel");
+    expect(pixel.level).toBe("red");
+    expect(pixel.fix).toMatch(/never pinged/i);
+  });
+
+  it("distinguishes 'pixel live but launchwakeSignup() not firing' when it has pinged", () => {
+    const h = deriveTrackingHealth(base({ signups: 0, clicks: 8, pixelEverFired: true }));
+    expect(item(h, "pixel").fix).toMatch(/launchwakeSignup\(\) isn't firing/i);
+  });
+
+  it("notes a never-fired pixel even before any clicks (amber, not red)", () => {
+    const h = deriveTrackingHealth(base({ signups: 0, clicks: 0, pixelEverFired: false }));
+    const pixel = item(h, "pixel");
+    expect(pixel.level).toBe("amber");
+    expect(pixel.detail).toMatch(/never pinged/i);
+  });
+
+  it("escalates clicks-with-no-signups after 14+ days", () => {
+    const h = deriveTrackingHealth(
+      base({ signups: 0, clicks: 30, firstClickAt: new Date("2026-06-14T12:00:00.000Z") }),
+    );
+    const pixel = item(h, "pixel");
+    expect(pixel.level).toBe("red");
+    expect(pixel.detail).toMatch(/20 days/);
+    expect(pixel.detail).toMatch(/not one signup/i);
+  });
+
+  it("does not escalate when clicks are recent (under 14 days)", () => {
+    const h = deriveTrackingHealth(
+      base({ signups: 0, clicks: 4, firstClickAt: new Date("2026-07-01T12:00:00.000Z") }),
+    );
+    expect(item(h, "pixel").detail).not.toMatch(/days/);
+  });
+});
+
+describe("deriveTrackingHealth — dark-social share", () => {
+  it("flags a high untracked share amber with a survey nudge", () => {
+    const h = deriveTrackingHealth(base({ signups: 10, unattributedSignups: 6 }));
+    const ds = item(h, "darksocial");
+    expect(ds.level).toBe("amber");
+    expect(ds.detail).toMatch(/6 of 10/);
+    expect(ds.detail).toMatch(/60%/);
+    expect(ds.fix).toMatch(/how did you hear/i);
+  });
+
+  it("reports a low untracked share green, with no fix", () => {
+    const h = deriveTrackingHealth(base({ signups: 10, unattributedSignups: 2 }));
+    const ds = item(h, "darksocial");
+    expect(ds.level).toBe("green");
+    expect(ds.fix).toBeUndefined();
+  });
+
+  it("omits the dark-social item entirely when everything is attributed", () => {
+    const h = deriveTrackingHealth(base({ signups: 5, unattributedSignups: 0 }));
+    expect(h.items.find((i) => i.key === "darksocial")).toBeUndefined();
+  });
+});
+
 describe("deriveTrackingHealth — webhooks", () => {
   it("marks an unconnected integration amber, not red", () => {
     const h = deriveTrackingHealth(
