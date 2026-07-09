@@ -77,6 +77,30 @@ Tracked link clicks ──> /r/[code] route ──> Event ingest ──> attribu
   posts the `lw_ref` back to `/api/track/signup`, or a server-side `fetch` (the "Backend"
   snippet, no SDK). Keep it optional; clicks work without integration, signups need the pixel.
 
+### Reconciled Results — tracked vs reported (honest, never merged)
+
+There are two independent measurement systems and they answer different questions, so we show
+them side by side and **never merge them into one "exact" number** (`reconcileAttribution`,
+pure, in `lib/selfReport.ts`; assembled by `getReconciledResults`):
+
+- **Tracked** — link-attributed `SIGNUP` events. Verifiable, and the only signal the moat uses.
+- **Reported** — "how did you hear about us?" survey answers, normalized to a catalog **platform**
+  by a pure matcher (`normalizeSource`: `"hn"`/`"hacker news"` → `hackernews`, and Turkish
+  free text like `"bir arkadaşım tavsiye etti"` → word-of-mouth, since the survey runs on the
+  customer's site in their language). Self-reported → unverifiable.
+
+The reconciliation unit is the **platform** (a coarse answer says "Reddit", not "r/webdev"), so
+multiple channels on one platform sum without double-counting an answer. Each row carries a
+blended **confidence** label — `HIGH` (tracked + reported agree), `MEDIUM` (one source only),
+`LOW` (combined sample < 5) — and totals reconcile *within* each system (attributed + remainder).
+
+- **Dark social / unknown** gets its own row: unattributed tracked signups + survey answers with
+  no channel (word-of-mouth, podcast, search…), with a factual explainer (~85% of sharing is
+  untrackable industry-wide — normal, not a tracking failure). Honesty is the brand feature.
+- **Moat stays tracked-only.** `ChannelStat.signups` / `outcomeEvidence` use tracked signups; a
+  new `ChannelStat.reportedSignups` stores the survey counts *alongside* (split evenly across a
+  project's channels on a platform, floored — never inflating) so benchmarks can show both later.
+
 ### Capture resilience (fewer lost conversions)
 
 The gap between a real conversion and an attributed one is where founders lose trust in the

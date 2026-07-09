@@ -1,10 +1,16 @@
 import { getWorkspace } from "@/lib/session";
-import { getResultsRollup, getSelfReportRollup, formatMoney } from "@/lib/attribution";
+import {
+  getResultsRollup,
+  getSelfReportRollup,
+  getReconciledResults,
+  formatMoney,
+} from "@/lib/attribution";
 import { getTrackingHealth } from "@/lib/trackingHealth";
 import { RoiStrip } from "@/components/results/RoiStrip";
 import { TrackingHealthBanner } from "@/components/results/TrackingHealthBanner";
 import { PostCoachList } from "@/components/results/PostCoach";
 import { SelfReportPanel } from "@/components/results/SelfReportPanel";
+import { ReconciliationPanel } from "@/components/results/ReconciliationPanel";
 import { GetStartedSteps } from "@/components/results/GetStartedSteps";
 import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
@@ -41,6 +47,9 @@ export default async function ResultsPage({
   // link/UTM can't see. Exists independently of tracked posts, so it's shown
   // even when no channel has been marked posted yet.
   const selfReport = await getSelfReportRollup(ws.project.id);
+  // The blended, honest view: tracked (Events) vs reported (survey) per source,
+  // with a confidence label and the dark-social/unknown bucket.
+  const reconciled = await getReconciledResults(ws.project.id);
   const canCoach = ws.plan !== "FREE";
 
   // Ingestion health — surface active webhook failures so a data gap here isn't
@@ -130,6 +139,8 @@ export default async function ResultsPage({
         <RoiStrip roi={r.roi} topRevenueChannel={r.topRevenueChannel} />
       )}
       <StatStrip stats={stats} />
+
+      <ReconciliationPanel view={reconciled} />
 
       <Panel title="By channel" right="across all ships">
         <div className="tblwrap">

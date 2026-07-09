@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { deriveSignalTags } from "./channels";
+import { sourcePlatform } from "./selfReport";
 
 /**
  * The flywheel: aggregate real outcomes (posts, clicks, signups, removals) per
@@ -44,41 +45,90 @@ export function productTagFor(projectText: string): string {
  * productTag. Cheap at MVP scale; would become an incremental Inngest job later.
  */
 export async function rollupAllChannelStats(): Promise<void> {
-  const posts = await db.post.findMany({
-    include: {
-      ship: {
-        include: {
-          project: { select: { name: true, description: true, url: true } },
+  const [posts, selfReports] = await Promise.all([
+    db.post.findMany({
+      include: {
+        channel: { select: { id: true, platform: true } },
+        ship: {
+          include: {
+            project: { select: { id: true, name: true, description: true, url: true } },
+          },
         },
+        trackedLink: { include: { events: { select: { type: true } } } },
       },
-      trackedLink: { include: { events: { select: { type: true } } } },
-    },
-  });
+    }),
+    db.selfReport.findMany({ select: { projectId: true, source: true } }),
+  ]);
+
+  // Reported signups per (project, platform) — survey answers mapped to a platform.
+  const reportedByProjectPlatform = new Map<string, Map<string, number>>();
+  for (const sr of selfReports) {
+    const platform = sourcePlatform(sr.source);
+    if (!platform) continue; // dark social has no channel to credit
+    const byPlat = reportedByProjectPlatform.get(sr.projectId) ?? new Map<string, number>();
+    byPlat.set(String(platform), (byPlat.get(String(platform)) ?? 0) + 1);
+    reportedByProjectPlatform.set(sr.projectId, byPlat);
+  }
 
   const tagCache = new Map<string, string>();
-  const acc = new Map<string, OutcomeSignal & { channelId: string; productTag: string }>();
+  type Row = OutcomeSignal & { channelId: string; productTag: string; reportedSignups: number };
+  const acc = new Map<string, Row>();
+  // Which distinct channels each project posted to, per platform — so a project's
+  // platform-reported answers split across its channels without double-counting.
+  const projectChannels = new Map<string, { tag: string; byPlatform: Map<string, Set<string>> }>();
 
   for (const post of posts) {
     const proj = post.ship.project;
-    const projKey = `${proj.name}|${proj.url ?? ""}`;
-    let tag = tagCache.get(projKey);
+    let tag = tagCache.get(proj.id);
     if (!tag) {
       tag = productTagFor(`${proj.name} ${proj.description ?? ""} ${proj.url ?? ""}`);
-      tagCache.set(projKey, tag);
+      tagCache.set(proj.id, tag);
     }
 
     const key = `${post.channelId}::${tag}`;
     const row =
       acc.get(key) ??
-      { channelId: post.channelId, productTag: tag, posts: 0, clicks: 0, signups: 0, removals: 0 };
+      {
+        channelId: post.channelId,
+        productTag: tag,
+        posts: 0,
+        clicks: 0,
+        signups: 0,
+        removals: 0,
+        reportedSignups: 0,
+      };
 
     row.posts += 1;
     if (post.status === "REMOVED") row.removals += 1;
     for (const e of post.trackedLink?.events ?? []) {
       if (e.type === "CLICK") row.clicks += 1;
-      else if (e.type === "SIGNUP") row.signups += 1;
+      else if (e.type === "SIGNUP") row.signups += 1; // TRACKED signups only
     }
     acc.set(key, row);
+
+    // Note the project→platform→channel mapping for the reported split below.
+    const pc = projectChannels.get(proj.id) ?? { tag, byPlatform: new Map<string, Set<string>>() };
+    const platform = String(post.channel.platform);
+    const set = pc.byPlatform.get(platform) ?? new Set<string>();
+    set.add(post.channelId);
+    pc.byPlatform.set(platform, set);
+    projectChannels.set(proj.id, pc);
+  }
+
+  // Split each project's platform-reported answers evenly across the channels it
+  // posted to on that platform (floored — never inflates the platform's total).
+  for (const [projectId, pc] of projectChannels) {
+    const reported = reportedByProjectPlatform.get(projectId);
+    if (!reported) continue;
+    for (const [platform, channelIds] of pc.byPlatform) {
+      const total = reported.get(platform) ?? 0;
+      const per = channelIds.size > 0 ? Math.floor(total / channelIds.size) : 0;
+      if (per === 0) continue;
+      for (const channelId of channelIds) {
+        const row = acc.get(`${channelId}::${pc.tag}`);
+        if (row) row.reportedSignups += per;
+      }
+    }
   }
 
   // Replace the table with the freshly computed rollup.
@@ -92,6 +142,7 @@ export async function rollupAllChannelStats(): Promise<void> {
         clicks: r.clicks,
         signups: r.signups,
         removals: r.removals,
+        reportedSignups: r.reportedSignups,
       })),
     }),
   ]);

@@ -79,27 +79,67 @@ export function sourcePlatform(source: string): Platform | null {
   return OPTION_BY_VALUE.get(source)?.platform ?? null;
 }
 
+/** Human display label for a catalog platform (the reconciliation row header). */
+const PLATFORM_LABELS: Record<string, string> = {
+  HACKERNEWS: "Hacker News",
+  REDDIT: "Reddit",
+  PRODUCTHUNT: "Product Hunt",
+  INDIEHACKERS: "Indie Hackers",
+  DEVTO: "DEV.to",
+  LOBSTERS: "Lobsters",
+  X: "X / Twitter",
+  LINKEDIN: "LinkedIn",
+  DISCORD: "Discord",
+  SLACK: "Slack",
+  NEWSLETTER: "Newsletter",
+  DIRECTORY: "Directory",
+  MASTODON: "Mastodon",
+  BLUESKY: "Bluesky",
+  FORUM: "Forum",
+  YOUTUBE: "YouTube",
+  BLOG: "Blog",
+  OTHER: "Other",
+};
+
+/** Display label for a catalog platform; falls back to a humanized enum name. */
+export function platformLabel(platform: Platform | string): string {
+  const key = String(platform);
+  return PLATFORM_LABELS[key] ?? key.charAt(0) + key.slice(1).toLowerCase();
+}
+
 /**
  * Free-text alias → source key. Matched (substring, case-insensitive) against
  * the answer AFTER exact-key match fails, so a customer form that sends its own
  * label ("Twitter", "a friend recommended it", "chatgpt") still normalizes into
- * the shared taxonomy. More specific aliases first.
+ * the shared taxonomy. The survey runs on the *customer's* site in whatever
+ * language they use, so aliases include Turkish (and other) phrasings alongside
+ * English. More specific aliases first; word-of-mouth is last so a named platform
+ * always wins over "a friend shared it on X".
  */
 const ALIASES: Array<[patterns: string[], source: string]> = [
   [["hacker news", "hackernews", "ycombinator", "news.yc", "show hn", " hn ", "hn.", "on hn"], "hackernews"],
-  [["product hunt", "producthunt", "prod hunt"], "producthunt"],
-  [["twitter", "tweet", "x.com", " x ", "on x"], "x"],
-  [["linkedin"], "linkedin"],
-  [["reddit", "subreddit", "r/"], "reddit"],
-  [["youtube", "yt video", "a youtube"], "youtube"],
+  [["product hunt", "producthunt", "prod hunt", "ürün avı"], "producthunt"],
+  [["twitter", "tweet", "x.com", " x ", "on x", "x'te", "x'ten", "x’te", "twitter'da", "twitter’da"], "x"],
+  [["linkedin", "linkedin'de", "linkedin’de"], "linkedin"],
+  [["reddit", "subreddit", "r/", "reddit'te", "reddit'de", "reddit’te"], "reddit"],
+  [["youtube", "yt video", "a youtube", "youtube'da", "youtube’da", "video"], "youtube"],
   [["podcast"], "podcast"],
-  [["newsletter", "substack", "email digest"], "newsletter"],
-  [["dev.to", "medium", "blog", "article", "hashnode"], "blog"],
-  [["discord", "slack", "community", "forum"], "community"],
-  [["github", "gh repo", "open source", "open-source"], "github"],
-  [["chatgpt", "gpt", "claude", "perplexity", "copilot", "ai assistant", " llm", "gemini"], "ai"],
-  [["google", "search", "bing", "seo", "duckduckgo", "searched"], "search"],
-  [["friend", "colleague", "coworker", "co-worker", "word of mouth", "referral", "referred", "recommend", "someone told", "a person"], "word_of_mouth"],
+  [["newsletter", "substack", "email digest", "bülten", "e-bülten", "e-posta bülteni"], "newsletter"],
+  [["dev.to", "medium", "blog", "article", "hashnode", "makale", "blog yazısı", "yazısında"], "blog"],
+  [["discord", "slack", "community", "forum", "topluluk", "sunucusunda"], "community"],
+  [["github", "gh repo", "open source", "open-source", "açık kaynak"], "github"],
+  [["chatgpt", "gpt", "claude", "perplexity", "copilot", "ai assistant", " llm", "gemini", "yapay zeka", "yapay zekâ"], "ai"],
+  [["google", "search", "bing", "seo", "duckduckgo", "searched", "arama", "arattım", "aratınca", "internette", "internetten", "google'da", "google’da"], "search"],
+  [
+    [
+      // English
+      "friend", "colleague", "coworker", "co-worker", "word of mouth", "referral",
+      "referred", "recommend", "someone told", "a person",
+      // Turkish: arkadaş(ım/ı), meslektaş, tavsiye, öner(di/i), tanıdık, biri söyledi, duydum, kulaktan kulağa
+      "arkadaş", "meslektaş", "iş arkadaş", "tavsiye", "öner", "tanıdık", "biri söyledi", "birisi söyledi", "duydum", "kulaktan kulağa", "ağızdan ağıza",
+    ],
+    "word_of_mouth",
+  ],
 ];
 
 export type NormalizedSource = {
@@ -272,4 +312,139 @@ export function buildSelfReportInsight(rollup: SelfReportRollup): string | null 
   }
 
   return parts.join(" ");
+}
+
+// ── Reconciliation: tracked (Events) vs reported (survey) ──────────────────
+// Two independent measurement systems, deliberately NOT merged into one "exact"
+// number. Tracked = link-attributed SIGNUP events (verifiable). Reported = survey
+// answers mapped to a platform (self-reported, unverifiable). We show both side by
+// side per source with a confidence label, plus a dark-social bucket for whatever
+// neither system pins to a channel.
+
+export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW";
+
+/** Below this combined sample a row is LOW confidence regardless of agreement. */
+export const MIN_CONFIDENT_SAMPLE = 5;
+
+/**
+ * Blended confidence for a source row — NOT a merged count, just how much to trust
+ * the pair. LOW when the combined sample is small (< MIN_CONFIDENT_SAMPLE); HIGH
+ * when tracked and reported BOTH credit this source (two independent signals
+ * agree); MEDIUM when only one of the two has it.
+ */
+export function confidenceFor(trackedSignups: number, reportedSignups: number): ConfidenceLevel {
+  const sample = trackedSignups + reportedSignups;
+  if (sample < MIN_CONFIDENT_SAMPLE) return "LOW";
+  if (trackedSignups > 0 && reportedSignups > 0) return "HIGH";
+  return "MEDIUM";
+}
+
+export type PlatformCount = { platform: Platform | string; count: number };
+
+export type ReconciledChannel = {
+  platform: string;
+  label: string;
+  trackedSignups: number;
+  reportedSignups: number;
+  /** trackedSignups + reportedSignups (drives ordering + confidence). */
+  sample: number;
+  confidence: ConfidenceLevel;
+};
+
+export type DarkSocialBucket = {
+  /** Survey answers whose source has no channel (word of mouth, podcast, search…). */
+  reportedSignups: number;
+  /** Tracked SIGNUP events with no channel (no lw_ref, no email match). */
+  trackedSignups: number;
+  /** reportedSignups + trackedSignups. */
+  total: number;
+  /** Dark social as a share of ALL self-reported answers (0..1). */
+  reportedShare: number;
+  /** Top named dark-social source, for the explainer line. */
+  topSource: { source: string; label: string; count: number } | null;
+  /** Factual, brand-honest one-liner (kept research-accurate, never alarmist). */
+  explainer: string;
+};
+
+export type ReconciliationView = {
+  channels: ReconciledChannel[];
+  darkSocial: DarkSocialBucket;
+  /** All link-attributed tracked signups (Σ channels.trackedSignups). */
+  trackedAttributed: number;
+  /** All platform-mapped reports (Σ channels.reportedSignups). */
+  reportedAttributed: number;
+  /** Every tracked SIGNUP event: attributed + unattributed. */
+  totalTracked: number;
+  /** Every survey answer: platform-mapped + dark social. */
+  totalReported: number;
+};
+
+/** Factual dark-social explainer — honesty as a brand feature, no hype. */
+export const DARK_SOCIAL_EXPLAINER =
+  "Dark social is the sharing analytics can't see — DMs, group chats, Slack, podcasts, someone typing your URL after a friend mentioned it. Industry-wide, roughly 85% of sharing happens here, so a large unknown slice is normal, not a tracking failure.";
+
+/**
+ * Reconcile the two attribution systems into one honest view. Pure. `tracked` and
+ * `reported` are per-platform counts; `unattributedTracked` / `darkReported` are
+ * the channel-less remainders. Rows sort by combined evidence. Totals reconcile
+ * WITHIN each system (attributed + remainder = system total), and the two systems
+ * stay separate — a tracked count and a reported count are never summed into one.
+ */
+export function reconcileAttribution(input: {
+  tracked: PlatformCount[];
+  reported: PlatformCount[];
+  unattributedTracked: number;
+  darkReported: number;
+  topDarkSource?: { source: string; label: string; count: number } | null;
+}): ReconciliationView {
+  const sumInto = (rows: PlatformCount[]): Map<string, number> => {
+    const m = new Map<string, number>();
+    for (const r of rows) {
+      const k = String(r.platform);
+      m.set(k, (m.get(k) ?? 0) + Math.max(0, r.count));
+    }
+    return m;
+  };
+  const trackedByP = sumInto(input.tracked);
+  const reportedByP = sumInto(input.reported);
+
+  const channels: ReconciledChannel[] = [...new Set([...trackedByP.keys(), ...reportedByP.keys()])]
+    .map((p) => {
+      const trackedSignups = trackedByP.get(p) ?? 0;
+      const reportedSignups = reportedByP.get(p) ?? 0;
+      return {
+        platform: p,
+        label: platformLabel(p),
+        trackedSignups,
+        reportedSignups,
+        sample: trackedSignups + reportedSignups,
+        confidence: confidenceFor(trackedSignups, reportedSignups),
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.sample - a.sample ||
+        b.trackedSignups - a.trackedSignups ||
+        a.label.localeCompare(b.label),
+    );
+
+  const trackedAttributed = [...trackedByP.values()].reduce((n, v) => n + v, 0);
+  const reportedAttributed = [...reportedByP.values()].reduce((n, v) => n + v, 0);
+  const totalReported = reportedAttributed + input.darkReported;
+
+  return {
+    channels,
+    darkSocial: {
+      reportedSignups: input.darkReported,
+      trackedSignups: input.unattributedTracked,
+      total: input.darkReported + input.unattributedTracked,
+      reportedShare: totalReported > 0 ? input.darkReported / totalReported : 0,
+      topSource: input.topDarkSource ?? null,
+      explainer: DARK_SOCIAL_EXPLAINER,
+    },
+    trackedAttributed,
+    reportedAttributed,
+    totalTracked: trackedAttributed + input.unattributedTracked,
+    totalReported,
+  };
 }

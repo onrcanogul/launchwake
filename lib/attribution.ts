@@ -9,9 +9,13 @@ import {
   normalizeSource,
   rollupSelfReports,
   buildSelfReportInsight,
+  reconcileAttribution,
+  sourcePlatform,
+  sourceLabel,
   MAX_ANSWER_LEN,
   type SelfReportRow,
   type SelfReportRollup,
+  type ReconciliationView,
 } from "./selfReport";
 
 /**
@@ -706,6 +710,71 @@ export async function getSelfReportRollup(
     insight: buildSelfReportInsight(rollup),
     lastAt: reports[0]?.createdAt ?? null,
   };
+}
+
+/**
+ * The honest, blended Results view: per-source tracked (Events) vs reported
+ * (survey) signups with a confidence label, plus the dark-social/unknown bucket.
+ * The two systems are reconciled but never merged into one "exact" number — a
+ * tracked count is verifiable, a self-report isn't, so they're shown side by side.
+ *
+ * Reconciliation unit is the catalog *platform* (the granularity a coarse survey
+ * answer actually has: "Reddit", not "r/webdev"), so multiple channels on one
+ * platform sum without double-counting a reported answer.
+ */
+export async function getReconciledResults(
+  projectId: string,
+): Promise<ReconciliationView> {
+  const [posts, unattributedTracked, reports] = await Promise.all([
+    db.post.findMany({
+      where: { ship: { projectId } },
+      select: {
+        channel: { select: { platform: true } },
+        trackedLink: { select: { events: { select: { type: true } } } },
+      },
+    }),
+    db.event.count({ where: { projectId, trackedLinkId: null, type: "SIGNUP" } }),
+    db.selfReport.findMany({ where: { projectId }, select: { source: true } }),
+  ]);
+
+  // Tracked SIGNUP events grouped by the post's channel platform.
+  const trackedByPlatform = new Map<string, number>();
+  for (const p of posts) {
+    let signups = 0;
+    for (const e of p.trackedLink?.events ?? []) if (e.type === "SIGNUP") signups += 1;
+    if (signups > 0) {
+      const key = String(p.channel.platform);
+      trackedByPlatform.set(key, (trackedByPlatform.get(key) ?? 0) + signups);
+    }
+  }
+
+  // Self-reports: platform-mapped answers vs pure dark social (no platform).
+  const reportedByPlatform = new Map<string, number>();
+  const darkCounts = new Map<string, number>();
+  let darkReported = 0;
+  for (const r of reports) {
+    const platform = sourcePlatform(r.source);
+    if (platform) {
+      const key = String(platform);
+      reportedByPlatform.set(key, (reportedByPlatform.get(key) ?? 0) + 1);
+    } else {
+      darkReported += 1;
+      darkCounts.set(r.source, (darkCounts.get(r.source) ?? 0) + 1);
+    }
+  }
+  const topDark = [...darkCounts.entries()].sort(
+    (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+  )[0];
+
+  return reconcileAttribution({
+    tracked: [...trackedByPlatform].map(([platform, count]) => ({ platform, count })),
+    reported: [...reportedByPlatform].map(([platform, count]) => ({ platform, count })),
+    unattributedTracked,
+    darkReported,
+    topDarkSource: topDark
+      ? { source: topDark[0], label: sourceLabel(topDark[0]), count: topDark[1] }
+      : null,
+  });
 }
 
 /** Does the pixel route have a project to serve? (Existence check for GET.) */

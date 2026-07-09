@@ -476,7 +476,13 @@ model ChannelStat {
   productTag String // profile bucket, e.g. "devtools-backend"
   posts      Int      @default(0)
   clicks     Int      @default(0)
+  // TRACKED signups (Events) — the verifiable signal the moat/ranking uses.
   signups    Int      @default(0)
+  // SELF-REPORTED signups (survey answers) stored ALONGSIDE, never mixed into
+  // `signups`: unverifiable, so it never drives ranking, but benchmarks can show
+  // "tracked vs reported" later. Split evenly across a project's channels on the
+  // same platform to avoid double-counting a coarse answer.
+  reportedSignups Int  @default(0)
   removals   Int      @default(0)
   updatedAt  DateTime @updatedAt
 
