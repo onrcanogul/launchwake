@@ -16,9 +16,13 @@ on:
     - cron: "*/10 * * * *" # webhook retries — every 10 min
     - cron: "*/15 * * * *" # reminders — every 15 min
     - cron: "0 7 * * 1" # weekly digest — Monday 07:00 UTC
+    - cron: "0 8 1 * *" # monthly report — 1st of month 08:00 UTC
     - cron: "0 */6 * * *" # intent radar — every 6h
     - cron: "0 5 * * *" # category benchmarks — daily 05:00 UTC
   workflow_dispatch: {}
+
+# Note: milestone notifications and the activation drip have no schedule of their
+# own — they ride the reminders endpoint above (every 15 min), so nothing to add here.
 
 jobs:
   retry-webhooks:
@@ -52,6 +56,18 @@ jobs:
       - name: Trigger weekly digest
         run: |
           curl -fsS -X POST "${CRON_TARGET_URL}/api/cron/digest" \
+            -H "Authorization: Bearer ${CRON_SECRET}"
+        env:
+          CRON_TARGET_URL: ${{ vars.CRON_TARGET_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+  monthly-report:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 8 1 * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger monthly report
+        run: |
+          curl -fsS -X POST "${CRON_TARGET_URL}/api/cron/monthly-report" \
             -H "Authorization: Bearer ${CRON_SECRET}"
         env:
           CRON_TARGET_URL: ${{ vars.CRON_TARGET_URL }}

@@ -35,15 +35,20 @@ model User {
   accounts         Account[]
   sessions         Session[]
   reminders        Reminder[]
+  lifecycleEmails  LifecycleEmail[]
   // Team seats: memberships this user owns (they pay) vs is a member of.
   ownedMemberships TeamMembership[] @relation("TeamOwner")
   memberships      TeamMembership[] @relation("TeamMember")
   sentInvites      TeamInvite[]     @relation("TeamInvites")
   brand            Brand? // agency white-label branding (Team)
   lastDigestAt     DateTime? // last weekly digest sent (guards against re-sends)
-  // Product-notification emails (weekly digest, plan-ready). Default on; the
-  // one-click unsubscribe link and the Settings toggle turn it off. Never
-  // gates transactional auth email (magic links).
+  // Last milestone-notification email sent — enforces "max 1 milestone email per
+  // user per day" (task 2), even when several milestones land in one window.
+  lastMilestoneAt  DateTime?
+  // Product-notification emails (the weekly digest, the plan-ready ping, and the
+  // lifecycle set: milestones, the activation drip, the monthly report). Default
+  // on; the one-click unsubscribe link and the Settings toggle turn it off. Never
+  // gates transactional auth email (magic links). Respected by every sender.
   emailNotifications Boolean @default(true)
   // Self-reported "how did you hear about us?" answer at signup — LaunchWake
   // dogfooding its own dark-social attribution (a tracked link/UTM can't see the
@@ -466,6 +471,39 @@ enum ReminderStatus {
   SENT
   FAILED
   CANCELED
+}
+
+// Ledger of one-shot lifecycle emails already handled for a user, so nothing ever
+// repeats. Covers the milestone notifications (task 2), the activation drip (task
+// 3), and the monthly report (task 4). The mere existence of a row means "already
+// sent"; `key` discriminates within a `kind`:
+//   FIRST_SIGNUP    → the channel name ("Show HN")
+//   SIGNUP_COUNT    → the crossed multiple of ten ("10", "20", …)
+//   MONTHLY_REPORT  → "<projectId>:<YYYY-MM>" (one per project per month)
+//   everything else → "" (a per-user singleton: FIRST_CLICK, the drip steps)
+// The reminders cron writes milestone/drip rows; the monthly cron writes report
+// rows. Inserts use createMany+skipDuplicates against the unique index, so a
+// double fire is a silent no-op.
+model LifecycleEmail {
+  id     String             @id @default(cuid())
+  userId String
+  user   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind   LifecycleEmailKind
+  key    String             @default("")
+  sentAt DateTime           @default(now())
+
+  @@unique([userId, kind, key])
+  @@index([userId, kind])
+}
+
+enum LifecycleEmailKind {
+  FIRST_CLICK
+  FIRST_SIGNUP
+  SIGNUP_COUNT
+  DRIP_WELCOME
+  DRIP_PIXEL
+  DRIP_LAUNCH
+  MONTHLY_REPORT
 }
 
 // Aggregated outcome data per channel (the flywheel / moat).
