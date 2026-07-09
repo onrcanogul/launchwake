@@ -3,7 +3,12 @@
 import { useState, useTransition } from "react";
 import { Icon } from "@/components/Icon";
 import { useToast } from "@/components/ui/toast";
-import { startCheckout, startTeamCheckout, openPortal } from "@/app/app/settings/actions";
+import {
+  startCheckout,
+  startTeamCheckout,
+  openPortal,
+  cancelSubscription,
+} from "@/app/app/settings/actions";
 import type { PlanUsage } from "@/lib/billing";
 
 const PLAN_LABEL: Record<string, string> = { FREE: "Free", PRO: "Pro", TEAM: "Team" };
@@ -15,6 +20,7 @@ function dollars(cents: number): string {
 export function BillingPanel({
   usage,
   billingConfigured,
+  polarBilling,
   justUpgraded,
   teamPricePerSeatCents,
   teamMinSeats,
@@ -22,6 +28,8 @@ export function BillingPanel({
 }: {
   usage: PlanUsage;
   billingConfigured: boolean;
+  /** Polar is the active provider → in-app "Cancel subscription" is available. */
+  polarBilling: boolean;
   justUpgraded: boolean;
   teamPricePerSeatCents: number;
   teamMinSeats: number;
@@ -30,6 +38,7 @@ export function BillingPanel({
   const { toast } = useToast();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [seats, setSeats] = useState(Math.max(teamMinSeats, usage.seats));
   const paid = usage.plan === "PRO" || usage.plan === "TEAM";
   const isTeam = usage.plan === "TEAM";
@@ -42,6 +51,25 @@ export function BillingPanel({
       else if (res.error) {
         setError(res.error);
         toast(res.error, "error");
+      }
+    });
+  };
+
+  const cancel = () => {
+    setError(null);
+    start(async () => {
+      const res = await cancelSubscription();
+      if (res.error) {
+        setError(res.error);
+        toast(res.error, "error");
+        setConfirmCancel(false);
+      } else if (res.ok) {
+        const when = res.endsAt
+          ? new Date(res.endsAt).toLocaleDateString()
+          : "the end of your billing period";
+        toast(`Subscription canceled — you keep access until ${when}.`, "success");
+        setConfirmCancel(false);
+        window.location.reload();
       }
     });
   };
@@ -70,13 +98,43 @@ export function BillingPanel({
           </span>
         </div>
         {paid ? (
-          <button
-            className="btn btn-s"
-            disabled={pending || !billingConfigured}
-            onClick={() => go(openPortal)}
-          >
-            <Icon name="external" /> Manage billing
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button
+              className="btn btn-s"
+              disabled={pending || !billingConfigured}
+              onClick={() => go(openPortal)}
+            >
+              <Icon name="external" /> Manage billing
+            </button>
+            {polarBilling &&
+              (confirmCancel ? (
+                <>
+                  <button
+                    className="btn btn-s"
+                    disabled={pending}
+                    onClick={cancel}
+                    style={{ color: "var(--bad)", borderColor: "var(--bad)" }}
+                  >
+                    {pending ? "Canceling…" : "Confirm cancel"}
+                  </button>
+                  <button
+                    className="btn btn-s"
+                    disabled={pending}
+                    onClick={() => setConfirmCancel(false)}
+                  >
+                    Keep plan
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="btn btn-s"
+                  disabled={pending}
+                  onClick={() => setConfirmCancel(true)}
+                >
+                  Cancel subscription
+                </button>
+              ))}
+          </div>
         ) : (
           <button className="btn btn-p" disabled={pending} onClick={() => go(startCheckout)}>
             {pending ? "Redirecting…" : "Upgrade to Pro — $29/mo"}

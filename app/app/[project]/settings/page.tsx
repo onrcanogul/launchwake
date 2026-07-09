@@ -202,6 +202,7 @@ export default async function SettingsPage({
           <BillingPanel
             usage={usage}
             billingConfigured={billingConfigured() || polarConfigured()}
+            polarBilling={polarConfigured()}
             justUpgraded={upgraded === "1"}
             teamPricePerSeatCents={TEAM_PRICE_PER_SEAT_CENTS}
             teamMinSeats={TEAM_MIN_SEATS}

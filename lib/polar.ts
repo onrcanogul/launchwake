@@ -133,11 +133,75 @@ export async function createPolarCheckoutUrl(
   const checkout = await getPolar().checkouts.create({
     products: [productId],
     customerEmail: user.email,
+    // Key the Polar customer to our user id so we can later open their portal and
+    // cancel their subscription by external id — no polarCustomerId column needed.
+    externalCustomerId: userId,
     successUrl: `${appUrl}/app/settings?upgraded=1`,
     metadata,
   });
   if (!checkout.url) throw new Error("Polar did not return a checkout URL.");
   return checkout.url;
+}
+
+// ── Manage / cancel ────────────────────────────────────────
+
+/**
+ * Create a Polar customer portal session for this user and return its URL. The
+ * portal lets the customer manage their subscription — update card, view
+ * invoices, and cancel. Requires the customer to exist (created at checkout with
+ * externalCustomerId = userId).
+ */
+export async function createPolarPortalUrl(userId: string): Promise<string> {
+  const session = await getPolar().customerSessions.create({
+    externalCustomerId: userId,
+  });
+  return session.customerPortalUrl;
+}
+
+/**
+ * Pick the subscription to cancel from a customer's list: prefer an
+ * active/trialing one not already scheduled to cancel, else any active one, else
+ * null. Pure so it's unit-testable without the Polar API.
+ */
+export function pickCancelableSubscription<
+  T extends { id: string; status: string; cancelAtPeriodEnd?: boolean | null },
+>(items: T[]): T | null {
+  const active = items.filter(
+    (s) => s.status === "active" || s.status === "trialing",
+  );
+  return active.find((s) => !s.cancelAtPeriodEnd) ?? active[0] ?? null;
+}
+
+export type PolarCancelResult = { canceled: boolean; endsAt: Date | null };
+
+/**
+ * Cancel the user's active Polar subscription at period end: stops future
+ * charges while keeping access until the current period ends, after which the
+ * `subscription.revoked` webhook downgrades them to FREE. Returns when access
+ * ends. Throws if there's no active subscription to cancel.
+ */
+export async function cancelPolarSubscription(
+  userId: string,
+): Promise<PolarCancelResult> {
+  const polar = getPolar();
+  const result = await polar.subscriptions.list({
+    externalCustomerId: userId,
+    active: true,
+  });
+
+  const items: Array<{ id: string; status: string; cancelAtPeriodEnd?: boolean }> =
+    [];
+  for await (const page of result) {
+    items.push(...page.result.items);
+  }
+  const sub = pickCancelableSubscription(items);
+  if (!sub) throw new Error("No active subscription found to cancel.");
+
+  const updated = await polar.subscriptions.update({
+    id: sub.id,
+    subscriptionUpdate: { cancelAtPeriodEnd: true },
+  });
+  return { canceled: true, endsAt: updated.endsAt ?? updated.currentPeriodEnd ?? null };
 }
 
 // ── Webhook ────────────────────────────────────────────────

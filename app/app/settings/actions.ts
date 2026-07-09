@@ -7,7 +7,12 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createCheckoutUrl, createPortalUrl, billingConfigured } from "@/lib/billing";
-import { createPolarCheckoutUrl, polarConfigured } from "@/lib/polar";
+import {
+  createPolarCheckoutUrl,
+  createPolarPortalUrl,
+  cancelPolarSubscription,
+  polarConfigured,
+} from "@/lib/polar";
 import {
   resolveAccount,
   createInvite,
@@ -331,16 +336,42 @@ export async function setEmailPreference(
   return { ok: true };
 }
 
-/** Open the Stripe billing portal → returns the URL. */
+/**
+ * Open the customer billing portal → returns the URL. Prefers Polar's portal
+ * (manage card, invoices, cancel) when configured, else Stripe's.
+ */
 export async function openPortal(): Promise<BillingState & { url?: string }> {
   const userId = await requireUserId();
-  if (!billingConfigured()) {
+  if (!polarConfigured() && !billingConfigured()) {
     return { error: "Billing isn't configured on this deployment." };
   }
   try {
-    const url = await createPortalUrl(userId);
+    const url = polarConfigured()
+      ? await createPolarPortalUrl(userId)
+      : await createPortalUrl(userId);
     return { url };
   } catch (err) {
     return { error: `Could not open billing portal: ${(err as Error).message}` };
+  }
+}
+
+/**
+ * Cancel the caller's subscription at the end of the current billing period
+ * (stops future charges; access continues until then). Polar only — Stripe users
+ * cancel via the billing portal (openPortal). Returns a human message + endsAt.
+ */
+export async function cancelSubscription(): Promise<
+  BillingState & { ok?: boolean; endsAt?: string }
+> {
+  const userId = await requireUserId();
+  if (!polarConfigured()) {
+    return { error: "Manage your subscription from the billing portal." };
+  }
+  try {
+    const { endsAt } = await cancelPolarSubscription(userId);
+    revalidatePath("/app/[project]/settings", "page");
+    return { ok: true, endsAt: endsAt ? endsAt.toISOString() : undefined };
+  } catch (err) {
+    return { error: `Could not cancel subscription: ${(err as Error).message}` };
   }
 }

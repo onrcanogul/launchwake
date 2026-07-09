@@ -4,6 +4,7 @@ import {
   seatsFromAmount,
   subscriptionPlanUpdate,
   attributePolarOrder,
+  pickCancelableSubscription,
   type PolarProductIds,
 } from "./polar";
 import { TEAM_MIN_SEATS, TEAM_MAX_SEATS } from "./billing";
@@ -79,6 +80,44 @@ describe("subscriptionPlanUpdate", () => {
       plan: "FREE",
       seats: 1,
     });
+  });
+});
+
+describe("pickCancelableSubscription", () => {
+  const sub = (id: string, status: string, cancelAtPeriodEnd = false) => ({
+    id,
+    status,
+    cancelAtPeriodEnd,
+  });
+
+  it("returns null when there is no active subscription", () => {
+    expect(pickCancelableSubscription([])).toBeNull();
+    expect(
+      pickCancelableSubscription([sub("s1", "canceled"), sub("s2", "past_due")]),
+    ).toBeNull();
+  });
+  it("picks the active subscription", () => {
+    expect(pickCancelableSubscription([sub("s1", "active")])?.id).toBe("s1");
+    expect(pickCancelableSubscription([sub("s2", "trialing")])?.id).toBe("s2");
+  });
+  it("prefers an active sub not already scheduled to cancel", () => {
+    const picked = pickCancelableSubscription([
+      sub("scheduled", "active", true),
+      sub("fresh", "active", false),
+    ]);
+    expect(picked?.id).toBe("fresh");
+  });
+  it("falls back to an active sub even if it's already scheduled to cancel", () => {
+    expect(
+      pickCancelableSubscription([sub("only", "active", true)])?.id,
+    ).toBe("only");
+  });
+  it("ignores non-active subscriptions when choosing", () => {
+    const picked = pickCancelableSubscription([
+      sub("dead", "canceled"),
+      sub("live", "active"),
+    ]);
+    expect(picked?.id).toBe("live");
   });
 });
 
