@@ -166,6 +166,23 @@
         "l": "attribution on every plan, so you finally know which channel drove signups"
       }
     ],
+    "giveawayKicker": "Early access",
+    "giveawayTitle": "A few founders get LaunchWake free.",
+    "giveawayLead": "We're opening early access to a small group — full plan, every channel, attribution and all. Leave your email for a chance to be one of them. We reach out to the people we pick.",
+    "giveawayPerks": [
+      "Every channel, unlocked",
+      "Attribution on every plan",
+      "No credit card"
+    ],
+    "giveawayEmailPlaceholder": "you@yourstartup.com",
+    "giveawayEmailAria": "Email address",
+    "giveawaySubmit": "Count me in",
+    "giveawaySubmitSaving": "Adding you…",
+    "giveawayNote": "A few spots, picked by hand. No spam — unsubscribe anytime.",
+    "giveawayDoneTitle": "You're on the list.",
+    "giveawayDoneBody": "If you're picked, we'll email you an invite. In the meantime, the Launch Checker is free — no login needed.",
+    "giveawayDoneCta": "Try the Launch Checker",
+    "giveawayError": "Couldn't add you — try again.",
     "finalTitle": "Your next launch deserves an audience.",
     "finalLead": "Ship it. We'll make the waves.",
     "finalNote": "Free to start · No credit card · No login for the Launch Checker"

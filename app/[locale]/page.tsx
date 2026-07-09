@@ -5,6 +5,7 @@ import { alternatesFor, type Locale } from "@/i18n/paths";
 import { PublicShell } from "@/components/public/PublicShell";
 import { TrackView } from "@/components/analytics/TrackView";
 import { LaunchChecker } from "@/components/public/LaunchChecker";
+import { EarlyAccessSignup } from "@/components/public/EarlyAccessSignup";
 import { PUBLIC_FREE_RECS } from "@/lib/launchChecker";
 import { PricingCards } from "@/components/public/PricingCards";
 import { Icon, type IconName } from "@/components/Icon";
@@ -201,6 +202,14 @@ export default async function LandingPage(props: {
             {t("pricingHintLink")}
           </Link>
         </p>
+      </section>
+
+      {/* ── Early access giveaway ── */}
+      <section className="lp-section" id="early-access">
+        <div className="lp-kicker">{t("giveawayKicker")}</div>
+        <h2 className="lp-h2">{t("giveawayTitle")}</h2>
+        <p className="lp-lead">{t("giveawayLead")}</p>
+        <EarlyAccessSignup />
       </section>
 
       {/* ── Final ── */}

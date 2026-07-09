@@ -166,6 +166,23 @@
         "l": "her planda atıf — hangi kanalın kayıt getirdiğini nihayet görürsün"
       }
     ],
+    "giveawayKicker": "Erken erişim",
+    "giveawayTitle": "Birkaç kurucuya LaunchWake ücretsiz.",
+    "giveawayLead": "Erken erişimi küçük bir gruba açıyoruz — tam plan, tüm kanallar, atıf takibi dahil. Onlardan biri olma şansı için e-postanı bırak. Seçtiklerimize biz ulaşırız.",
+    "giveawayPerks": [
+      "Tüm kanallar açık",
+      "Her planda atıf takibi",
+      "Kredi kartı yok"
+    ],
+    "giveawayEmailPlaceholder": "sen@girisimin.com",
+    "giveawayEmailAria": "E-posta adresi",
+    "giveawaySubmit": "Ben varım",
+    "giveawaySubmitSaving": "Ekleniyor…",
+    "giveawayNote": "Sınırlı kontenjan, elle seçiliyor. Spam yok — istediğin an çıkabilirsin.",
+    "giveawayDoneTitle": "Listedesin.",
+    "giveawayDoneBody": "Seçilirsen davetini e-posta ile göndeririz. O zamana kadar Launch Checker ücretsiz — giriş gerekmez.",
+    "giveawayDoneCta": "Launch Checker'ı dene",
+    "giveawayError": "Ekleyemedik — tekrar dene.",
     "finalTitle": "Bir sonraki lansmanın bir izleyici hak ediyor.",
     "finalLead": "Sen çıkar. Dalgayı biz yaratırız.",
     "finalNote": "Ücretsiz başla · Kredi kartı yok · Launch Checker için giriş gerekmez"

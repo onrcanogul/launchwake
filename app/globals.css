@@ -3304,6 +3304,19 @@ tbody tr {
   line-height: 1.5;
 }
 
+/* Landing early-access giveaway card — a centered variant of .gate */
+.ea-card {
+  max-width: 520px;
+  margin: 30px auto 0;
+  padding: 26px 24px;
+  text-align: center;
+}
+.ea-note {
+  color: var(--tx3);
+  font-size: 12px;
+  margin-top: 14px;
+}
+
 /* Channel directory grid */
 .ch-grid {
   display: grid;
