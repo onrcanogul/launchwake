@@ -1,6 +1,10 @@
 import { Platform, BanRisk } from "@prisma/client";
 import type { Seed } from "./types";
-import { ALTERNATIVETO_READINESS, SAASHUB_READINESS } from "./requirements";
+import {
+  ALTERNATIVETO_READINESS,
+  SAASHUB_READINESS,
+  SETAPP_READINESS,
+} from "./requirements";
 
 /** Product/startup/software directories & launch platforms (built for listing). */
 export const directories: Seed[] = [
@@ -185,5 +189,30 @@ export const directories: Seed[] = [
     defaultBanRisk: BanRisk.MEDIUM,
     bestTime: "Anytime (queued)",
     tags: ["directory", "saas", "b2b", "software", "product", "marketing"],
+  },
+
+  // ── Vertical pack: Mac / desktop ─────────────────────────────────
+  {
+    slug: "dir-macmenubar",
+    name: "MacMenuBar",
+    platform: Platform.DIRECTORY,
+    url: "https://macmenubar.com/submit-your-menu-bar-app/",
+    audienceDesc: "curated directory of 1,400+ macOS menu bar apps · Mac power-user discovery",
+    rules: "A human-curated directory of true macOS menu bar apps. Submit via the 'Submit your menu bar app' form; the menu bar must be central to the app's experience (non–menu-bar apps are rejected). Search the directory first to confirm it isn't already listed, and expect owner/editorial review before it goes live.",
+    defaultBanRisk: BanRisk.LOW,
+    bestTime: "Anytime (curated)",
+    tags: ["directory", "macos", "desktop", "software", "showcase"],
+  },
+  {
+    slug: "dir-setapp",
+    name: "Setapp",
+    platform: Platform.DIRECTORY,
+    url: "https://setapp.com/developers",
+    audienceDesc: "MacPaw's curated Mac/iOS app subscription bundle · distribution to Setapp subscribers",
+    rules: "A curated subscription marketplace, not a forum: developers apply to get an app in. The path is apply → MacPaw technical/quality review (apply only if you're confident in the app's quality) → integrate the Setapp SDK → launch. There's no upfront fee; revenue is a usage-based share (Setapp Membership ~70/30; a Single-App option is 85/15).",
+    defaultBanRisk: BanRisk.LOW,
+    bestTime: "Anytime (application + review)",
+    tags: ["directory", "macos", "desktop", "software", "product"],
+    accountRequirements: SETAPP_READINESS,
   },
 ];

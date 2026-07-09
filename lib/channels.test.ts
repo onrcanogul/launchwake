@@ -65,6 +65,48 @@ describe("deriveSignalTags", () => {
     expect(tags.has("blog")).toBe(true);
     expect(tags.has("writeup")).toBe(true);
   });
+
+  it("maps hardware/embedded keywords to the hardware pack tags", () => {
+    const tags = deriveSignalTags({
+      projectText: "OpenTrace — a KiCad plugin for PCB design and firmware",
+      shipText: "New microcontroller board bring-up guide",
+      shipType: "FEATURE",
+    });
+    expect(tags.has("pcb")).toBe(true);
+    expect(tags.has("hardware")).toBe(true);
+    expect(tags.has("electronics")).toBe(true);
+    expect(tags.has("firmware")).toBe(true);
+    expect(tags.has("embedded")).toBe(true);
+  });
+
+  it("maps macOS keywords to the desktop pack tags", () => {
+    const tags = deriveSignalTags({
+      projectText: "BarKit — a macOS menu bar app",
+      shipText: "1.0 launch",
+      shipType: "LAUNCH",
+    });
+    expect(tags.has("macos")).toBe(true);
+    expect(tags.has("desktop")).toBe(true);
+  });
+
+  it("maps a privacy keyword to the privacy/security tags", () => {
+    const tags = deriveSignalTags({
+      projectText: "A privacy-first analytics tool",
+      shipText: "launch",
+      shipType: "LAUNCH",
+    });
+    expect(tags.has("privacy")).toBe(true);
+    expect(tags.has("security")).toBe(true);
+  });
+
+  it("does not fire the CLI tag on the substring in 'client'", () => {
+    const tags = deriveSignalTags({
+      projectText: "A billing tool for your clients",
+      shipText: "new invoice view",
+      shipType: "FEATURE",
+    });
+    expect(tags.has("cli")).toBe(false);
+  });
 });
 
 describe("matchChannels", () => {

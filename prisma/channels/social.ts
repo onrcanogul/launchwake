@@ -6,6 +6,7 @@ import {
   SUBSTACK_READINESS,
   FCC_NEWS_READINESS,
   DZONE_READINESS,
+  PRIVACY_GUIDES_READINESS,
 } from "./requirements";
 
 /** Blogging platforms, dev-heavy social networks, and technical forums. */
@@ -135,5 +136,54 @@ export const social: Seed[] = [
     defaultBanRisk: BanRisk.HIGH,
     bestTime: "Tue-Thu, 9am-1pm ET",
     tags: ["developers", "technical", "backend", "frontend", "devtools", "community"],
+  },
+
+  // ── Vertical pack: privacy / security ────────────────────────────
+  {
+    slug: "forum-privacyguides",
+    name: "Privacy Guides Forum",
+    platform: Platform.FORUM,
+    url: "https://discuss.privacyguides.net/",
+    audienceDesc: "Active Discourse forum for privacy tech, digital rights, and cybersecurity (~870 active users/30 days).",
+    rules: "You may promote your own project ONLY in the Project Showcase category, and you must first contact the Privacy Guides team to verify yourself before posting; recommending your tool in other threads isn't allowed unless Privacy Guides already recommends it. Disclose your affiliation (conflict of interest), post original content (AI-generated posts are prohibited), and for sensitive-data tools be ready with a security white paper and threat model. Privacy Guides takes no affiliate money.",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Weekday EU/US overlap (mid-day ET)",
+    tags: ["privacy", "security", "opensource", "community", "technical"],
+    accountRequirements: PRIVACY_GUIDES_READINESS,
+  },
+
+  // ── Vertical pack: hardware / EE ─────────────────────────────────
+  {
+    slug: "forum-eevblog",
+    name: "EEVblog Forum",
+    platform: Platform.FORUM,
+    url: "https://www.eevblog.com/forum/",
+    audienceDesc: "Large, highly active electronics-engineering forum (~71k members, 3M+ posts).",
+    rules: "Commercial content is channeled into specific boards, not banned outright: the Buy/Sell/Wanted board is for 'dealers who are valued contributors to the forum community', the Crowd-funded Projects board allows promotions 'just be ready for serious expert feedback', and the Jobs board welcomes companies 'provided they don't spam and run — you must stick around & contribute'. Drive-by self-promo elsewhere is treated as spam; become a genuine contributor first.",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Weekdays (active around the clock)",
+    tags: ["hardware", "electronics", "makers", "community", "technical"],
+  },
+  {
+    slug: "forum-kicad",
+    name: "KiCad Forum",
+    platform: Platform.FORUM,
+    url: "https://forum.kicad.info/",
+    audienceDesc: "Official community forum for the open-source KiCad EDA/PCB suite; active daily.",
+    rules: "The official KiCad user forum, run on Discourse under standard 'improve the discussion / keep it tidy' guidelines: 'Don't post spam or otherwise vandalize the forum… avoid even the appearance of any of these things.' There's no advertising board, so overt self-promotion is off-topic — the fit is contributing to KiCad/EDA discussion and helping users, mentioning your tool only where genuinely relevant.",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Weekdays",
+    tags: ["pcb", "hardware", "opensource", "electronics", "community"],
+  },
+  {
+    slug: "hackaday-tips",
+    name: "Hackaday Tips Line",
+    platform: Platform.BLOG,
+    url: "https://hackaday.com/submit-a-tip/",
+    audienceDesc: "Editorial tip line for Hackaday, a major hardware/hacker publication with a large maker & EE readership.",
+    rules: "Submit a project tip by emailing tips@hackaday.com or using the on-page form (name, email, subject line, link, comments). Self-submitting your own project is explicitly welcomed ('projects you yourself document — don't be bashful'), but don't send press releases: write a short, genuine note pointing to the parts most interesting to the Hackaday crowd, and host the build details (e.g., on Hackaday.io) before you send the tip.",
+    defaultBanRisk: BanRisk.LOW,
+    bestTime: "Anytime (editorial submission)",
+    tags: ["hardware", "electronics", "makers", "blog", "opensource"],
   },
 ];

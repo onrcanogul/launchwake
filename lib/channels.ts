@@ -130,6 +130,28 @@ const KEYWORD_TAGS: Record<string, string[]> = {
   serverless: ["cloud", "devops", "infra"],
   design: ["design", "product"],
   newsletter: ["newsletter", "writeup"],
+  // Terminal / CLI (phrases, to avoid the "cli" substring firing on "client")
+  "command line": ["cli", "devtools", "developers"],
+  "command-line": ["cli", "devtools", "developers"],
+  terminal: ["cli", "devtools", "developers"],
+  // Mac / desktop — connect a native-app product to the Mac/desktop pack.
+  macos: ["macos", "desktop"],
+  "mac app": ["macos", "desktop", "software"],
+  "menu bar": ["macos", "desktop"],
+  menubar: ["macos", "desktop"],
+  "desktop app": ["desktop", "developers"],
+  apple: ["apple", "macos"],
+  // Hardware / electronics / embedded — connect an EE product to the hardware pack.
+  hardware: ["hardware", "electronics"],
+  electronics: ["electronics", "hardware"],
+  pcb: ["pcb", "hardware", "electronics"],
+  firmware: ["firmware", "embedded"],
+  microcontroller: ["embedded", "firmware", "hardware"],
+  rtos: ["embedded", "firmware"],
+  "embedded system": ["embedded", "firmware", "hardware"],
+  "internet of things": ["embedded", "hardware"],
+  // Privacy
+  privacy: ["privacy", "security"],
 };
 
 const SHIP_TYPE_TAGS: Record<string, string[]> = {
