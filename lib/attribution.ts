@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { randomBytes, createHash, createHmac, timingSafeEqual } from "crypto";
 import { db } from "./db";
 import { env } from "./env";
 import { isSafeHttpUrl } from "./url";
@@ -50,6 +50,80 @@ export function sanitizeRef(raw: string | null | undefined): string | null {
 
 export function platformSource(platform: Platform | string): string {
   return String(platform).toLowerCase();
+}
+
+// ── Idempotency keys (dedup) ───────────────────────────────
+// CLICK and SIGNUP ingestion is idempotent: each event carries a `dedupeKey` and
+// a partial unique index (trackedLinkId, type, dedupeKey) makes a re-fire a
+// no-op. The keys below are pure + deterministic so the same visitor/day always
+// hashes to the same key (and so they're unit-testable without a request).
+
+function sha256Hex(input: string): string {
+  return createHash("sha256").update(input).digest("hex");
+}
+
+/** UTC calendar day (YYYY-MM-DD) — the fixed dedup window for click/signup keys. */
+export function utcDayStamp(date: Date = new Date()): string {
+  return date.toISOString().slice(0, 10);
+}
+
+export type ClickDedupeInput = {
+  /** Best-effort client IP (hashed into the key — never stored raw). */
+  ip: string;
+  userAgent: string;
+  shortCode: string;
+  /** UTC day; defaults to today. Passed in tests for determinism. */
+  day?: string;
+};
+
+/**
+ * Dedup key for a CLICK: sha256(ipHash + userAgent + shortCode + UTC-day). Same
+ * IP + UA hitting the same link within a UTC day collapses to one CLICK, so a
+ * double-tap, a ret/refresh, or a redirect replay can't inflate the count.
+ */
+export function clickDedupeKey(input: ClickDedupeInput): string {
+  const day = input.day ?? utcDayStamp();
+  const ipHash = sha256Hex(input.ip || "");
+  return sha256Hex(`${ipHash}|${input.userAgent}|${input.shortCode}|${day}`);
+}
+
+export type SignupDedupeInput = ClickDedupeInput & {
+  /** Email from the pixel/beacon, if it supplies one. */
+  email?: string | null;
+};
+
+/**
+ * Dedup key for a SIGNUP. Prefer sha256(lowercased email) when the pixel/beacon
+ * reports one — the strongest identity, so the same person signing up twice via
+ * one link counts once regardless of device/day. Falls back to the same ip-based
+ * key as a click when there's no email.
+ */
+export function signupDedupeKey(input: SignupDedupeInput): string {
+  const email = input.email?.trim().toLowerCase();
+  if (email) return sha256Hex(`email:${email}`);
+  return clickDedupeKey(input);
+}
+
+// ── Revenue signature (HMAC) ───────────────────────────────
+
+/**
+ * Constant-time verify of an `x-lw-signature` header against the raw request
+ * body, using the project's `webhookSecret` as the HMAC-SHA256 key. Accepts a
+ * bare hex digest or a `sha256=<hex>` prefixed one. Pure → unit-testable.
+ */
+export function verifyRevenueSignature(
+  rawBody: string,
+  signature: string | null | undefined,
+  secret: string | null | undefined,
+): boolean {
+  if (!secret || !signature) return false;
+  const provided = signature.startsWith("sha256=") ? signature.slice(7) : signature;
+  if (!/^[0-9a-fA-F]{64}$/.test(provided)) return false;
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  const a = Buffer.from(expected, "hex");
+  const b = Buffer.from(provided.toLowerCase(), "hex");
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 export function slugifyCampaign(title: string): string {
@@ -166,19 +240,24 @@ export async function recordPostForRecommendation(
 /** Log a CLICK and return the destination (with lw_ref appended). */
 export async function ingestClick(
   shortCode: string,
-  opts: { record?: boolean } = {},
+  opts: { record?: boolean; dedupeKey?: string | null } = {},
 ): Promise<string | null> {
   const link = await db.trackedLink.findUnique({ where: { shortCode } });
   if (!link) return null;
   // Read-time open-redirect guard: never 302 to a non-http(s) destination even
   // if a bad value somehow reached the row. Caller falls back to the home page.
   if (!isSafeHttpUrl(link.destUrl)) return null;
-  // `record: false` (rate-limited hits) still redirects the human but does not
-  // log a CLICK — so a script can't inflate a channel's click count.
+  // `record: false` (rate-limited / bot hits) still redirects the human but does
+  // not log a CLICK — so a script can't inflate a channel's click count.
   if (opts.record !== false) {
     try {
-      await db.event.create({
-        data: { trackedLinkId: link.id, type: "CLICK" },
+      // Single-query idempotent insert: createMany + skipDuplicates emits
+      // INSERT … ON CONFLICT DO NOTHING, so a re-fire on the same dedupeKey is a
+      // silent no-op (honors the partial unique index) and never adds a query to
+      // the redirect path.
+      await db.event.createMany({
+        data: [{ trackedLinkId: link.id, type: "CLICK", dedupeKey: opts.dedupeKey ?? null }],
+        skipDuplicates: true,
       });
     } catch (err) {
       // Logging the click must never break the redirect — capture and continue.
@@ -190,28 +269,63 @@ export async function ingestClick(
   return u.toString();
 }
 
-/** Log a SIGNUP for a tracked link. Returns false if the code is unknown. */
+export type IngestSignupOptions = {
+  /** Idempotency key (see signupDedupeKey). A re-fire on the same key is a no-op. */
+  dedupeKey?: string | null;
+  /**
+   * When set, enforce that the tracked link belongs to this project — for callers
+   * that carry a *verified* project context (authenticated server actions). A
+   * mismatch is refused with a captured warning. Public pixel calls omit this and
+   * stay global (they only carry the short code).
+   */
+  projectId?: string;
+};
+
+/**
+ * Log a SIGNUP for a tracked link. Idempotent: with a `dedupeKey`, a repeat fire
+ * (retried beacon, double submit) is silently skipped. Returns true only when a
+ * NEW event was recorded — so the caller's first-signup / pixel-installed logic
+ * never re-fires on a dedup. Returns false on an unknown code, a tenant mismatch,
+ * a dedup, or a write error.
+ */
 export async function ingestSignup(
   shortCode: string,
   meta?: Record<string, unknown>,
+  opts?: IngestSignupOptions,
 ): Promise<boolean> {
-  const link = await db.trackedLink.findUnique({ where: { shortCode } });
+  const link = await db.trackedLink.findUnique({
+    where: { shortCode },
+    select: { id: true, post: { select: { ship: { select: { projectId: true } } } } },
+  });
   if (!link) return false;
-  try {
-    await db.event.create({
-      data: {
-        trackedLinkId: link.id,
-        type: "SIGNUP",
-        meta: meta ? (meta as object) : undefined,
-      },
+  if (opts?.projectId && link.post.ship.projectId !== opts.projectId) {
+    // A verified caller asked to attribute to a link it doesn't own — refuse and
+    // surface it (a cross-tenant write would silently corrupt another founder's data).
+    captureError(new Error("SIGNUP tenant mismatch: link does not belong to project"), {
+      at: "attribution.ingestSignup.tenantMismatch",
+      projectId: opts.projectId,
     });
+    return false;
+  }
+  try {
+    const res = await db.event.createMany({
+      data: [
+        {
+          trackedLinkId: link.id,
+          type: "SIGNUP",
+          dedupeKey: opts?.dedupeKey ?? null,
+          meta: meta ? (meta as object) : undefined,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return res.count > 0;
   } catch (err) {
     // The signup beacon is fire-and-forget; surface the failure instead of
     // 500-ing a sendBeacon the browser won't retry.
     captureError(err, { at: "attribution.ingestSignup", trackedLinkId: link.id });
     return false;
   }
-  return true;
 }
 
 /**
@@ -426,19 +540,78 @@ export type RevenueInput = {
   meta?: Record<string, unknown>;
 };
 
+export type IngestRevenueOptions = {
+  /**
+   * When set, enforce that the tracked link belongs to this project — for callers
+   * with a verified project context (the per-project Stripe webhook). A mismatch
+   * is refused with a captured warning so revenue can't be written across tenants.
+   */
+  projectId?: string;
+  /**
+   * Explicit trust for signature-verified server paths (the Stripe webhook,
+   * LaunchWake's own billing/Polar). Ignored when `hmac` is supplied.
+   */
+  verified?: boolean;
+  /**
+   * Public path: verify `x-lw-signature` (HMAC-SHA256 of the raw body) against the
+   * owning project's `webhookSecret`. A valid signature is trusted; anything else
+   * (no secret configured, missing/bad signature) is recorded as verified=false.
+   */
+  hmac?: { rawBody: string; signature: string | null };
+};
+
 /**
  * Log REVENUE for a tracked link — the strongest signal: this channel didn't
- * just drive a signup, it drove money. Returns false if the code is unknown or
- * the amount is non-positive.
+ * just drive a signup, it drove money. Returns false if the code is unknown, the
+ * amount is non-positive, or a verified caller's project doesn't own the link.
+ *
+ * The `verified` flag records whether we can vouch for the amount (see
+ * IngestRevenueOptions). Untrusted revenue is still stored — Results just sums it
+ * separately — so a founder sees it without it corrupting the trusted headline.
  */
 export async function ingestRevenue(
   shortCode: string,
   input: RevenueInput,
   client: Pick<typeof db, "trackedLink" | "event"> = db,
+  opts?: IngestRevenueOptions,
 ): Promise<boolean> {
   if (!Number.isFinite(input.amountCents) || input.amountCents <= 0) return false;
-  const link = await client.trackedLink.findUnique({ where: { shortCode } });
+  const link = await client.trackedLink.findUnique({
+    where: { shortCode },
+    select: {
+      id: true,
+      post: {
+        select: {
+          ship: {
+            select: { projectId: true, project: { select: { webhookSecret: true } } },
+          },
+        },
+      },
+    },
+  });
   if (!link) return false;
+
+  if (opts?.projectId && link.post.ship.projectId !== opts.projectId) {
+    captureError(new Error("REVENUE tenant mismatch: link does not belong to project"), {
+      at: "attribution.ingestRevenue.tenantMismatch",
+      projectId: opts.projectId,
+    });
+    return false;
+  }
+
+  // Determine trust: a signed public call is verified iff the HMAC checks out;
+  // server callers set `verified` explicitly; default trusted otherwise.
+  let verified = true;
+  if (opts?.hmac) {
+    verified = verifyRevenueSignature(
+      opts.hmac.rawBody,
+      opts.hmac.signature,
+      link.post.ship.project.webhookSecret,
+    );
+  } else if (typeof opts?.verified === "boolean") {
+    verified = opts.verified;
+  }
+
   await client.event.create({
     data: {
       trackedLinkId: link.id,
@@ -446,6 +619,7 @@ export async function ingestRevenue(
       amountCents: Math.round(input.amountCents),
       currency: (input.currency ?? "usd").toLowerCase(),
       recurring: Boolean(input.recurring),
+      verified,
       meta: input.meta ? (input.meta as object) : undefined,
     },
   });
@@ -464,6 +638,8 @@ export type ResultRow = {
   signups: number;
   conversion: number; // 0..1
   revenueCents: number;
+  /** Portion of revenueCents from signature-verified (trusted) events. */
+  verifiedRevenueCents: number;
   recurringCents: number;
   removed: boolean;
   /** Cached post-mortem coaching, if the founder has run it. */
@@ -478,6 +654,7 @@ export type ChannelRollup = {
   signups: number;
   conversion: number;
   revenueCents: number;
+  verifiedRevenueCents: number;
   recurringCents: number;
 };
 
@@ -500,6 +677,8 @@ export type ResultsRollup = {
   totalSignups: number;
   conversion: number;
   totalRevenueCents: number;
+  /** Sum of trusted (signature-verified) revenue only — the safe-to-quote figure. */
+  totalVerifiedRevenueCents: number;
   mrrCents: number;
   currency: string;
   bestChannel: string | null;
@@ -558,7 +737,15 @@ export async function getResultsRollup(
       ship: { select: { title: true } },
       trackedLink: {
         include: {
-          events: { select: { type: true, amountCents: true, recurring: true, currency: true } },
+          events: {
+            select: {
+              type: true,
+              amountCents: true,
+              recurring: true,
+              currency: true,
+              verified: true,
+            },
+          },
         },
       },
     },
@@ -572,6 +759,7 @@ export async function getResultsRollup(
     let clicks = 0;
     let signups = 0;
     let revenueCents = 0;
+    let verifiedRevenueCents = 0;
     let recurringCents = 0;
     for (const e of events) {
       if (e.type === "CLICK") clicks += 1;
@@ -579,6 +767,7 @@ export async function getResultsRollup(
       else if (e.type === "REVENUE") {
         const amt = e.amountCents ?? 0;
         revenueCents += amt;
+        if (e.verified) verifiedRevenueCents += amt;
         if (e.recurring) recurringCents += amt;
         if (e.currency) currency = e.currency;
       }
@@ -593,6 +782,7 @@ export async function getResultsRollup(
       signups,
       conversion: clicks > 0 ? signups / clicks : 0,
       revenueCents,
+      verifiedRevenueCents,
       recurringCents,
       removed: p.status === "REMOVED",
       coaching: (p.coachingJson as CoachResult | null) ?? null,
@@ -611,12 +801,14 @@ export async function getResultsRollup(
         signups: 0,
         conversion: 0,
         revenueCents: 0,
+        verifiedRevenueCents: 0,
         recurringCents: 0,
       };
     c.posts += 1;
     c.clicks += r.clicks;
     c.signups += r.signups;
     c.revenueCents += r.revenueCents;
+    c.verifiedRevenueCents += r.verifiedRevenueCents;
     c.recurringCents += r.recurringCents;
     byChannel.set(r.channelName, c);
   }
@@ -632,6 +824,7 @@ export async function getResultsRollup(
   const totalClicks = perPost.reduce((n, r) => n + r.clicks, 0);
   const totalSignups = perPost.reduce((n, r) => n + r.signups, 0);
   const totalRevenueCents = perPost.reduce((n, r) => n + r.revenueCents, 0);
+  const totalVerifiedRevenueCents = perPost.reduce((n, r) => n + r.verifiedRevenueCents, 0);
   const mrrCents = perPost.reduce((n, r) => n + r.recurringCents, 0);
   const postCount = perPost.length;
   const effortMinutes = estimateEffortMinutes(postCount);
@@ -645,6 +838,7 @@ export async function getResultsRollup(
     totalSignups,
     conversion: totalClicks > 0 ? totalSignups / totalClicks : 0,
     totalRevenueCents,
+    totalVerifiedRevenueCents,
     mrrCents,
     currency,
     bestChannel: perChannel.find((c) => c.signups > 0)?.channelName ?? null,

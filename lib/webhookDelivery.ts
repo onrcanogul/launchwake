@@ -267,6 +267,13 @@ async function applyStripeDelivery(
       meta: { via: "stripe", eventType: event.type, eventId: delivery.dedupeKey },
     },
     client,
+    {
+      // Verified project context: this delivery is bound to a project (the URL
+      // carried {projectId}) and its Stripe signature was checked upstream — so
+      // enforce tenant ownership of the link and trust the amount.
+      projectId: delivery.projectId ?? undefined,
+      verified: true,
+    },
   );
   return { shipId: null, created: false, attributed };
 }

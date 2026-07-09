@@ -1,4 +1,17 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createHmac } from "crypto";
+
+// ingestSignup uses the module-level Prisma singleton (not injectable), so mock
+// it to unit-test the dedup + tenant-scope logic. ingestRevenue takes an
+// injectable client and is tested with a local fake instead.
+const dbMock = vi.hoisted(() => ({
+  trackedLink: { findUnique: vi.fn() },
+  event: { createMany: vi.fn() },
+}));
+vi.mock("./db", () => ({ db: dbMock }));
+const captureErrorMock = vi.hoisted(() => vi.fn());
+vi.mock("./observability", () => ({ captureError: captureErrorMock }));
+
 import {
   generateShortCode,
   slugifyCampaign,
@@ -9,8 +22,20 @@ import {
   formatMoney,
   sanitizeRef,
   captureSignupRef,
+  utcDayStamp,
+  clickDedupeKey,
+  signupDedupeKey,
+  verifyRevenueSignature,
+  ingestSignup,
+  ingestRevenue,
   type ResultRow,
 } from "./attribution";
+
+beforeEach(() => {
+  dbMock.trackedLink.findUnique.mockReset();
+  dbMock.event.createMany.mockReset();
+  captureErrorMock.mockReset();
+});
 
 describe("generateShortCode", () => {
   it("is URL-safe and the requested length", () => {
@@ -81,6 +106,7 @@ function row(partial: Partial<ResultRow> & { channelName: string }): ResultRow {
     signups: 0,
     conversion: 0,
     revenueCents: 0,
+    verifiedRevenueCents: 0,
     recurringCents: 0,
     removed: false,
     coaching: null,
@@ -163,5 +189,180 @@ describe("captureSignupRef", () => {
   it("swallows a write failure so sign-in never breaks", async () => {
     const update = vi.fn().mockRejectedValue(new Error("db down"));
     await expect(captureSignupRef("user_1", "aB3xZ0q", clientWith(update))).resolves.toBe(false);
+  });
+});
+
+describe("dedupe keys", () => {
+  const base = { ip: "203.0.113.7", userAgent: "Mozilla/5.0", shortCode: "aB3xZ0q", day: "2026-07-09" };
+
+  it("utcDayStamp is the YYYY-MM-DD of a date (UTC)", () => {
+    expect(utcDayStamp(new Date("2026-07-09T23:59:00.000Z"))).toBe("2026-07-09");
+    expect(utcDayStamp(new Date("2026-07-10T00:00:00.000Z"))).toBe("2026-07-10");
+  });
+
+  it("clickDedupeKey is a deterministic 64-hex digest", () => {
+    const k = clickDedupeKey(base);
+    expect(k).toMatch(/^[0-9a-f]{64}$/);
+    expect(clickDedupeKey(base)).toBe(k); // stable for the same inputs
+  });
+
+  it("clickDedupeKey changes with ip, UA, code, or day (so distinct clicks stay distinct)", () => {
+    const k = clickDedupeKey(base);
+    expect(clickDedupeKey({ ...base, ip: "198.51.100.2" })).not.toBe(k);
+    expect(clickDedupeKey({ ...base, userAgent: "curl/8" })).not.toBe(k);
+    expect(clickDedupeKey({ ...base, shortCode: "other12" })).not.toBe(k);
+    expect(clickDedupeKey({ ...base, day: "2026-07-10" })).not.toBe(k);
+  });
+
+  it("signupDedupeKey prefers the lowercased email when present", () => {
+    const a = signupDedupeKey({ ...base, email: "Founder@Example.com" });
+    const b = signupDedupeKey({ ...base, email: "founder@example.com" });
+    expect(a).toBe(b); // case-insensitive
+    // Email identity ignores ip/UA/day/code — same person, one signup per link.
+    expect(signupDedupeKey({ ip: "x", userAgent: "y", shortCode: "z", email: "founder@example.com" })).toBe(a);
+  });
+
+  it("signupDedupeKey falls back to the ip-based click key without an email", () => {
+    expect(signupDedupeKey(base)).toBe(clickDedupeKey(base));
+    expect(signupDedupeKey({ ...base, email: "" })).toBe(clickDedupeKey(base));
+    expect(signupDedupeKey({ ...base, email: null })).toBe(clickDedupeKey(base));
+  });
+
+  it("an email-based key differs from the ip-based key", () => {
+    expect(signupDedupeKey({ ...base, email: "a@b.com" })).not.toBe(clickDedupeKey(base));
+  });
+});
+
+describe("verifyRevenueSignature", () => {
+  const secret = "whsec_test_secret";
+  const body = '{"ref":"aB3xZ0q","amountCents":4900}';
+  const sign = (b: string, s: string) => createHmac("sha256", s).update(b).digest("hex");
+
+  it("accepts a valid HMAC-SHA256 of the raw body", () => {
+    expect(verifyRevenueSignature(body, sign(body, secret), secret)).toBe(true);
+  });
+
+  it("accepts a sha256=<hex> prefixed signature", () => {
+    expect(verifyRevenueSignature(body, `sha256=${sign(body, secret)}`, secret)).toBe(true);
+  });
+
+  it("rejects a tampered body, wrong secret, or wrong signature", () => {
+    expect(verifyRevenueSignature('{"amountCents":999900}', sign(body, secret), secret)).toBe(false);
+    expect(verifyRevenueSignature(body, sign(body, "other"), secret)).toBe(false);
+    expect(verifyRevenueSignature(body, "deadbeef".repeat(8), secret)).toBe(false);
+  });
+
+  it("rejects when the signature or secret is missing, or malformed", () => {
+    expect(verifyRevenueSignature(body, null, secret)).toBe(false);
+    expect(verifyRevenueSignature(body, sign(body, secret), null)).toBe(false);
+    expect(verifyRevenueSignature(body, sign(body, secret), "")).toBe(false);
+    expect(verifyRevenueSignature(body, "not-hex", secret)).toBe(false);
+  });
+});
+
+describe("ingestSignup (dedup + tenant scope)", () => {
+  const linkRow = { id: "link_1", post: { ship: { projectId: "proj_1" } } };
+
+  it("records a new signup and returns true (count > 0)", async () => {
+    dbMock.trackedLink.findUnique.mockResolvedValue(linkRow);
+    dbMock.event.createMany.mockResolvedValue({ count: 1 });
+
+    const ok = await ingestSignup("aB3xZ0q", { via: "pixel" }, { dedupeKey: "k1" });
+    expect(ok).toBe(true);
+    expect(dbMock.event.createMany).toHaveBeenCalledWith({
+      data: [{ trackedLinkId: "link_1", type: "SIGNUP", dedupeKey: "k1", meta: { via: "pixel" } }],
+      skipDuplicates: true,
+    });
+  });
+
+  it("returns false on a dedup (ON CONFLICT skipped → count 0) so pixel-installed never re-fires", async () => {
+    dbMock.trackedLink.findUnique.mockResolvedValue(linkRow);
+    dbMock.event.createMany.mockResolvedValue({ count: 0 });
+    expect(await ingestSignup("aB3xZ0q", undefined, { dedupeKey: "k1" })).toBe(false);
+  });
+
+  it("returns false for an unknown short code without attempting a write", async () => {
+    dbMock.trackedLink.findUnique.mockResolvedValue(null);
+    expect(await ingestSignup("nope", undefined, { dedupeKey: "k" })).toBe(false);
+    expect(dbMock.event.createMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses a cross-tenant write and captures a warning", async () => {
+    dbMock.trackedLink.findUnique.mockResolvedValue(linkRow);
+    const ok = await ingestSignup("aB3xZ0q", undefined, { projectId: "proj_OTHER", dedupeKey: "k" });
+    expect(ok).toBe(false);
+    expect(dbMock.event.createMany).not.toHaveBeenCalled();
+    expect(captureErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ at: "attribution.ingestSignup.tenantMismatch", projectId: "proj_OTHER" }),
+    );
+  });
+
+  it("allows the write when the verified project owns the link", async () => {
+    dbMock.trackedLink.findUnique.mockResolvedValue(linkRow);
+    dbMock.event.createMany.mockResolvedValue({ count: 1 });
+    expect(await ingestSignup("aB3xZ0q", undefined, { projectId: "proj_1", dedupeKey: "k" })).toBe(true);
+  });
+});
+
+describe("ingestRevenue (tenant scope + verified flag)", () => {
+  type Client = Parameters<typeof ingestRevenue>[2];
+  function makeClient(link: unknown) {
+    const events: Array<Record<string, unknown>> = [];
+    const client = {
+      trackedLink: { findUnique: vi.fn(async () => link) },
+      event: { create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => void events.push(data)) },
+    };
+    return { client: client as unknown as Client, events };
+  }
+  const link = (opts: { projectId?: string; secret?: string | null } = {}) => ({
+    id: "link_1",
+    post: { ship: { projectId: opts.projectId ?? "proj_1", project: { webhookSecret: opts.secret ?? null } } },
+  });
+  const input = { amountCents: 4900, currency: "usd", recurring: true };
+
+  it("defaults to verified=true for trusted server callers", async () => {
+    const { client, events } = makeClient(link());
+    expect(await ingestRevenue("aB3xZ0q", input, client, { verified: true })).toBe(true);
+    expect(events[0]).toMatchObject({ type: "REVENUE", amountCents: 4900, verified: true });
+  });
+
+  it("enforces tenant ownership and refuses a mismatch", async () => {
+    const { client, events } = makeClient(link({ projectId: "proj_1" }));
+    const ok = await ingestRevenue("aB3xZ0q", input, client, { projectId: "proj_OTHER", verified: true });
+    expect(ok).toBe(false);
+    expect(events).toHaveLength(0);
+    expect(captureErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ at: "attribution.ingestRevenue.tenantMismatch" }),
+    );
+  });
+
+  it("records verified=true when the HMAC matches the project secret", async () => {
+    const secret = "whsec_1";
+    const body = '{"amountCents":4900}';
+    const sig = createHmac("sha256", secret).update(body).digest("hex");
+    const { client, events } = makeClient(link({ secret }));
+    await ingestRevenue("aB3xZ0q", input, client, { hmac: { rawBody: body, signature: sig } });
+    expect(events[0]).toMatchObject({ verified: true });
+  });
+
+  it("records verified=false for an unsigned/invalid public call (untrusted, but stored)", async () => {
+    const { client, events } = makeClient(link({ secret: "whsec_1" }));
+    await ingestRevenue("aB3xZ0q", input, client, { hmac: { rawBody: "{}", signature: null } });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ verified: false });
+  });
+
+  it("records verified=false when the project has no secret configured", async () => {
+    const { client, events } = makeClient(link({ secret: null }));
+    await ingestRevenue("aB3xZ0q", input, client, { hmac: { rawBody: "{}", signature: "deadbeef".repeat(8) } });
+    expect(events[0]).toMatchObject({ verified: false });
+  });
+
+  it("rejects a non-positive amount before any lookup", async () => {
+    const { client, events } = makeClient(link());
+    expect(await ingestRevenue("aB3xZ0q", { amountCents: 0 }, client, { verified: true })).toBe(false);
+    expect(events).toHaveLength(0);
   });
 });

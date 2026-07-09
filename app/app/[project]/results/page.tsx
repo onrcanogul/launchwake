@@ -72,6 +72,10 @@ export default async function ResultsPage({
   );
 
   const hasRevenue = r.totalRevenueCents > 0;
+  // Revenue we can vouch for (signature-verified webhooks / HMAC-signed calls) vs
+  // unsigned client-supplied amounts. Surfaced separately so a spoofable figure
+  // never silently inflates the trusted headline.
+  const unverifiedCents = r.totalRevenueCents - r.totalVerifiedRevenueCents;
 
   if (r.perPost.length === 0) {
     return (
@@ -97,8 +101,13 @@ export default async function ResultsPage({
       ? {
           label: "Revenue attributed",
           value: formatMoney(r.totalRevenueCents, r.currency),
-          detailUp: true,
-          detail: r.mrrCents > 0 ? `${formatMoney(r.mrrCents, r.currency)} recurring` : "one-time",
+          detailUp: unverifiedCents <= 0,
+          detail:
+            unverifiedCents > 0
+              ? `${formatMoney(r.totalVerifiedRevenueCents, r.currency)} verified`
+              : r.mrrCents > 0
+                ? `${formatMoney(r.mrrCents, r.currency)} recurring`
+                : "one-time",
         }
       : {
           label: "Conversion",

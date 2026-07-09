@@ -3,6 +3,7 @@ import { z } from "zod";
 import { isValidProjectId } from "@/lib/pixel";
 import { recordPixelPing } from "@/lib/attribution";
 import { rateLimitDurable, clientIp } from "@/lib/ratelimit";
+import { isLikelyBot, botSignalsFromHeaders } from "@/lib/botDetection";
 import { captureUser, EVENTS } from "@/lib/analytics";
 
 /**
@@ -34,6 +35,11 @@ export async function POST(req: NextRequest) {
   const rl = await rateLimitDurable(`verify:${clientIp(req.headers)}`, RL_LIMIT, RL_WINDOW_MS);
   if (!rl.ok) {
     return NextResponse.json({ ok: false, error: "Rate limited" }, { status: 429, headers: CORS });
+  }
+  // A crawler/prefetch that happens to execute the pixel shouldn't flip the
+  // "pixel detected" state — acknowledge without recording.
+  if (isLikelyBot(botSignalsFromHeaders(req.headers))) {
+    return NextResponse.json({ ok: false }, { headers: CORS });
   }
 
   let body: unknown;

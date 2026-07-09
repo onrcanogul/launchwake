@@ -366,6 +366,18 @@ model Event {
   amountCents   Int?
   currency      String?
   recurring     Boolean     @default(false)
+  // Idempotency key for CLICK/SIGNUP dedup (see lib/attribution.clickDedupeKey /
+  // signupDedupeKey). Null for legacy rows and REVENUE events. A *partial* unique
+  // index on (trackedLinkId, type, dedupeKey) WHERE dedupeKey IS NOT NULL enforces
+  // "record each click/signup at most once" without constraining the null rows.
+  // Prisma Migrate can't express a partial index, so it's created by hand in the
+  // migration; inserts use ON CONFLICT DO NOTHING (createMany skipDuplicates).
+  dedupeKey     String?
+  // Trust flag for REVENUE: true when the amount came from a signature-verified
+  // source (the Stripe webhook, LaunchWake's own billing) or an HMAC-signed
+  // /api/track/revenue call; false when a public caller supplied an unsigned
+  // amount we can't vouch for. Results sums verified revenue separately.
+  verified      Boolean     @default(true)
   meta          Json?
   createdAt     DateTime    @default(now())
 }

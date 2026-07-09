@@ -77,6 +77,37 @@ Tracked link clicks ──> /r/[code] route ──> Event ingest ──> attribu
   posts the `lw_ref` cookie back to `/api/track/signup`, or a server-side callback. Keep it
   optional; clicks work without integration, signups require the pixel.
 
+### Data-integrity guards (attribution)
+
+A founder trusts these numbers to pick channels, so a padded count is worse than a missing
+one. Four guards keep the signal clean; the pure logic lives in `/lib` and is unit-tested.
+
+- **Idempotent CLICK/SIGNUP.** Every recorded click/signup carries an `Event.dedupeKey`; a
+  *partial* unique index `(trackedLinkId, type, dedupeKey) WHERE dedupeKey IS NOT NULL`
+  makes a re-fire a no-op. Keys (see `lib/attribution.ts`):
+  - CLICK — `sha256(ipHash + userAgent + shortCode + UTC-day)` → one click per visitor/link/day.
+  - SIGNUP — `sha256(lowercased email)` when the pixel/beacon supplies one (strongest
+    identity), else the same ip-based key. Email is hashed server-side, never stored.
+  - Writes use `createMany({ skipDuplicates })` → a single `INSERT … ON CONFLICT DO NOTHING`.
+    On conflict the insert is silently skipped (no error to the caller), and the `/r`
+    redirect keeps its one-lookup-plus-one-write latency profile.
+- **Bot / prefetch filtering** (`lib/botDetection.ts` `isLikelyBot`). `/r/[code]` and every
+  `/api/track/*` endpoint still redirect / return `200`, but *skip recording* for known
+  crawler/spider/preview/headless user-agents, a missing user-agent, and prefetch hints
+  (`Purpose: prefetch`, `Sec-Purpose`, `X-Moz: prefetch`, `X-Purpose: preview`).
+- **Tenant scoping.** `ingestSignup` / `ingestRevenue` take an optional `projectId`. A caller
+  with a *verified* project context (the per-project Stripe webhook `/api/track/stripe/{projectId}`,
+  authenticated server actions) passes it, and a link whose `post.ship.projectId` doesn't
+  match is refused with a captured warning — no cross-tenant writes. Public pixel calls carry
+  only the short code, so they stay global (and rate-limited).
+- **Revenue trust (`Event.verified`).** Amounts are client-supplied. `/api/track/revenue`
+  marks revenue `verified=true` only when the request carries a valid `x-lw-signature`
+  (HMAC-SHA256 of the raw body, keyed by the project's `webhookSecret`); unsigned/invalid
+  calls are still recorded as `verified=false` rather than trusted. Signature-verified server
+  paths (the Stripe webhook, LaunchWake's own billing/Polar) record `verified=true`. Results
+  sums verified revenue separately (`totalVerifiedRevenueCents`) so a spoofable figure never
+  inflates the trusted headline.
+
 ## Security & guards
 
 - No auto-posting anywhere (product principle).

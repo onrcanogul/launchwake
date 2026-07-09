@@ -4,6 +4,7 @@ import { isValidProjectId } from "@/lib/pixel";
 import { recordSelfReport } from "@/lib/attribution";
 import { MAX_ANSWER_LEN } from "@/lib/selfReport";
 import { rateLimitDurable, clientIp } from "@/lib/ratelimit";
+import { isLikelyBot, botSignalsFromHeaders } from "@/lib/botDetection";
 import { captureUser, EVENTS } from "@/lib/analytics";
 
 /**
@@ -46,6 +47,10 @@ export async function POST(req: NextRequest) {
   const rl = await rateLimitDurable(`survey:${clientIp(req.headers)}`, RL_LIMIT, RL_WINDOW_MS);
   if (!rl.ok) {
     return NextResponse.json({ ok: false, error: "Rate limited" }, { status: 429, headers: CORS });
+  }
+  // Skip crawler/prefetch hits so they can't pollute the dark-social breakdown.
+  if (isLikelyBot(botSignalsFromHeaders(req.headers))) {
+    return NextResponse.json({ ok: false }, { headers: CORS });
   }
 
   let body: unknown;

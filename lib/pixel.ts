@@ -76,10 +76,12 @@ export function buildPixelJs(appUrl: string, projectId: string): string {
     var ref = new URLSearchParams(location.search).get('lw_ref');
     if (ref) localStorage.setItem('lw_ref', ref);
   } catch (e) {}
-  // 2. Call launchwakeSignup() on your signup-success page.
-  window.launchwakeSignup = function () {
+  // 2. Call launchwakeSignup() on your signup-success page. Pass the new user's
+  //    email (optional) to strengthen dedup — it's hashed on our server for the
+  //    idempotency key and never stored.
+  window.launchwakeSignup = function (email) {
     var r; try { r = localStorage.getItem('lw_ref'); } catch (e) {}
-    if (r) beacon('/api/track/signup', { ref: r });
+    if (r) beacon('/api/track/signup', { ref: r, email: email || undefined });
   };
   // 2b. Call launchwakeSurvey(answer) with the visitor's "how did you hear
   //     about us?" answer. This is the only signal that catches dark social —

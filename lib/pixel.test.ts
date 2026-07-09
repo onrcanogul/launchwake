@@ -56,7 +56,7 @@ describe("buildPixelJs", () => {
   it("captures lw_ref and defines launchwakeSignup", () => {
     expect(js).toContain("get('lw_ref')");
     expect(js).toContain("localStorage.setItem('lw_ref', ref)");
-    expect(js).toContain("window.launchwakeSignup = function ()");
+    expect(js).toContain("window.launchwakeSignup = function (email)");
     expect(js).toContain("'/api/track/signup'");
   });
 
