@@ -69,6 +69,23 @@ const schema = z.object({
   STRIPE_SECRET_KEY: OptionalString,
   STRIPE_WEBHOOK_SECRET: OptionalString,
 
+  // ── Polar (merchant of record) ────────────────────────
+  // LaunchWake's OWN subscription billing via Polar (polar.sh). All optional to
+  // boot; lib/polar.ts guards each at the point of use and the app degrades to
+  // Stripe (or no billing) when unset — mirroring the Stripe block above. When
+  // POLAR_ACCESS_TOKEN is present, checkout prefers Polar over Stripe.
+  // POLAR_ENV selects the API host: sandbox → sandbox-api.polar.sh (test mode),
+  // production → api.polar.sh.
+  POLAR_ACCESS_TOKEN: OptionalString,
+  POLAR_WEBHOOK_SECRET: OptionalString,
+  POLAR_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
+  // Product IDs from the Polar dashboard (each maps to a plan; Pro monthly and
+  // annual both grant PRO, Team grants seat-based TEAM, Launch Pass is a one-off).
+  POLAR_PRODUCT_PRO: OptionalString,
+  POLAR_PRODUCT_PRO_ANNUAL: OptionalString,
+  POLAR_PRODUCT_LAUNCH_PASS: OptionalString,
+  POLAR_PRODUCT_TEAM: OptionalString,
+
   // ── Inngest (later) ───────────────────────────────────
   INNGEST_EVENT_KEY: OptionalString,
   INNGEST_SIGNING_KEY: OptionalString,

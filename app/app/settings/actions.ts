@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createCheckoutUrl, createPortalUrl, billingConfigured } from "@/lib/billing";
+import { createPolarCheckoutUrl, polarConfigured } from "@/lib/polar";
 import {
   resolveAccount,
   createInvite,
@@ -183,36 +184,43 @@ export async function leaveTeam(): Promise<{ ok: boolean; error?: string }> {
   }
 }
 
-/** Start Pro checkout → returns the Stripe URL for the client to redirect to. */
+/**
+ * Start Pro checkout → returns the hosted checkout URL to redirect to. Prefers
+ * Polar when configured (POLAR_ACCESS_TOKEN), else falls back to Stripe.
+ */
 export async function startCheckout(): Promise<BillingState & { url?: string }> {
   const userId = await requireUserId();
-  if (!billingConfigured()) {
+  if (!polarConfigured() && !billingConfigured()) {
     return {
       error:
-        "Billing isn't configured on this deployment (set STRIPE_SECRET_KEY).",
+        "Billing isn't configured on this deployment (set POLAR_ACCESS_TOKEN or STRIPE_SECRET_KEY).",
     };
   }
   try {
-    const url = await createCheckoutUrl(userId);
+    const url = polarConfigured()
+      ? await createPolarCheckoutUrl(userId)
+      : await createCheckoutUrl(userId);
     return { url };
   } catch (err) {
     return { error: `Could not start checkout: ${(err as Error).message}` };
   }
 }
 
-/** Start Team checkout for `seats` seats → returns the Stripe URL. */
+/** Start Team checkout for `seats` seats → returns the hosted checkout URL. */
 export async function startTeamCheckout(
   seats: number,
 ): Promise<BillingState & { url?: string }> {
   const userId = await requireUserId();
-  if (!billingConfigured()) {
+  if (!polarConfigured() && !billingConfigured()) {
     return {
       error:
-        "Billing isn't configured on this deployment (set STRIPE_SECRET_KEY).",
+        "Billing isn't configured on this deployment (set POLAR_ACCESS_TOKEN or STRIPE_SECRET_KEY).",
     };
   }
   try {
-    const url = await createCheckoutUrl(userId, { plan: "TEAM", seats });
+    const url = polarConfigured()
+      ? await createPolarCheckoutUrl(userId, { plan: "TEAM", seats })
+      : await createCheckoutUrl(userId, { plan: "TEAM", seats });
     return { url };
   } catch (err) {
     return { error: `Could not start checkout: ${(err as Error).message}` };

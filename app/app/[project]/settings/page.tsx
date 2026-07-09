@@ -26,6 +26,7 @@ import {
   TEAM_MIN_SEATS,
   TEAM_MAX_SEATS,
 } from "@/lib/billing";
+import { polarConfigured } from "@/lib/polar";
 import { getTeamView } from "@/lib/team";
 import { getTrackingStatus } from "@/lib/attribution";
 import {
@@ -200,7 +201,7 @@ export default async function SettingsPage({
         <Panel title="Plan">
           <BillingPanel
             usage={usage}
-            billingConfigured={billingConfigured()}
+            billingConfigured={billingConfigured() || polarConfigured()}
             justUpgraded={upgraded === "1"}
             teamPricePerSeatCents={TEAM_PRICE_PER_SEAT_CENTS}
             teamMinSeats={TEAM_MIN_SEATS}
