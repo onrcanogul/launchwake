@@ -277,6 +277,56 @@ export const SAASHUB_READINESS: AccountRequirementsInput = {
     "SaaSHub submit page + FAQ — all products pass an approval queue; unreleased/waitlist products and free-subdomain sites are rejected; domain-email verification grants priority.",
 };
 
+/**
+ * r/MacApps — self-promo IS allowed, but gated by a published in-sub karma
+ * threshold plus a post-approval + flair flow (verified July 2026 against the
+ * sub's own about/rules.json).
+ */
+export const MACAPPS_READINESS: AccountRequirementsInput = {
+  level: "required",
+  minKarmaOrReputation: { value: 10, unit: "in-sub (local) karma" },
+  profileTips: [
+    "Earn 10 karma inside r/MacApps first — comment genuinely before you post; promoting your app in comments is disallowed until you hit 10 local karma.",
+    "Complete the sub's 'read the rules' step to gain post approval, then use the correct flair (Lifetime > Subscription > Free; prefix the title [OS] for open source).",
+    "Link only to the Mac App Store or your own official download page — third-party hosts, redirect/shortened URLs, and affiliate/referral links are removed.",
+    "Self-promo is capped at once per developer per 30 days (counted even from removed posts); if you don't qualify for the main feed, use the monthly promo megathread.",
+  ],
+  sourceNote:
+    "r/MacApps about/rules.json (fetched July 2026) — 10 local karma required before promoting, main-feed promotion requires qualifying + the PCP template (else the monthly megathread), official-distribution links only, and one self-promo per developer per 30 days.",
+};
+
+/**
+ * Setapp — a curated Mac/iOS subscription marketplace. No account gate, but a
+ * real editorial/technical quality review + SDK integration before an app is
+ * accepted (verified July 2026 against setapp.com/developers).
+ */
+export const SETAPP_READINESS: AccountRequirementsInput = {
+  level: "required",
+  profileTips: [
+    "Setapp is a curated marketplace — apply, then pass MacPaw's technical/quality review before your app is accepted (they advise applying only if you're confident in the app's quality).",
+    "Plan for SDK integration: accepted apps embed the Setapp SDK before they launch on the platform.",
+    "There's no upfront fee, but revenue is a usage-based share (Setapp Membership ~70/30; a Single-App option is 85/15) — weigh the economics before applying.",
+  ],
+  sourceNote:
+    "Setapp for Developers (setapp.com/developers, fetched July 2026) — four-step path (apply → technical/quality review → SDK integration → launch); no upfront fee, usage-based revenue share.",
+};
+
+/**
+ * Privacy Guides forum — promotion is confined to the Project Showcase category
+ * AND gated on team verification + conflict-of-interest disclosure (verified
+ * July 2026 against discuss.privacyguides.net guidelines).
+ */
+export const PRIVACY_GUIDES_READINESS: AccountRequirementsInput = {
+  level: "required",
+  profileTips: [
+    "You may only promote your own project in the Project Showcase category — and you must first contact the Privacy Guides team to verify yourself before posting.",
+    "Disclose your affiliation/position (conflict of interest) up front; recommending your own tool in other threads isn't allowed unless Privacy Guides already recommends it.",
+    "For tools handling sensitive data, be ready with a security white paper and a clear threat model; original content only — AI-generated posts are prohibited.",
+  ],
+  sourceNote:
+    "Privacy Guides forum guidelines + the 'posting about my project' thread (discuss.privacyguides.net, fetched July 2026) — project promotion is restricted to Project Showcase after team verification, with mandatory conflict-of-interest disclosure.",
+};
+
 /** r/cybersecurity — the one researched subreddit with published numeric limits. */
 export const R_CYBERSECURITY_READINESS: AccountRequirementsInput = {
   level: "required",

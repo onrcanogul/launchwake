@@ -1,6 +1,6 @@
 import { Platform, BanRisk } from "@prisma/client";
 import type { Seed } from "./types";
-import { redditReadiness, R_CYBERSECURITY_READINESS } from "./requirements";
+import { redditReadiness, R_CYBERSECURITY_READINESS, MACAPPS_READINESS } from "./requirements";
 
 /** Niche language/framework/domain subreddits (verified real, promo rules honest). */
 export const subreddits: Seed[] = [
@@ -336,6 +336,261 @@ export const subreddits: Seed[] = [
     accountRequirements: redditReadiness({
       extraTips: [
         "Use the submit-page title format: '[Project name] - [short description]'.",
+      ],
+    }),
+  },
+
+  // ── Vertical pack: SaaS / indie ──────────────────────────────────
+  {
+    slug: "r-indiebiz",
+    name: "r/indiebiz",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/indiebiz/",
+    audienceDesc: "~39k independent & small-business founders",
+    rules: "Sharing your services and products is on-topic: post a self-post describing your business and tag the title with the sub's format — [INTRO], [OFFER], [NETWORKING], [RESOURCE], or [REQUEST]. Moderators 'reserve the right to curb spamminess', absolutely no MLM is allowed, and general reddiquette applies.",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Weekday mornings ET",
+    tags: ["founders", "indie", "startup", "makers", "growth"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Tag your title with the sub's format: [INTRO] / [OFFER] / [NETWORKING] / [RESOURCE] / [REQUEST].",
+        "No MLM posts of any kind — an explicit sidebar rule.",
+      ],
+    }),
+  },
+  {
+    slug: "r-entrepreneurridealong",
+    name: "r/EntrepreneurRideAlong",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/EntrepreneurRideAlong/",
+    audienceDesc: "~710k founders following build-in-public journeys",
+    rules: "A large 'build in public' community for following real founder journeys in real time; the only posted rules are be respectful, follow Reddit's global rules, and engage with good intent. There's no formal self-promo ban, but bare launch links read as spam — frame the ship as a transparent progress update (what you built, the numbers, the lesson) and reply to comments.",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Weekday mornings ET",
+    tags: ["founders", "startup", "indie", "growth", "community"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Frame it as a founder-journey update with real numbers and lessons, not a bare launch link.",
+      ],
+    }),
+  },
+  {
+    slug: "r-microsaas",
+    name: "r/microsaas",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/microsaas/",
+    audienceDesc: "~200k micro-SaaS founders & indie builders",
+    rules: "Sharing your own micro-SaaS is allowed but must add value: 'purely promotional links without context', low-insight build-in-public updates, and repetitive link-dropping are removed. If you post your product you must include the backstory, tech stack, revenue (if comfortable), or a specific lesson learned; no black-hat tactics and no 'DM me' requests.",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Weekday mornings ET",
+    tags: ["saas", "indie", "founders", "product", "startup"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Rule 2: include backstory, tech stack, revenue (if comfortable), or a specific lesson — bare promo is removed.",
+      ],
+    }),
+  },
+
+  // ── Vertical pack: devtools / CLI ────────────────────────────────
+  {
+    slug: "r-commandline",
+    name: "r/commandline",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/commandline/",
+    audienceDesc: "~128k CLI/TUI builders & terminal power-users",
+    rules: "CLI/TUI projects only (no GUI-only tools), and you must agree to the rules once before your first post and choose a flair. Self-promotion is allowed but gated — projects newer than ~30 days or with only a few commits are removed, you must disclose any affiliation and list similar tools and how yours differs, and AI-generated post text is prohibited (partially AI-generated code must be disclosed).",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Weekday mornings ET",
+    tags: ["developers", "technical", "cli", "devtools", "opensource"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Projects newer than ~30 days (or with very few commits) are removed — don't post a day-one launch.",
+        "You must agree to the sub's rules once before your first post; disclose affiliation and compare to alternatives.",
+        "AI-generated post text/titles are prohibited; disclose any AI-generated code.",
+      ],
+    }),
+  },
+  {
+    slug: "r-opensource",
+    name: "r/opensource",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/opensource/",
+    audienceDesc: "~367k open-source developers & maintainers",
+    rules: "Self-promotion is permitted 'to a degree' (Reddit's ~10% guideline) as long as you're not a link farm, and sharing your own project REQUIRES the 'Promotional' flair. Hard gate: any linked repo must carry an OSI-approved open-source LICENSE file. AI-generated content is treated as low-effort and 'ban worthy', and titles must match the source (no sensationalizing).",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Weekday mornings ET",
+    tags: ["opensource", "developers", "software", "showcase", "community"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Use the 'Promotional' flair when sharing your own project.",
+        "Your repo must include an OSI-approved open-source LICENSE file or it's off-topic.",
+        "No AI-generated content — the sub treats it as ban-worthy.",
+      ],
+    }),
+  },
+
+  // ── Vertical pack: AI tools ──────────────────────────────────────
+  {
+    slug: "r-artificial",
+    name: "r/artificial",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/artificial/",
+    audienceDesc: "~1.3M general-AI news & discussion audience",
+    rules: "A large general-AI news/discussion sub, not a launch board: Rule 4 bans selling your own products, your first post or comment can't be promotional (the ~10% rule), and 'what's the best tool for X?' posts are removed. Share a genuine AI writeup or research angle and participate first — mods suggest modmailing before posting, and heavy AutoMod filtering targets promo from low-history accounts.",
+    defaultBanRisk: BanRisk.HIGH,
+    bestTime: "Weekday mornings ET",
+    tags: ["ai", "ml", "developers", "technical", "community"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Your first post/comment can't be promotional (10% rule); Rule 4 bans selling your own product — share a writeup, not a launch.",
+      ],
+    }),
+  },
+  {
+    slug: "r-chatgptcoding",
+    name: "r/ChatGPTCoding",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/ChatGPTCoding/",
+    audienceDesc: "~389k developers using AI to write code",
+    rules: "A restricted sub (posting is approval/AutoMod-gated) where every post needs a flair or it's removed. 'Sharing your work' is tolerated in the main feed, but overt service/product promotion belongs in the designated self-promo thread or requires applying for a sponsorship via modmail; include the prompt you used when you post generated code, and don't sell model access.",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Weekday mornings ET",
+    tags: ["ai", "developers", "technical", "community"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "The sub is 'restricted' — posting is approval-gated, and every post must carry a flair.",
+        "Overt product/service promotion goes in the self-promo thread or via a modmail sponsorship — 'sharing your work' is tolerated in the main feed.",
+      ],
+    }),
+  },
+  {
+    slug: "r-aipromptprogramming",
+    name: "r/aipromptprogramming",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/aipromptprogramming/",
+    audienceDesc: "~233k AI-tools & prompt-engineering builders",
+    rules: "A restricted 'AI hackerspace' feed for AI tools in programming and prompt engineering. Posts must stay on-topic and English-only; the written Rule 6 prohibits self-promotion and ads for commercial products, so keep posts genuinely educational (how the tool helps) rather than a launch pitch — posting is approval/AutoMod-gated.",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Weekday mornings ET",
+    tags: ["ai", "developers", "technical", "makers"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Rule 6 officially prohibits self-promotion/ads — post genuinely educational content, not a launch pitch.",
+        "The sub is 'restricted' (posting is approval-gated).",
+      ],
+    }),
+  },
+
+  // ── Vertical pack: Mac / desktop ─────────────────────────────────
+  {
+    slug: "r-macapps",
+    name: "r/macapps",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/macapps/",
+    audienceDesc: "~238k Mac app enthusiasts · the most promo-friendly Mac sub",
+    rules: "Self-promotion is explicitly allowed but tightly gated. You need 10 karma earned inside r/MacApps and post approval before posting, the correct flair (Lifetime > Subscription > Free; [OS] for open source), and official links only (Mac App Store or your own site — no third-party hosts, redirect/shortened, or affiliate links). Promotion is capped at once per developer per 30 days; devs who don't qualify for the main feed must use the monthly megathread.",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Weekday mornings ET",
+    tags: ["macos", "desktop", "product", "software", "showcase"],
+    accountRequirements: MACAPPS_READINESS,
+  },
+  {
+    slug: "r-macos",
+    name: "r/macOS",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/macos/",
+    audienceDesc: "~603k general macOS discussion & support community",
+    rules: "A general macOS discussion/support community, not a showcase: self-promotion is permitted ONLY on Saturdays (UTC) and only for apps on the Mac App Store or reputable, established GitHub repos (all GitHub links are auto-audited by 'GitHub Guard', and off-whitelist domains are auto-removed). Promotional posts any other day are removed; 'curl | sh' pipe-to-shell commands are auto-removed.",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Saturdays (UTC)",
+    tags: ["macos", "desktop", "community", "apple", "software"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Self-promotion is allowed ONLY on Saturdays (UTC), and only for Mac App Store apps or established GitHub repos.",
+        "New/low-reputation GitHub repos may be filtered by 'GitHub Guard'; off-whitelist domains are auto-removed.",
+      ],
+    }),
+  },
+  {
+    slug: "r-apple",
+    name: "r/apple",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/apple/",
+    audienceDesc: "~6.4M unofficial Apple community · general, strictly moderated",
+    rules: "A huge, strictly moderated general Apple community. Developer self-promotion is allowed only on Sundays (California time) and only as a self-post, and activity requirements are enforced — you're expected to have participated organically (unrelated posts/comments) rather than showing up only to promote. No YouTube/tweet self-promo, and no tech-support or 'what should I buy' posts.",
+    defaultBanRisk: BanRisk.HIGH,
+    bestTime: "Sundays (California time)",
+    tags: ["apple", "macos", "mobile", "community", "product"],
+    accountRequirements: redditReadiness({
+      minAccountAgeDays: 30,
+      extraTips: [
+        "Developer self-promo is Sundays-only (California time), self-post only.",
+        "Activity requirements are enforced — build genuine, unrelated participation in r/apple before you promote.",
+      ],
+    }),
+  },
+
+  // ── Vertical pack: privacy / security ────────────────────────────
+  {
+    slug: "r-privacy",
+    name: "r/privacy",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/privacy/",
+    audienceDesc: "~1.6M digital-privacy discussion community",
+    rules: "A strict privacy discussion sub that effectively bans promotion: Rule 3 forbids advertising or marketing products, services, websites, or social accounts (including affiliate/referral links and content-creator promotion); Rule 13 has put app-promotion requests 'on hold' — even open-source; and Rule 7 bans promoting closed-source software. Don't launch here — contribute to the discussion instead (surveys/fundraising also need prior approval).",
+    defaultBanRisk: BanRisk.HIGH,
+    bestTime: "Not a promo venue — contribute only",
+    tags: ["privacy", "security", "community", "technical", "developers"],
+  },
+  {
+    slug: "r-opsec",
+    name: "r/opsec",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/opsec/",
+    audienceDesc: "~76k operational-security methodology community",
+    rules: "An operational-security methodology sub built around threat modeling, not product posts. You must read the pinned rules thread and state your threat model before posting, and 'don't just name a tool' — single-tool/product recommendations without a threat-model rationale are removed. There's no self-promotion lane, so a launch post is off-culture here.",
+    defaultBanRisk: BanRisk.HIGH,
+    bestTime: "Not a promo venue — contribute only",
+    tags: ["privacy", "security", "technical", "community"],
+  },
+
+  // ── Vertical pack: hardware / EE ─────────────────────────────────
+  {
+    slug: "r-printedcircuitboard",
+    name: "r/PrintedCircuitBoard",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/PrintedCircuitBoard/",
+    audienceDesc: "~98k PCB designers doing schematic/layout reviews",
+    rules: "The official PCB design-review sub, scoped to schematic/layout review requests only. Rule 2 bans spam/ads/sales/promotion/surveys, Rule 3 bans 'show & tell / look what I made' posts unless you previously ran a review of the same board, Rule 4 bans self-promotion/job-seeking, and Rule 5 bans shilling (no PCB company names in titles). Don't launch here — post a genuine design review or contribute.",
+    defaultBanRisk: BanRisk.HIGH,
+    bestTime: "Not a promo venue — reviews only",
+    tags: ["hardware", "electronics", "pcb", "makers", "technical"],
+  },
+  {
+    slug: "r-askelectronics",
+    name: "r/AskElectronics",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/AskElectronics/",
+    audienceDesc: "~930k component-level electronics Q&A community",
+    rules: "A component-level electronics Q&A help sub. Rule 4 flatly prohibits advertisements, commercial offers, giveaways, spam, and self-promotion, and trading is not allowed. Posts must be clear, on-topic questions (descriptive title, basic diagnostics) — it's not a venue to launch a product, so engage by genuinely answering questions instead.",
+    defaultBanRisk: BanRisk.HIGH,
+    bestTime: "Not a promo venue — Q&A only",
+    tags: ["electronics", "hardware", "technical", "community"],
+  },
+  {
+    slug: "r-embedded",
+    name: "r/embedded",
+    platform: Platform.REDDIT,
+    url: "https://www.reddit.com/r/embedded/",
+    audienceDesc: "~274k embedded-systems engineers & hobbyists",
+    rules: "An embedded-systems discussion/Q&A sub. Rule 4 bars spam, commercial posts, links to commercial/crowdfunding pages, and self-promotion — but at moderator discretion, self-promo from people who genuinely contribute in other ways may be allowed and tagged with the 'Self-promo' flair. Keep posts on-topic (a micro is involved), put the actual question in the title, and earn goodwill by helping before you share.",
+    defaultBanRisk: BanRisk.MEDIUM,
+    bestTime: "Weekday mornings ET",
+    tags: ["embedded", "firmware", "hardware", "developers", "technical"],
+    accountRequirements: redditReadiness({
+      extraTips: [
+        "Rule 4 bans self-promo by default; a mod-discretion 'Self-promo' flair lane exists for people who contribute to the sub in other ways.",
+        "Contribute genuine help first, then share tagged as 'Self-promo'.",
       ],
     }),
   },
