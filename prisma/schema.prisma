@@ -45,6 +45,12 @@ model User {
   // one-click unsubscribe link and the Settings toggle turn it off. Never
   // gates transactional auth email (magic links).
   emailNotifications Boolean @default(true)
+  // Self-reported "how did you hear about us?" answer at signup — LaunchWake
+  // dogfooding its own dark-social attribution (a tracked link/UTM can't see the
+  // podcast, DM, or word-of-mouth that actually drove the signup). `heardVia` is
+  // the normalized source key (see lib/selfReport.ts); null when unanswered.
+  heardVia         String?
+  heardViaAt       DateTime?
   createdAt        DateTime  @default(now())
 }
 
@@ -166,6 +172,7 @@ model Project {
   pixelVerifiedAt      DateTime?
   slackWebhookUrl      String? // Slack incoming webhook for reminders / new-ship pings
   ships                Ship[]
+  selfReports          SelfReport[] // self-reported "how did you hear" answers from the survey snippet
   intentQueries        IntentQuery[] // Intent Radar: saved "people looking for us" watches
   // White-label client report: a stable, branded link at /report/c/{token}.
   reportToken          String?  @unique
@@ -367,6 +374,35 @@ enum EventType {
   CLICK
   SIGNUP
   REVENUE
+}
+
+// Self-reported attribution — "how did you hear about us?" answered on the
+// customer's signup form (via the survey snippet) or LaunchWake's own signup.
+// This is the ONLY signal that catches dark social: a link/UTM sees a click, but
+// the podcast, DM, or word-of-mouth that sent someone to type the URL directly
+// leaves no click at all. Deliberately NOT tied to a TrackedLink (a self-report
+// exists with or without a prior click). `lwRef` records the tracked ref that
+// WAS present at the same moment, if any — so we can measure how often link-based
+// attribution disagrees with what the human actually said.
+model SelfReport {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // The raw answer (a chosen option label or free text), trimmed + truncated.
+  answer    String
+  // Normalized coarse source key (see lib/selfReport.ts SELF_REPORT_OPTIONS):
+  // "reddit" | "x" | "hackernews" | "podcast" | "word_of_mouth" | "search" | …
+  source    String
+  // The catalog platform this source maps to, for reconciling against link
+  // attribution. Null for sources with no distribution channel (word of mouth,
+  // search, a podcast) — those are pure dark social.
+  platform  Platform?
+  // The lw_ref (tracked-link short code) present when the answer was given, if
+  // any. Null = no tracked click preceded this signup (dark social).
+  lwRef     String?
+  createdAt DateTime  @default(now())
+
+  @@index([projectId, createdAt])
 }
 
 // Scheduled "post at the best time" reminder (email/Slack ping — never posts).

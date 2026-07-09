@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { saveStripeWebhookSecret } from "@/app/app/settings/actions";
 import { CodePrompt, preStyle } from "@/components/settings/CodePrompt";
 import { PixelSnippet } from "@/components/settings/PixelSnippet";
+import { SurveySnippet } from "@/components/settings/SurveySnippet";
 
 type Status = {
   signups: number;
@@ -15,6 +16,8 @@ type Status = {
   revenueCents: number;
   currency: string;
   lastRevenueAt: Date | null;
+  selfReports: number;
+  lastSelfReportAt: Date | null;
 };
 
 function ago(date: Date): string {
@@ -183,10 +186,31 @@ This attributes Stripe revenue automatically — no custom payment-handling code
       </p>
       <PixelSnippet appUrl={appUrl} projectId={projectId} />
 
-      {/* 2 — Revenue (generic) */}
+      {/* 2 — Dark social (self-report) */}
+      <div style={sub}>
+        <Icon name="where" style={{ width: 14, height: 14, stroke: "var(--ac)", strokeWidth: 1.7, fill: "none" }} />
+        2 · Catch dark social (self-report)
+      </div>
+      {status.selfReports > 0 && (
+        <div className="track-status ok" style={{ marginBottom: 10 }}>
+          <span className="dot" style={{ background: "var(--ok)" }} />
+          <b>{status.selfReports}</b> self-report{status.selfReports === 1 ? "" : "s"} captured
+          {status.lastSelfReportAt ? `, last ${ago(status.lastSelfReportAt)}` : ""}.
+        </div>
+      )}
+      <p style={{ color: "var(--tx2)", fontSize: 12.5, marginBottom: 10 }}>
+        A link only sees a click. The podcast, the DM, the &ldquo;a friend told
+        me&rdquo; that made someone type your URL directly leaves no click to
+        attribute — and UTM files it under &ldquo;direct&rdquo;. Ask them. Add a{" "}
+        <b>&ldquo;How did you hear about us?&rdquo;</b> field and it lands on
+        Results, reconciled against any link we already tracked.
+      </p>
+      <SurveySnippet />
+
+      {/* 3 — Revenue (generic) */}
       <div style={sub}>
         <Icon name="target" style={{ width: 14, height: 14, stroke: "var(--ac)", strokeWidth: 1.7, fill: "none" }} />
-        2 · Attribute revenue (any provider)
+        3 · Attribute revenue (any provider)
       </div>
       {status.revenueEvents > 0 && (
         <div className="track-status ok" style={{ marginBottom: 10 }}>
@@ -203,10 +227,10 @@ This attributes Stripe revenue automatically — no custom payment-handling code
       </p>
       <CodePrompt code={revenueSnippet} prompt={revenuePrompt} codeLabel="Revenue example" />
 
-      {/* 3 — Stripe turnkey */}
+      {/* 4 — Stripe turnkey */}
       <div style={sub}>
         <Icon name="target" style={{ width: 14, height: 14, stroke: "var(--ac)", strokeWidth: 1.7, fill: "none" }} />
-        3 · Stripe (turnkey) {stripeSecretSet && <span className="badge" style={{ color: "var(--ok)" }}><span className="dot" style={{ background: "var(--ok)" }} />connected</span>}
+        4 · Stripe (turnkey) {stripeSecretSet && <span className="badge" style={{ color: "var(--ok)" }}><span className="dot" style={{ background: "var(--ok)" }} />connected</span>}
       </div>
       <p style={{ color: "var(--tx2)", fontSize: 12.5, marginBottom: 8 }}>
         In Stripe → Developers → Webhooks, add this endpoint (events{" "}

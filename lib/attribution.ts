@@ -5,6 +5,14 @@ import { isSafeHttpUrl } from "./url";
 import { captureError } from "./observability";
 import type { CoachResult } from "./coach";
 import type { Platform } from "@prisma/client";
+import {
+  normalizeSource,
+  rollupSelfReports,
+  buildSelfReportInsight,
+  MAX_ANSWER_LEN,
+  type SelfReportRow,
+  type SelfReportRollup,
+} from "./selfReport";
 
 /**
  * Attribution: tracked links + click/signup ingest + per-channel rollups.
@@ -295,6 +303,110 @@ export async function recordPixelPing(projectId: string): Promise<PixelPingResul
   };
 }
 
+// ── Self-reported attribution (dark social) ────────────────────────────────
+
+export type SelfReportInput = {
+  /** The raw answer — a chosen option key or free text. */
+  answer: string;
+  /** The lw_ref present at the same moment, if any (null = no tracked click). */
+  lwRef?: string | null;
+};
+
+export type SelfReportResult = {
+  ok: boolean;
+  /** True when this is the project's first-ever self-report (activation signal). */
+  first: boolean;
+  /** Owner account id (for the survey_installed funnel event); null if unknown. */
+  accountId: string | null;
+};
+
+/**
+ * Record one self-reported "how did you hear about us?" answer for a project.
+ * Normalizes the answer into the shared source taxonomy and stores the tracked
+ * ref (if any) alongside it, so getSelfReportRollup can later measure how often
+ * the link-based attribution disagreed with what the human said. Unknown project
+ * ids are acknowledged but not stored (the endpoint is public + CORS-open).
+ */
+export async function recordSelfReport(
+  projectId: string,
+  input: SelfReportInput,
+): Promise<SelfReportResult> {
+  const answer = (input.answer ?? "").trim();
+  if (!answer) return { ok: false, first: false, accountId: null };
+
+  const project = await db.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, userId: true },
+  });
+  if (!project) return { ok: false, first: false, accountId: null };
+
+  const { source, platform } = normalizeSource(answer);
+  const lwRef = input.lwRef?.trim() || null;
+
+  const priorCount = await db.selfReport.count({ where: { projectId } });
+  try {
+    await db.selfReport.create({
+      data: {
+        projectId,
+        answer: answer.slice(0, MAX_ANSWER_LEN),
+        source,
+        platform,
+        lwRef,
+      },
+    });
+  } catch (err) {
+    // Fire-and-forget from a public beacon — never 500 a survey submission.
+    captureError(err, { at: "attribution.recordSelfReport", projectId });
+    return { ok: false, first: false, accountId: null };
+  }
+  return { ok: true, first: priorCount === 0, accountId: project.userId };
+}
+
+export type SelfReportView = SelfReportRollup & {
+  insight: string | null;
+  lastAt: Date | null;
+};
+
+/**
+ * Per-project self-report rollup for Results: source breakdown, the dark-social
+ * share, and the link-vs-reality divergence. Resolves each stored lw_ref back to
+ * the channel's platform so the pure rollup can compare "what the link said"
+ * against "what the person said".
+ */
+export async function getSelfReportRollup(
+  projectId: string,
+): Promise<SelfReportView> {
+  const reports = await db.selfReport.findMany({
+    where: { projectId },
+    select: { source: true, lwRef: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Resolve the distinct tracked refs to their channel platform in one query.
+  const refs = [...new Set(reports.map((r) => r.lwRef).filter((v): v is string => Boolean(v)))];
+  const platformByRef = new Map<string, Platform>();
+  if (refs.length > 0) {
+    const links = await db.trackedLink.findMany({
+      where: { shortCode: { in: refs } },
+      select: { shortCode: true, post: { select: { channel: { select: { platform: true } } } } },
+    });
+    for (const l of links) platformByRef.set(l.shortCode, l.post.channel.platform);
+  }
+
+  const rows: SelfReportRow[] = reports.map((r) => ({
+    source: r.source,
+    hasRef: Boolean(r.lwRef),
+    linkPlatform: r.lwRef ? platformByRef.get(r.lwRef) ?? null : null,
+  }));
+
+  const rollup = rollupSelfReports(rows);
+  return {
+    ...rollup,
+    insight: buildSelfReportInsight(rollup),
+    lastAt: reports[0]?.createdAt ?? null,
+  };
+}
+
 /** Does the pixel route have a project to serve? (Existence check for GET.) */
 export async function pixelProjectExists(projectId: string): Promise<boolean> {
   const project = await db.project.findUnique({
@@ -561,6 +673,9 @@ export type TrackingStatus = {
   revenueCents: number;
   currency: string;
   lastRevenueAt: Date | null;
+  /** Self-reported "how did you hear" answers captured via the survey snippet. */
+  selfReports: number;
+  lastSelfReportAt: Date | null;
 };
 
 /** For the Settings pixel card — is data actually flowing in? */
@@ -570,7 +685,7 @@ export async function getTrackingStatus(
   const where = {
     trackedLink: { post: { ship: { projectId } } },
   } as const;
-  const [signups, clicks, last, revAgg, lastRev] = await Promise.all([
+  const [signups, clicks, last, revAgg, lastRev, selfReports, lastSelf] = await Promise.all([
     db.event.count({ where: { ...where, type: "SIGNUP" } }),
     db.event.count({ where: { ...where, type: "CLICK" } }),
     db.event.findFirst({
@@ -588,6 +703,12 @@ export async function getTrackingStatus(
       orderBy: { createdAt: "desc" },
       select: { createdAt: true, currency: true },
     }),
+    db.selfReport.count({ where: { projectId } }),
+    db.selfReport.findFirst({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    }),
   ]);
   return {
     signups,
@@ -597,6 +718,8 @@ export async function getTrackingStatus(
     revenueCents: revAgg._sum.amountCents ?? 0,
     currency: lastRev?.currency ?? "usd",
     lastRevenueAt: lastRev?.createdAt ?? null,
+    selfReports,
+    lastSelfReportAt: lastSelf?.createdAt ?? null,
   };
 }
 

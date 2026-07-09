@@ -15,6 +15,8 @@
  * snippets; the ping-recording db side lives in lib/attribution.ts.
  */
 
+import { SELF_REPORT_OPTIONS } from "./selfReport";
+
 /** cuid/cuid2-shaped ids only — the pixel route interpolates this into JS. */
 export function isValidProjectId(id: string): boolean {
   return /^[a-z0-9]{20,32}$/.test(id);
@@ -79,6 +81,16 @@ export function buildPixelJs(appUrl: string, projectId: string): string {
     var r; try { r = localStorage.getItem('lw_ref'); } catch (e) {}
     if (r) beacon('/api/track/signup', { ref: r });
   };
+  // 2b. Call launchwakeSurvey(answer) with the visitor's "how did you hear
+  //     about us?" answer. This is the only signal that catches dark social —
+  //     the podcast/DM/word-of-mouth that a link or UTM can never see. The
+  //     stored lw_ref goes too, so LaunchWake can flag when the link disagrees
+  //     with what the human said.
+  window.launchwakeSurvey = function (answer) {
+    if (!answer) return;
+    var r; try { r = localStorage.getItem('lw_ref'); } catch (e) {}
+    beacon('/api/track/survey', { project: PROJECT, answer: String(answer), ref: r || null });
+  };
   // 3. Verification ping (throttled per browser) so LaunchWake can show
   //    "pixel detected". Skipped when localStorage is unavailable.
   try {
@@ -91,4 +103,62 @@ export function buildPixelJs(appUrl: string, projectId: string): string {
   } catch (e) {}
 })();
 `;
+}
+
+// ── Self-report survey snippet (dark-social attribution) ───────────────────
+// The pixel above defines window.launchwakeSurvey(answer); these builders give
+// the user a turnkey "how did you hear about us?" field to wire it to. The
+// option set is the shared taxonomy (lib/selfReport.ts) so both funnels — the
+// customer's and LaunchWake's own — normalize into the same sources.
+
+/** The <option> rows for the drop-in select, from the shared taxonomy. */
+export function surveyOptionsHtml(): string {
+  return SELF_REPORT_OPTIONS.filter((o) => o.value !== "other")
+    .map((o) => `    <option value="${o.value}">${o.label}</option>`)
+    .join("\n");
+}
+
+/** The one-liner the user calls once the answer is chosen / signup succeeds. */
+export function surveyCallSnippet(): string {
+  return `// Once the visitor picks an answer (or on signup success), report it:
+window.launchwakeSurvey(document.getElementById('lw-heard').value);`;
+}
+
+/**
+ * A complete drop-in "how did you hear about us?" field for a signup form. It
+ * only needs the pixel (which defines launchwakeSurvey) already on the page.
+ */
+export function surveyDropInSnippet(): string {
+  return `<!-- On your signup form. Needs the LaunchWake pixel on the page. -->
+<label for="lw-heard">How did you hear about us?</label>
+<select id="lw-heard" onchange="window.launchwakeSurvey(this.value)">
+    <option value="" disabled selected>Choose one…</option>
+${surveyOptionsHtml()}
+    <option value="other">Something else</option>
+</select>`;
+}
+
+/** Snippet for a React/Next.js signup form (controlled select). */
+export function surveyReactSnippet(): string {
+  return `// In your signup form. Needs the LaunchWake pixel in the app.
+<label htmlFor="lw-heard">How did you hear about us?</label>
+<select
+  id="lw-heard"
+  defaultValue=""
+  onChange={(e) => window.launchwakeSurvey?.(e.target.value)}
+>
+  <option value="" disabled>Choose one…</option>
+${SELF_REPORT_OPTIONS.map((o) => `  <option value="${o.value}">${o.label}</option>`).join("\n")}
+</select>`;
+}
+
+/** AI-assistant prompt that sets the same thing up, stack-agnostic. */
+export function surveyPromptSnippet(): string {
+  return `Add a "How did you hear about us?" question to my signup flow and report the answer to LaunchWake. Detect my framework and fit the integration to how my signup form already works — the example is illustrative.
+
+1. On the signup form, add a required-ish dropdown with these options (value → label):
+${SELF_REPORT_OPTIONS.map((o) => `   - ${o.value} → ${o.label}`).join("\n")}
+2. The LaunchWake pixel (already installed site-wide) exposes a global \`window.launchwakeSurvey(answer)\`. Call it with the selected value once the signup succeeds (or on change).
+
+This captures dark-social attribution — the podcast, DM, or word-of-mouth that a tracked link or UTM can never see — and reconciles it against any link click LaunchWake already recorded.`;
 }

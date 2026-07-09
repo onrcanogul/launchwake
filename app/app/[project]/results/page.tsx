@@ -1,9 +1,10 @@
 import { getWorkspace } from "@/lib/session";
-import { getResultsRollup, formatMoney } from "@/lib/attribution";
+import { getResultsRollup, getSelfReportRollup, formatMoney } from "@/lib/attribution";
 import { getTrackingHealth } from "@/lib/trackingHealth";
 import { RoiStrip } from "@/components/results/RoiStrip";
 import { TrackingHealthBanner } from "@/components/results/TrackingHealthBanner";
 import { PostCoachList } from "@/components/results/PostCoach";
+import { SelfReportPanel } from "@/components/results/SelfReportPanel";
 import { GetStartedSteps } from "@/components/results/GetStartedSteps";
 import { Panel } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
@@ -36,6 +37,10 @@ export default async function ResultsPage({
   const ws = await getWorkspace(project);
 
   const r = await getResultsRollup(ws.project.id);
+  // Self-reported ("how did you hear?") attribution — the dark-social slice a
+  // link/UTM can't see. Exists independently of tracked posts, so it's shown
+  // even when no channel has been marked posted yet.
+  const selfReport = await getSelfReportRollup(ws.project.id);
   const canCoach = ws.plan !== "FREE";
 
   // Ingestion health — surface active webhook failures so a data gap here isn't
@@ -73,6 +78,8 @@ export default async function ResultsPage({
       <>
         {header}
         <TrackingHealthBanner projectId={project} failedCount={failedDeliveries} />
+        {/* Dark social can arrive before any channel is marked posted. */}
+        <SelfReportPanel report={selfReport} />
         <GetStartedSteps projectId={project} pixelVerifiedAt={ws.project.pixelVerifiedAt} />
       </>
     );
@@ -213,6 +220,8 @@ export default async function ResultsPage({
           </table>
         </div>
       </Panel>
+
+      <SelfReportPanel report={selfReport} />
 
       {r.insight && (
         <Panel title="What LaunchWake sees" right={<Badge accent>insight</Badge>}>

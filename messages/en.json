@@ -331,7 +331,9 @@
     "continueEmail": "Continue with email",
     "noProviders": "No OAuth providers are configured. Set AUTH_GITHUB_ID / EMAIL_SERVER in your env to enable sign-in.",
     "demo": "demo",
-    "continueDemo": "Continue as demo (Hookline)"
+    "continueDemo": "Continue as demo (Hookline)",
+    "heardLabel": "How did you hear about us?",
+    "heardDefault": "Choose one — optional"
   },
   "ForTag": {
     "metaTitleSuffix": "Ranked by ban risk | LaunchWake",

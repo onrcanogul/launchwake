@@ -27,6 +27,7 @@ describe("EVENTS", () => {
         "draft_copied",
         "ship_marked_posted",
         "pixel_installed",
+        "survey_installed",
       ].sort(),
     );
   });

@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { signIn } from "next-auth/react";
 import { Icon } from "@/components/Icon";
-import { requestMagicLink } from "@/components/auth/loginActions";
+import { requestMagicLink, stashSignupSource } from "@/components/auth/loginActions";
+import { SELF_REPORT_OPTIONS } from "@/lib/selfReport";
 
 type Props = {
   githubEnabled: boolean;
@@ -21,6 +22,7 @@ export function LoginForm({
 }: Props) {
   const t = useTranslations("Login");
   const [email, setEmail] = useState("");
+  const [heard, setHeard] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(false);
@@ -31,14 +33,29 @@ export function LoginForm({
     void signIn(id, { callbackUrl, ...extra });
   };
 
+  // GitHub has no email pre-auth, so stash the "how did you hear" answer in a
+  // cookie that rides the OAuth redirect back, then start the sign-in.
+  const startGithub = async () => {
+    setPending("github");
+    if (heard) {
+      try {
+        await stashSignupSource(heard);
+      } catch {
+        /* attribution is best-effort — never block sign-in */
+      }
+    }
+    void signIn("github", { callbackUrl });
+  };
+
   const sendEmail = async () => {
     if (!email) return;
     setPending("nodemailer");
     setError(false);
     setInvalid(false);
     try {
-      // Rate-limit gate runs BEFORE Auth.js is invoked.
-      const gate = await requestMagicLink(email);
+      // Rate-limit gate runs BEFORE Auth.js is invoked. The self-reported source
+      // (if any) is stashed keyed by email inside the gate.
+      const gate = await requestMagicLink(email, heard || undefined);
       if (!gate.ok && gate.reason === "invalid") {
         setInvalid(true);
         return;
@@ -67,10 +84,32 @@ export function LoginForm({
 
   return (
     <div className="authbox">
+      {!sent && (githubEnabled || emailEnabled) && (
+        <div style={{ marginBottom: 14 }}>
+          <label className="fl" htmlFor="lw-heard">
+            {t("heardLabel")}
+          </label>
+          <select
+            id="lw-heard"
+            className="inp"
+            value={heard}
+            onChange={(e) => setHeard(e.target.value)}
+            disabled={pending !== null}
+          >
+            <option value="">{t("heardDefault")}</option>
+            {SELF_REPORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {githubEnabled && (
         <button
           className="oauth"
-          onClick={() => start("github")}
+          onClick={() => void startGithub()}
           disabled={pending !== null}
         >
           <Icon name="github" style={{ fill: "currentColor", stroke: "none" }} />

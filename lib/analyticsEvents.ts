@@ -20,6 +20,8 @@ export const EVENTS = {
   shipMarkedPosted: "ship_marked_posted",
   /** The attribution pixel proved it's live (first signup ping / verify). */
   pixelInstalled: "pixel_installed",
+  /** The dark-social survey snippet went live (first self-report received). */
+  surveyInstalled: "survey_installed",
 } as const;
 
 export type AnalyticsEvent = (typeof EVENTS)[keyof typeof EVENTS];
