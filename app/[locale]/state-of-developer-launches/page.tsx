@@ -3,8 +3,10 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { useTranslations } from "next-intl";
 import {
   getStateOfLaunches,
+  getPublicBenchmarkBoard,
   MIN_SAMPLE_POSTS,
   type ChannelLeader,
+  type PublicBenchmarkBoard,
 } from "@/lib/stateOfLaunches";
 import { Link } from "@/i18n/navigation";
 import { alternatesFor, type Locale } from "@/i18n/paths";
@@ -79,6 +81,42 @@ function LeaderRow({
   );
 }
 
+/** Public-engagement board (HN/PH medians) — the cold-start signal, shown as its
+ *  own clearly-labelled section, never blended into first-party numbers. */
+function PublicBenchmarkSection({ board }: { board: PublicBenchmarkBoard }) {
+  const t = useTranslations("StateOfLaunches");
+  return (
+    <section className="cd-sec">
+      <h2>
+        <Icon name="results" />
+        {t("publicHeading")}
+      </h2>
+      <p className="sol-subnote">{t("publicNote")}</p>
+      <div className="sol-cats">
+        {board.categories.map((cat) => (
+          <div className="sol-cat" key={cat.tag}>
+            <div className="sol-cat-head">
+              <span className="sol-cat-name">{cat.label}</span>
+            </div>
+            <ol className="sol-cat-list">
+              {cat.channels.map((c, i) => (
+                <li key={c.name}>
+                  <span className="sol-cat-rank num">{i + 1}</span>
+                  <Icon name={platformIcon(c.platform)} className="pi" />
+                  <span className="sol-cat-ch">{c.name}</span>
+                  <span className="sol-cat-sg num">
+                    {c.medianUpvotes.toLocaleString()} {t("publicPoints")}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default async function StateOfDeveloperLaunchesPage(props: {
   params: Promise<{ locale: Locale }>;
 }) {
@@ -86,7 +124,10 @@ export default async function StateOfDeveloperLaunchesPage(props: {
   setRequestLocale(locale);
   const t = await getTranslations("StateOfLaunches");
   const tc = await getTranslations("Common");
-  const report = await getStateOfLaunches();
+  const [report, publicBoard] = await Promise.all([
+    getStateOfLaunches(),
+    getPublicBenchmarkBoard(),
+  ]);
   const year = new Date().getFullYear();
   const { totals } = report;
 
@@ -103,20 +144,28 @@ export default async function StateOfDeveloperLaunchesPage(props: {
       <p className="pub-lede">{t("lede")}</p>
 
       {!report.hasData ? (
-        <div className="gate" style={{ marginTop: 28 }}>
-          <h3>{t("compilingTitle", { year })}</h3>
-          <p>{t("compilingBody", { min: MIN_SAMPLE_POSTS })}</p>
-          <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-            <Link href="/tools/launch-checker" className="btn btn-p">
-              <Icon name="target" />
-              {tc("planALaunch")}
-            </Link>
-            <Link href="/channels" className="btn btn-s">
-              <Icon name="shield" />
-              {tc("browseChannels")}
-            </Link>
+        <>
+          {/* Cold start: show the public engagement board instead of only a gate. */}
+          {publicBoard.hasData && <PublicBenchmarkSection board={publicBoard} />}
+          <div className="gate" style={{ marginTop: 28 }}>
+            <h3>{t("compilingTitle", { year })}</h3>
+            <p>
+              {publicBoard.hasData
+                ? t("publicCompiling")
+                : t("compilingBody", { min: MIN_SAMPLE_POSTS })}
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+              <Link href="/tools/launch-checker" className="btn btn-p">
+                <Icon name="target" />
+                {tc("planALaunch")}
+              </Link>
+              <Link href="/channels" className="btn btn-s">
+                <Icon name="shield" />
+                {tc("browseChannels")}
+              </Link>
+            </div>
           </div>
-        </div>
+        </>
       ) : (
         <>
           <div style={{ marginTop: 24 }}>
@@ -207,6 +256,10 @@ export default async function StateOfDeveloperLaunchesPage(props: {
               </div>
             </section>
           )}
+
+          {/* Public engagement board — additional cold-start signal alongside
+              the first-party numbers, never blended into them. */}
+          {publicBoard.hasData && <PublicBenchmarkSection board={publicBoard} />}
 
           {/* Ban rates */}
           {report.banRates.length > 0 && (

@@ -3293,6 +3293,28 @@ tbody tr {
   stroke-width: 1.6;
   fill: none;
 }
+.lc-bench {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg1);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--tx2);
+  font-variant-numeric: tabular-nums;
+}
+.lc-bench svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  stroke: var(--ac);
+  stroke-width: 1.6;
+  fill: none;
+}
 .rec-meta .k {
   display: inline-flex;
   align-items: center;

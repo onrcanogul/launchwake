@@ -7,6 +7,8 @@ import {
   enrichPublicPlanWhy,
   type PublicPlanInput,
 } from "@/lib/launchChecker";
+import { getCheckerBenchmark } from "@/lib/benchmarks";
+import { productTagFor } from "@/lib/stats";
 import { rateLimitDurable, clientIp } from "@/lib/ratelimit";
 import { captureAnon, EVENTS } from "@/lib/analytics";
 
@@ -91,8 +93,17 @@ export async function POST(req: Request) {
   // budget-capped LLM call (synthetic "public" bucket). Never throws: on a
   // missing key, exhausted budget, or provider error the heuristic copy stands.
   const plan = await enrichPublicPlanWhy(basePlan);
+
+  // Public benchmark teaser for the detected category — read straight from the
+  // precomputed ChannelBenchmark table (indexed lookup, ZERO extra network
+  // fetch at request time). Null when there's no trustworthy public median yet.
+  const productTag = productTagFor(
+    `${meta.name} ${meta.description ?? ""} ${(meta.topics ?? []).join(" ")} ${meta.language ?? ""} ${meta.homepage ?? ""}`,
+  );
+  const benchmark = await getCheckerBenchmark(productTag).catch(() => null);
+
   // Funnel: top of the activation funnel for logged-out visitors. After the
   // response so a slow analytics host can't delay the checker.
   after(() => captureAnon(EVENTS.launchCheckerRun, { has_release: Boolean(ship) }));
-  return NextResponse.json({ plan, repo: meta.fullName });
+  return NextResponse.json({ plan, repo: meta.fullName, benchmark });
 }

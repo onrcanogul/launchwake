@@ -2,7 +2,12 @@ import { notFound } from "next/navigation";
 import { getWorkspace } from "@/lib/session";
 import { getLaunchModeState } from "@/lib/launchMode";
 import { getResultsRollup, formatMoney } from "@/lib/attribution";
-import { getBenchmarkMap, type ChannelBenchmarkView } from "@/lib/benchmarks";
+import {
+  getBenchmarkMap,
+  benchmarkDisplay,
+  publicSource,
+  type ChannelBenchmarkView,
+} from "@/lib/benchmarks";
 import { productTagFor, bucketLabel } from "@/lib/stats";
 import { getGithubStatus } from "@/lib/github";
 import { isPaidPlan } from "@/lib/billing";
@@ -91,7 +96,11 @@ export default async function RetroPage({
               ) : (
                 rollup.perChannel.map((c) => {
                   const bench = benchByName.get(c.channelName);
-                  const median = bench?.medianSignups ?? null;
+                  // One honest cell across sources: first-party/blended → your
+                  // signups vs the category median; public-only → the public
+                  // engagement median, clearly labelled (never a "0 median").
+                  const disp = bench ? benchmarkDisplay(bench, categoryLabel) : null;
+                  const median = bench?.medianSignups ?? 0;
                   return (
                     <tr key={c.channelName}>
                       <td>
@@ -121,7 +130,7 @@ export default async function RetroPage({
                         </td>
                       )}
                       <td className="num" style={{ textAlign: "right" }}>
-                        {median === null ? (
+                        {disp === null ? (
                           <span style={{ color: "var(--tx3)" }}>—</span>
                         ) : !paid ? (
                           <Link
@@ -131,6 +140,13 @@ export default async function RetroPage({
                           >
                             Pro
                           </Link>
+                        ) : disp.source === "public" ? (
+                          <span
+                            style={{ color: "var(--tx3)" }}
+                            title={`Public engagement (${publicSource(bench!.platform).abbrev}, ${publicSource(bench!.platform).window}) — first-party signup median still building`}
+                          >
+                            {bench!.medianUpvotes} pts · public
+                          </span>
                         ) : (
                           <span
                             style={{

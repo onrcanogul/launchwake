@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { bucketLabel } from "./stats";
+import { MIN_PUBLIC_SAMPLE } from "./benchmarks";
 import type { BanRisk, Platform } from "@prisma/client";
 
 /**
@@ -300,6 +301,79 @@ export function stateOfLaunchesOgStats(
   ];
 }
 
+// ── Public benchmark board (cold-start engagement) ─────────
+
+/**
+ * The public page is built from first-party `ChannelStat`, which is empty until
+ * enough launches are tracked. This second, independent board surfaces the
+ * public-engagement bootstrap (`ChannelBenchmark` medians from HN/PH, last 90
+ * days) so the page shows real category signal on day one instead of only a
+ * "compiling" gate. It is NEVER blended into the first-party numbers — it renders
+ * as its own clearly-labelled section. Pure over structural rows → testable.
+ */
+export type PublicBenchRow = {
+  channelName: string;
+  platform: string;
+  productTag: string;
+  publicSample: number;
+  medianUpvotes: number;
+};
+
+export type PublicBenchLeader = {
+  name: string;
+  platform: string;
+  medianUpvotes: number;
+  publicSample: number;
+};
+
+export type PublicBenchCategory = {
+  tag: string;
+  label: string;
+  channels: PublicBenchLeader[];
+};
+
+export type PublicBenchmarkBoard = {
+  hasData: boolean;
+  categories: PublicBenchCategory[];
+};
+
+export function buildPublicBenchmarkBoard(rows: PublicBenchRow[]): PublicBenchmarkBoard {
+  // Group gated rows by leading category segment; keep the strongest median per
+  // channel within a category (a channel can appear under several product tags).
+  const byCategory = new Map<string, Map<string, PublicBenchLeader>>();
+  for (const r of rows) {
+    if (r.publicSample < MIN_PUBLIC_SAMPLE || r.medianUpvotes <= 0) continue;
+    const tag = (r.productTag.split("-")[0] || "general").toLowerCase();
+    const cat = byCategory.get(tag) ?? new Map<string, PublicBenchLeader>();
+    const existing = cat.get(r.channelName);
+    if (!existing || r.medianUpvotes > existing.medianUpvotes) {
+      cat.set(r.channelName, {
+        name: r.channelName,
+        platform: r.platform,
+        medianUpvotes: r.medianUpvotes,
+        publicSample: r.publicSample,
+      });
+    }
+    byCategory.set(tag, cat);
+  }
+
+  const categories: PublicBenchCategory[] = [];
+  for (const [tag, chans] of byCategory) {
+    const channels = [...chans.values()]
+      .sort((a, b) => b.medianUpvotes - a.medianUpvotes || a.name.localeCompare(b.name))
+      .slice(0, 4);
+    if (channels.length === 0) continue;
+    categories.push({ tag, label: categoryLabel(tag), channels });
+  }
+  categories.sort(
+    (a, b) =>
+      (b.channels[0]?.medianUpvotes ?? 0) - (a.channels[0]?.medianUpvotes ?? 0) ||
+      a.label.localeCompare(b.label),
+  );
+
+  return { hasData: categories.length > 0, categories };
+}
+
 // ── DB fetcher (thin) ──────────────────────────────────────
 
 /** Load the aggregate flywheel and build the public report. */
@@ -330,4 +404,21 @@ export async function getStateOfLaunches(): Promise<StateOfLaunches> {
   }));
 
   return buildStateOfLaunches(mapped);
+}
+
+/** Load the public-engagement bootstrap and build the public benchmark board. */
+export async function getPublicBenchmarkBoard(): Promise<PublicBenchmarkBoard> {
+  const rows = await db.channelBenchmark.findMany({
+    where: { publicSample: { gte: MIN_PUBLIC_SAMPLE } },
+    include: { channel: { select: { name: true, platform: true } } },
+  });
+  return buildPublicBenchmarkBoard(
+    rows.map((r) => ({
+      channelName: r.channel.name,
+      platform: r.channel.platform,
+      productTag: r.productTag,
+      publicSample: r.publicSample,
+      medianUpvotes: r.medianUpvotes,
+    })),
+  );
 }

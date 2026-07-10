@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
   buildStateOfLaunches,
+  buildPublicBenchmarkBoard,
   stateOfLaunchesOgStats,
   MIN_SAMPLE_POSTS,
   MIN_CONVERSION_CLICKS,
   type StatRow,
+  type PublicBenchRow,
 } from "./stateOfLaunches";
+import { MIN_PUBLIC_SAMPLE } from "./benchmarks";
 
 function row(over: Partial<StatRow> = {}): StatRow {
   return {
@@ -130,5 +133,58 @@ describe("stateOfLaunchesOgStats", () => {
     const stats = stateOfLaunchesOgStats(r);
     expect(stats.map((s) => s.label)).toEqual(["launches", "signups tracked", "channels"]);
     expect(stats[1].value).toBe("30");
+  });
+});
+
+describe("buildPublicBenchmarkBoard", () => {
+  function bench(over: Partial<PublicBenchRow> = {}): PublicBenchRow {
+    return {
+      channelName: "Hacker News — Show HN",
+      platform: "HACKERNEWS",
+      productTag: "devtools-backend",
+      publicSample: 30,
+      medianUpvotes: 42,
+      ...over,
+    };
+  }
+
+  it("is empty with no rows", () => {
+    expect(buildPublicBenchmarkBoard([]).hasData).toBe(false);
+  });
+
+  it("gates rows below the public sample floor", () => {
+    const board = buildPublicBenchmarkBoard([
+      bench({ publicSample: MIN_PUBLIC_SAMPLE - 1 }),
+    ]);
+    expect(board.hasData).toBe(false);
+  });
+
+  it("groups by leading category segment and labels it", () => {
+    const board = buildPublicBenchmarkBoard([
+      bench({ productTag: "devtools-backend", channelName: "Show HN", medianUpvotes: 42 }),
+      bench({ productTag: "saas", channelName: "Product Hunt", platform: "PRODUCTHUNT", medianUpvotes: 80 }),
+    ]);
+    expect(board.categories.map((c) => c.tag).sort()).toEqual(["devtools", "saas"]);
+    const saas = board.categories.find((c) => c.tag === "saas")!;
+    expect(saas.label).toBe("SaaS");
+    expect(saas.channels[0].name).toBe("Product Hunt");
+  });
+
+  it("keeps the strongest median for a channel seen under multiple tags", () => {
+    const board = buildPublicBenchmarkBoard([
+      bench({ productTag: "devtools", channelName: "Show HN", medianUpvotes: 30 }),
+      bench({ productTag: "devtools-backend", channelName: "Show HN", medianUpvotes: 55 }),
+    ]);
+    const devtools = board.categories.find((c) => c.tag === "devtools")!;
+    expect(devtools.channels).toHaveLength(1);
+    expect(devtools.channels[0].medianUpvotes).toBe(55);
+  });
+
+  it("orders categories by their strongest channel median", () => {
+    const board = buildPublicBenchmarkBoard([
+      bench({ productTag: "webdev", channelName: "Show HN", medianUpvotes: 20 }),
+      bench({ productTag: "ai", channelName: "Show HN", medianUpvotes: 90 }),
+    ]);
+    expect(board.categories[0].tag).toBe("ai");
   });
 });

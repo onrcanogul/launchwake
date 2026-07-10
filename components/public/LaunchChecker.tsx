@@ -21,6 +21,7 @@ export function LaunchChecker({ freeCount }: { freeCount: number }) {
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<PublicPlan | null>(null);
   const [repoName, setRepoName] = useState<string | null>(null);
+  const [benchmark, setBenchmark] = useState<string | null>(null);
 
   async function check(e: React.FormEvent) {
     e.preventDefault();
@@ -28,6 +29,7 @@ export function LaunchChecker({ freeCount }: { freeCount: number }) {
     setLoading(true);
     setError(null);
     setPlan(null);
+    setBenchmark(null);
     try {
       const res = await fetch("/api/public/launch-checker", {
         method: "POST",
@@ -41,6 +43,7 @@ export function LaunchChecker({ freeCount }: { freeCount: number }) {
       }
       setPlan(data.plan as PublicPlan);
       setRepoName(data.repo as string);
+      setBenchmark((data.benchmark as string | null) ?? null);
     } catch {
       setError(t("errorNetwork"));
     } finally {
@@ -72,7 +75,12 @@ export function LaunchChecker({ freeCount }: { freeCount: number }) {
       {error && <div className="lc-error">{error}</div>}
 
       {plan && (
-        <Results plan={plan} repoName={repoName} freeCount={freeCount} />
+        <Results
+          plan={plan}
+          repoName={repoName}
+          freeCount={freeCount}
+          benchmark={benchmark}
+        />
       )}
     </div>
   );
@@ -82,10 +90,13 @@ function Results({
   plan,
   repoName,
   freeCount,
+  benchmark,
 }: {
   plan: PublicPlan;
   repoName: string | null;
   freeCount: number;
+  /** Precomputed public benchmark teaser for the detected category, or null. */
+  benchmark: string | null;
 }) {
   const t = useTranslations("LaunchChecker");
   const free = plan.recs.slice(0, freeCount);
@@ -110,6 +121,13 @@ function Results({
           </div>
         </div>
       </div>
+
+      {benchmark && (
+        <div className="lc-bench" role="note">
+          <Icon name="results" />
+          <span>{benchmark}</span>
+        </div>
+      )}
 
       <div className="rec-list">
         {free.map((r) => (

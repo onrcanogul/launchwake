@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { env } from "./env";
 import { productTagFor, bucketLabel } from "./stats";
 
 /**
@@ -23,10 +24,71 @@ import { productTagFor, bucketLabel } from "./stats";
 export const MIN_FIRST_PARTY_POSTS = 3;
 // Public engagement needs this many sampled launches to be worth showing.
 export const MIN_PUBLIC_SAMPLE = 5;
-// Cap network calls per rollup so a big catalog can't fan out unboundedly.
-const MAX_PUBLIC_FETCHES = 16;
+// Cap network calls per rollup so a big catalog can't fan out unboundedly. The
+// per-(query|subreddit) cache keeps distinct calls small even at full coverage
+// (≈one HN/PH call per category query), so this is a generous safety ceiling.
+const MAX_PUBLIC_FETCHES = 64;
+// The public bootstrap reports engagement over this trailing window. HN Algolia
+// and Product Hunt filter to it precisely; the label says "last 90 days".
+export const PUBLIC_WINDOW_DAYS = 90;
 
 export type BenchmarkSource = "first-party" | "public" | "blended";
+
+/**
+ * Every leading `productTagFor` bucket we guarantee cold-start coverage for, so
+ * a brand-new category still gets a public median for its top launch venues even
+ * before any founder has posted in it. Mirrors `BUCKET_PRIORITY` in stats.ts,
+ * plus the "general" catch-all bucket.
+ */
+export const COVERAGE_BUCKETS = [
+  "devtools",
+  "saas",
+  "webdev",
+  "devops",
+  "infra",
+  "ai",
+  "opensource",
+  "selfhosted",
+  "node",
+  "javascript",
+  "frontend",
+  "backend",
+  "b2b",
+  "founders",
+  "general",
+] as const;
+
+/**
+ * The public "launch" venues we bootstrap coverage from: Hacker News (Show HN,
+ * via Algolia) and Product Hunt. Both support a precise 90-day window, so their
+ * medians can honestly carry the "HN/PH, last 90 days" label. Reddit medians are
+ * per-subreddit and only bootstrapped when a subreddit already appears in a real
+ * plan/post (see `bootstrapPublic`), never as blanket category coverage.
+ */
+const COVERAGE_PLATFORMS = new Set(["HACKERNEWS", "PRODUCTHUNT"]);
+const RISK_RANK: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+
+/**
+ * Honest per-source label for a public number, derived from the channel's own
+ * platform — so a row never claims a source it didn't come from. HN/PH carry the
+ * 90-day launch window; Reddit's public feed only exposes a trailing month.
+ */
+export function publicSource(platform: string): {
+  abbrev: string;
+  name: string;
+  window: string;
+} {
+  switch (platform) {
+    case "HACKERNEWS":
+      return { abbrev: "HN", name: "Hacker News", window: "last 90 days" };
+    case "PRODUCTHUNT":
+      return { abbrev: "PH", name: "Product Hunt", window: "last 90 days" };
+    case "REDDIT":
+      return { abbrev: "Reddit", name: "Reddit", window: "past 30 days" };
+    default:
+      return { abbrev: "public", name: "public sources", window: "recent" };
+  }
+}
 
 // ── Pure: median ───────────────────────────────────────────
 export function median(nums: number[]): number {
@@ -109,10 +171,19 @@ export type BenchmarkDisplay = {
 export function benchmarkDisplay(
   b: Pick<
     ChannelBenchmarkView,
-    "channelName" | "sampleSize" | "medianSignups" | "conversionPct" | "publicSample" | "medianUpvotes" | "source"
+    | "channelName"
+    | "platform"
+    | "sampleSize"
+    | "medianSignups"
+    | "conversionPct"
+    | "publicSample"
+    | "medianUpvotes"
+    | "source"
   >,
   categoryLabel: string,
 ): BenchmarkDisplay | null {
+  // Once first-party signups clear the gate we lead with the real number — even
+  // when public engagement also exists (a "blended" row keeps that label).
   if (b.sampleSize >= MIN_FIRST_PARTY_POSTS) {
     return {
       label: `${b.channelName} median for ${categoryLabel}`,
@@ -121,15 +192,34 @@ export function benchmarkDisplay(
       source: b.source,
     };
   }
+  // Cold start: fall back to public engagement, clearly labelled by its source
+  // so it never reads as first-party signup data.
   if (b.publicSample >= MIN_PUBLIC_SAMPLE) {
+    const src = publicSource(b.platform);
     return {
       label: `${b.channelName} engagement for ${categoryLabel}`,
       value: `${b.medianUpvotes} upvotes`,
-      sub: `median across ${b.publicSample} recent launches · signup data building`,
+      sub: `Public data (${src.abbrev}), ${src.window} · ${b.publicSample} launches · signup data building`,
       source: "public",
     };
   }
   return null;
+}
+
+// ── Pure: the public teaser line for the Launch Checker ────
+/**
+ * One header line for the public Launch Checker's detected category, built from
+ * the precomputed benchmark table (no request-time fetch). Null when there isn't
+ * a trustworthy public median yet. Pure → unit-testable.
+ */
+export function checkerBenchmarkLine(
+  b: { medianUpvotes: number; publicSample: number } | null,
+  categoryLabel: string,
+  channelShort = "Show HN",
+): string | null {
+  if (!b || b.publicSample < MIN_PUBLIC_SAMPLE || b.medianUpvotes <= 0) return null;
+  const pts = b.medianUpvotes;
+  return `Public data: ${categoryLabel} ${channelShort} posts got a median of ${pts} point${pts === 1 ? "" : "s"} in the last 90 days`;
 }
 
 /** Category label for the current project (e.g. "dev-tools"). */
@@ -138,16 +228,35 @@ export function categoryLabelFor(projectText: string): string {
 }
 
 // ── Read model for the plan screen ─────────────────────────
-/** Benchmarks for a category, keyed by channel slug (for rec lookup). */
+/** Split a productTag into the tags to query: the exact tag + its leading bucket. */
+function benchmarkTags(productTag: string): string[] {
+  const leading = productTag.split("-")[0];
+  return leading && leading !== productTag ? [productTag, leading] : [productTag];
+}
+
+/**
+ * Benchmarks for a category, keyed by channel slug (for rec lookup).
+ *
+ * A 2-segment product (e.g. "devtools-backend") reads its exact-tag rows AND the
+ * single-segment bucket rows ("devtools") that the cold-start bootstrap seeds.
+ * Exact-tag rows win per channel, so a channel shows the public bucket median at
+ * first and automatically switches to the product's own first-party/blended row
+ * as real samples accumulate under the specific tag.
+ */
 export async function getBenchmarkMap(
   productTag: string,
 ): Promise<Map<string, ChannelBenchmarkView>> {
   const rows = await db.channelBenchmark.findMany({
-    where: { productTag },
+    where: { productTag: { in: benchmarkTags(productTag) } },
     include: { channel: { select: { slug: true, name: true, platform: true } } },
   });
+  // Bucket (fallback) rows first, exact-tag rows last, so exact overrides bucket.
+  const ordered = [...rows].sort(
+    (a, b) =>
+      (a.productTag === productTag ? 1 : 0) - (b.productTag === productTag ? 1 : 0),
+  );
   const map = new Map<string, ChannelBenchmarkView>();
-  for (const r of rows) {
+  for (const r of ordered) {
     map.set(r.channel.slug, {
       channelSlug: r.channel.slug,
       channelName: r.channel.name,
@@ -162,6 +271,37 @@ export async function getBenchmarkMap(
     });
   }
   return map;
+}
+
+/**
+ * The public Launch Checker teaser line for a detected category — served from
+ * the precomputed table with a single indexed read and ZERO network fetch. Picks
+ * the category's Show HN public median (falling back to the leading bucket), the
+ * one universal launch venue every category can post to.
+ */
+export async function getCheckerBenchmark(productTag: string): Promise<string | null> {
+  const rows = await db.channelBenchmark.findMany({
+    where: {
+      productTag: { in: benchmarkTags(productTag) },
+      channel: { platform: "HACKERNEWS" },
+    },
+    include: { channel: { select: { name: true, slug: true } } },
+  });
+  if (rows.length === 0) return null;
+  // Prefer Show HN, then the exact tag, then the larger public sample.
+  const best = [...rows].sort((a, b) => {
+    const show = (a.channel.slug === "hn-show" ? 1 : 0) - (b.channel.slug === "hn-show" ? 1 : 0);
+    if (show !== 0) return -show;
+    const exact = (a.productTag === productTag ? 1 : 0) - (b.productTag === productTag ? 1 : 0);
+    if (exact !== 0) return -exact;
+    return b.publicSample - a.publicSample;
+  })[0];
+  const channelShort = best.channel.slug === "hn-show" ? "Show HN" : best.channel.name;
+  return checkerBenchmarkLine(
+    { medianUpvotes: best.medianUpvotes, publicSample: best.publicSample },
+    bucketLabel(productTag),
+    channelShort,
+  );
 }
 
 // ── Public engagement bootstrap (best-effort, cached) ──────
@@ -205,14 +345,114 @@ async function fetchJson(url: string): Promise<unknown | null> {
   }
 }
 
-/** Median upvotes for a category on Show HN. Best-effort → null on failure. */
+/** Median upvotes for a category on Show HN, last 90 days. Best-effort. */
 async function hnUpvotes(query: string): Promise<number[]> {
-  const since = Math.floor((Date.now() - 180 * 86_400_000) / 1000);
+  const since = Math.floor((Date.now() - PUBLIC_WINDOW_DAYS * 86_400_000) / 1000);
   const url = `https://hn.algolia.com/api/v1/search?tags=show_hn&query=${encodeURIComponent(query)}&numericFilters=created_at_i>${since}&hitsPerPage=50`;
   const json = (await fetchJson(url)) as { hits?: { points?: number | null }[] } | null;
   return (json?.hits ?? [])
     .map((h) => h.points ?? 0)
     .filter((p) => Number.isFinite(p) && p > 0);
+}
+
+/**
+ * Recent Product Hunt vote counts for a category, last 90 days. Token-gated: PH's
+ * API needs an OAuth developer token, so this is a no-op (returns []) unless
+ * `PRODUCT_HUNT_TOKEN` is configured — which keeps the "HN/PH" label honest (PH
+ * only contributes when we can actually read it). Best-effort → [] on failure.
+ */
+async function phUpvotes(query: string): Promise<number[]> {
+  const token = env.PRODUCT_HUNT_TOKEN;
+  if (!token) return [];
+  const postedAfter = new Date(Date.now() - PUBLIC_WINDOW_DAYS * 86_400_000).toISOString();
+  const gql = {
+    query:
+      "query($q:String,$after:DateTime){posts(order:VOTES,first:50,postedAfter:$after){edges{node{votesCount topics{edges{node{name}}}}}}}",
+    variables: { q: query, after: postedAfter },
+  };
+  try {
+    const res = await fetch("https://api.producthunt.com/v2/api/graphql", {
+      method: "POST",
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(6000),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "LaunchWake-Benchmarks",
+      },
+      body: JSON.stringify(gql),
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      data?: { posts?: { edges?: { node?: { votesCount?: number } }[] } };
+    };
+    return (json?.data?.posts?.edges ?? [])
+      .map((e) => e.node?.votesCount ?? 0)
+      .filter((v) => Number.isFinite(v) && v > 0);
+  } catch {
+    return [];
+  }
+}
+
+/** Minimal catalog shape the coverage seeder needs (DB-free → testable). */
+export type CatalogChannel = {
+  id: string;
+  slug: string;
+  platform: string;
+  url: string | null;
+  tags: string[];
+  defaultBanRisk: string;
+};
+
+/**
+ * Cold-start bootstrap targets: for every `COVERAGE_BUCKETS` category, the top
+ * launch venues (HN/PH) from the catalog by ban risk, always including Show HN so
+ * a brand-new category still gets at least one public median. Pure → testable.
+ */
+export function coverageTargets(
+  catalog: CatalogChannel[],
+  perBucket = 3,
+): BootstrapTarget[] {
+  const out: BootstrapTarget[] = [];
+  const seen = new Set<string>();
+  const hnShow =
+    catalog.find((c) => c.slug === "hn-show") ??
+    catalog.find((c) => c.platform === "HACKERNEWS");
+
+  for (const bucket of COVERAGE_BUCKETS) {
+    const matched = catalog
+      .filter((c) => COVERAGE_PLATFORMS.has(c.platform))
+      .filter((c) =>
+        bucket === "general"
+          ? c.tags.includes("launch") || c.tags.includes("product")
+          : c.tags.includes(bucket),
+      )
+      .sort(
+        (a, b) =>
+          (RISK_RANK[a.defaultBanRisk] ?? 9) - (RISK_RANK[b.defaultBanRisk] ?? 9) ||
+          a.slug.localeCompare(b.slug),
+      )
+      .slice(0, perBucket);
+
+    // Show HN is the universal launch venue — guarantee it for every bucket.
+    const list =
+      hnShow && !matched.some((c) => c.platform === "HACKERNEWS")
+        ? [hnShow, ...matched]
+        : matched;
+
+    for (const c of list) {
+      const key = `${bucket}::${c.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        productTag: bucket,
+        channelId: c.id,
+        platform: c.platform,
+        channelUrl: c.url,
+      });
+    }
+  }
+  return out;
 }
 
 /** Median upvotes for a subreddit's recent top posts. Best-effort. */
@@ -249,6 +489,7 @@ async function bootstrapPublic(
   for (const t of targets) {
     let cacheKey: string | null = null;
     if (t.platform === "HACKERNEWS") cacheKey = `hn:${categoryQuery(t.productTag)}`;
+    else if (t.platform === "PRODUCTHUNT") cacheKey = `ph:${categoryQuery(t.productTag)}`;
     else if (t.platform === "REDDIT") {
       const sub = subredditOf(t.channelUrl);
       if (sub) cacheKey = `reddit:${sub}`;
@@ -259,9 +500,12 @@ async function bootstrapPublic(
     if (!upvotes) {
       if (fetches >= MAX_PUBLIC_FETCHES) continue;
       fetches += 1;
-      upvotes = t.platform === "HACKERNEWS"
-        ? await hnUpvotes(categoryQuery(t.productTag))
-        : await redditUpvotes(subredditOf(t.channelUrl)!);
+      upvotes =
+        t.platform === "HACKERNEWS"
+          ? await hnUpvotes(categoryQuery(t.productTag))
+          : t.platform === "PRODUCTHUNT"
+            ? await phUpvotes(categoryQuery(t.productTag))
+            : await redditUpvotes(subredditOf(t.channelUrl)!);
       fetchCache.set(cacheKey, upvotes);
     }
     if (upvotes.length >= MIN_PUBLIC_SAMPLE) {
@@ -344,6 +588,27 @@ export async function rollupBenchmarks(
         platform: r.channel.platform,
         channelUrl: r.channel.url,
       });
+    }
+  }
+
+  // 2b) Cold-start category coverage — only when we're actually going to hit the
+  // network (withPublic). Guarantees every bucket has public targets (its top
+  // HN/PH launch venues) even with no posts or plans yet. Skipped on the
+  // request-path rollup, which stays first-party-only and fetch-free.
+  if (opts.withPublic) {
+    const catalog = await db.channel.findMany({
+      select: {
+        id: true,
+        slug: true,
+        platform: true,
+        url: true,
+        tags: true,
+        defaultBanRisk: true,
+      },
+    });
+    for (const t of coverageTargets(catalog)) {
+      const key = `${t.productTag}::${t.channelId}`;
+      if (!targets.has(key)) targets.set(key, t);
     }
   }
 

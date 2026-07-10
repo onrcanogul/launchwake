@@ -94,6 +94,12 @@ const schema = z.object({
   // Shared secret; the scheduler must send it to /api/cron/reminders.
   CRON_SECRET: OptionalString,
 
+  // ── Public benchmark bootstrap (optional) ─────────────
+  // Product Hunt API OAuth developer token. When set, the benchmarks cron reads
+  // recent PH vote counts to seed public "HN/PH" launch medians; when absent,
+  // the PH source is simply skipped (HN Algolia still provides coverage).
+  PRODUCT_HUNT_TOKEN: OptionalString,
+
   // ── Product analytics (optional) ──────────────────────
   // PostHog project API key for server-side event capture (activation funnel).
   // When absent, lib/analytics.ts is a no-op — the app runs identically.

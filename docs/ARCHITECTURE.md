@@ -35,6 +35,7 @@ Tracked link clicks ──> /r/[code] route ──> Event ingest ──> attribu
 - **`drafts.ts`** — `generateDraft(recommendation)` → platform-native `Draft` grounded in channel rules.
 - **`attribution.ts`** — `createTrackedLink(post)`, `ingest(shortCode, type)`, `rollup(projectId)`.
 - **`stats.ts`** — update `ChannelStat` from posts/events (flywheel); used by `analysis` re-ranking.
+- **`benchmarks.ts`** — per-(category, channel) `ChannelBenchmark` medians, the paywall trigger. See below.
 - **`billing.ts`** — Stripe checkout/portal; `assertEntitlement(user, action)`.
 
 ## Route structure (App Router)
@@ -162,6 +163,40 @@ one. Four guards keep the signal clean; the pure logic lives in `/lib` and is un
   paths (the Stripe webhook, LaunchWake's own billing/Polar) record `verified=true`. Results
   sums verified revenue separately (`totalVerifiedRevenueCents`) so a spoofable figure never
   inflates the trusted headline.
+
+## Category benchmarks (`lib/benchmarks.ts`)
+
+At the "should I invest in this channel?" moment we show a per-(category, channel) median for the
+founder's product bucket. Stored in `ChannelBenchmark`, keyed by `productTag` (a `productTagFor`
+bucket like `devtools-backend`) and channel. Two honest, **never-merged** sources, each row
+carrying a `source` label — `first-party` | `public` | `blended`:
+
+- **First-party** — median signups per post, aggregated anonymously across all accounts for a
+  (category, channel), once ≥ `MIN_FIRST_PARTY_POSTS` tracked posts exist. The real thing.
+- **Public bootstrap** — median engagement from **Hacker News (Show HN, Algolia)** and **Product
+  Hunt** (token-gated via `PRODUCT_HUNT_TOKEN`) over the **last 90 days**, gated at
+  `MIN_PUBLIC_SAMPLE`. Gives a category a defensible number on day one. Reddit medians are
+  bootstrapped only for subreddits already present in a real plan/post, never as blanket coverage.
+
+**Cold-start coverage.** `coverageTargets(catalog)` seeds every `COVERAGE_BUCKETS` category (the
+`productTagFor` leading segments + `general`) with its top HN/PH launch venues — always including
+Show HN — so a brand-new category has a public median before anyone posts. Read paths
+(`getBenchmarkMap`) query the exact tag **and** its leading bucket, with exact-tag rows overriding,
+so a `devtools-backend` product shows the `devtools` public median at first and switches to its own
+first-party/blended row automatically as samples accumulate.
+
+**Network is off the request path.** All fetching lives behind `rollupBenchmarks({ withPublic: true })`,
+run only by the daily `/api/cron/benchmarks` cron (best-effort `fetchJson`; never throws). The
+plan-build path calls `rollupBenchmarks()` (first-party only, no `withPublic`), and every UI read
+(`benchmarkDisplay`, `getBenchmarkMap`, `getCheckerBenchmark`, the state-of-launches board) is a
+pure function or an indexed DB read — zero network at request time.
+
+**Display gate & labels.** Rows render below the first-party gate too: `benchmarkDisplay` falls back
+to the public number, labelled by its true source — `Public data (HN/PH), last 90 days` — and
+switches to signups (blended/first-party) as data lands. Free-plan blur/lock is unchanged (the real
+number never reaches a locked client). Surfaces: the plan benchmark strip, the retro "vs median"
+column, the public **State of Developer Launches** board, and a one-line Launch Checker teaser
+(`getCheckerBenchmark`, served from the precomputed table).
 
 ## Security & guards
 
