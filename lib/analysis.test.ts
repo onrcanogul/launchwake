@@ -3,6 +3,9 @@ import {
   buildAnalysisPrompt,
   heuristicRank,
   computeBanRisk,
+  selectCandidates,
+  dropLowFitShortform,
+  SHORTFORM_FIT_FLOOR,
   type PlanInput,
 } from "./analysis";
 import type { ChannelLike, ScoredChannel } from "./channels";
@@ -64,8 +67,7 @@ describe("buildAnalysisPrompt", () => {
     expect(prompt).not.toMatch(/past results/i);
   });
 
-  it("renders the classification reason into context ONLY when short-form candidates are present", () => {
-    const reason = "a visual mobile photo editor — a before/after Reel fits";
+  it("includes the short-form judgment rule ONLY when a short-form candidate is present", () => {
     const tiktok: ChannelLike = {
       id: "sf",
       slug: "tiktok-app-demo",
@@ -76,21 +78,17 @@ describe("buildAnalysisPrompt", () => {
       tags: ["shortform", "mobile-app", "consumer", "visual-demo"],
     };
 
-    // With a short-form candidate → the product read is surfaced + the model is
-    // told to ground the format why-line in it.
-    const withShortform = buildAnalysisPrompt(input, [tiktok], undefined, {
-      classificationReason: reason,
-    });
-    expect(withShortform.prompt).toContain(`Product read: ${reason}`);
-    expect(withShortform.system).toMatch(/Product read/);
+    // With a short-form candidate → the model is told IT decides fit and to score
+    // short-form very low for a non-visual/B2B product (so it gets dropped).
+    const withShortform = buildAnalysisPrompt(input, [tiktok]);
+    expect(withShortform.system).toMatch(/SHORT-FORM VIDEO/);
+    expect(withShortform.system).toMatch(/YOU decide/i);
+    expect(withShortform.system).toMatch(/very LOW fitScore/i);
 
-    // Without any short-form candidate → the reason is suppressed (nothing to
-    // justify), so it never bloats an all-text-channel prompt.
-    const withoutShortform = buildAnalysisPrompt(input, candidates, undefined, {
-      classificationReason: reason,
-    });
-    expect(withoutShortform.prompt).not.toContain("Product read:");
-    expect(withoutShortform.system).not.toMatch(/Product read/);
+    // Without any short-form candidate → the rule is suppressed (nothing to judge),
+    // so it never bloats an all-text-channel prompt.
+    const withoutShortform = buildAnalysisPrompt(input, candidates);
+    expect(withoutShortform.system).not.toMatch(/SHORT-FORM VIDEO/);
   });
 
   it("injects per-channel past results and the weighting rule when provided", () => {
@@ -134,10 +132,10 @@ describe("heuristicRank", () => {
     expect(hn.fitScore).toBeGreaterThan(saas.fitScore);
   });
 
-  it("leads a short-form channel with the demo/format angle (and the honest attribution ceiling)", () => {
-    // Short-form channels only reach ranking for a visual/consumer product, so the
-    // why-line must call out the demo/format angle specifically, not the generic
-    // template — the full-plan transparency requirement.
+  it("leads a matching short-form channel with the demo/format angle (and the honest attribution ceiling)", () => {
+    // A short-form channel that matched the product's visual/consumer tags is a
+    // genuine fit, so the why-line must call out the demo/format angle
+    // specifically, not the generic template — the full-plan transparency rule.
     const tiktok: ChannelLike = {
       id: "sf",
       slug: "tiktok-app-demo",
@@ -158,6 +156,92 @@ describe("heuristicRank", () => {
     expect(why).toMatch(/bio.link/i);
     // grounded in the product name
     expect(why).toContain(input.project.name);
+  });
+
+  it("gives a short-form channel with NO tag overlap a sub-floor score (offline drop)", () => {
+    // Offline there's no LLM to judge fit, so a short-form channel the product
+    // didn't match on any visual/consumer tag must score below SHORTFORM_FIT_FLOOR
+    // — the plan then drops it, mirroring what the LLM does online.
+    const tiktok: ChannelLike = {
+      id: "sf",
+      slug: "tiktok-app-demo",
+      name: "TikTok — App Demo",
+      platform: "TIKTOK",
+      defaultBanRisk: "LOW",
+      tags: ["shortform", "mobile-app", "consumer", "visual-demo"],
+    };
+    const scored: ScoredChannel[] = [
+      { channel: tiktok, score: 0, matchedTags: [] },
+    ];
+    const fit = heuristicRank(scored, input).rankings[0].fitScore;
+    expect(fit).toBeLessThan(SHORTFORM_FIT_FLOOR);
+  });
+});
+
+describe("selectCandidates", () => {
+  const sf = (id: string): ScoredChannel => ({
+    channel: {
+      id,
+      slug: `sf-${id}`,
+      name: `Short ${id}`,
+      platform: "TIKTOK",
+      defaultBanRisk: "LOW",
+      tags: ["shortform", "consumer"],
+    },
+    score: -5,
+    matchedTags: [],
+  });
+  const dev = (id: string, score: number): ScoredChannel => ({
+    channel: {
+      id,
+      slug: `dev-${id}`,
+      name: `Dev ${id}`,
+      platform: "HACKERNEWS",
+      defaultBanRisk: "LOW",
+      tags: ["developers"],
+    },
+    score,
+    matchedTags: ["developers"],
+  });
+
+  it("always includes short-form channels the top slice missed", () => {
+    // Full ranking: two dev channels score high, one short-form sits last.
+    const ranked = [dev("a", 30), dev("b", 20), sf("x")];
+    const chosen = selectCandidates(ranked, 2); // top slice drops the short-form
+    const slugs = chosen.map((s) => s.channel.slug);
+    expect(slugs).toContain("dev-a");
+    expect(slugs).toContain("dev-b");
+    // ...but the short-form channel is appended so the LLM still judges it.
+    expect(slugs).toContain("sf-x");
+  });
+
+  it("does not duplicate a short-form channel already in the top slice", () => {
+    const ranked = [sf("x"), dev("a", 5)];
+    const chosen = selectCandidates(ranked, 2);
+    const sfCount = chosen.filter((s) => s.channel.slug === "sf-x").length;
+    expect(sfCount).toBe(1);
+  });
+});
+
+describe("dropLowFitShortform", () => {
+  const rec = (slug: string, tags: string[], fitScore: number) => ({
+    channel: { tags },
+    fitScore,
+    slug,
+  });
+
+  it("drops short-form recs below the floor but keeps ones at/above it", () => {
+    const recs = [
+      rec("tiktok-low", ["shortform", "consumer"], SHORTFORM_FIT_FLOOR - 1),
+      rec("tiktok-ok", ["shortform", "consumer"], SHORTFORM_FIT_FLOOR),
+    ];
+    const kept = dropLowFitShortform(recs).map((r) => r.slug);
+    expect(kept).toEqual(["tiktok-ok"]);
+  });
+
+  it("never floors a non-short-form channel, even at a low fitScore", () => {
+    const recs = [rec("hn-show", ["developers"], 3)];
+    expect(dropLowFitShortform(recs)).toHaveLength(1);
   });
 });
 

@@ -128,12 +128,9 @@ export async function generateQueueForShip(shipId: string): Promise<{ tasks: num
       project: {
         select: {
           id: true,
-          userId: true,
           name: true,
           description: true,
           url: true,
-          classificationJson: true,
-          classificationHash: true,
         },
       },
     },
@@ -141,13 +138,9 @@ export async function generateQueueForShip(shipId: string): Promise<{ tasks: num
   if (!ship) return { tasks: 0 };
 
   const catalog = await db.channel.findMany();
-  // Shared fit-context (cache-only — the queue is generated right after buildPlan
-  // has already classified + cached, so this hits the cache; it keeps short-form
-  // channels in the queue consistent with the plan without a second LLM call).
-  const { ctx } = await getProjectTagContext(ship.project, {
-    ship,
-    classifyOnMiss: false,
-  });
+  // Shared fit-context (keyword signals over product + ship text) so queue channel
+  // ranking stays consistent with the plan and the directory.
+  const { ctx } = await getProjectTagContext(ship.project, { ship });
 
   const perPhase: Partial<Record<QueuePhase, { id: string }[]>> = {};
   for (const phase of PHASE_ORDER) {

@@ -14,14 +14,15 @@ import type { Seed } from "./types";
  *      cadence, and — honestly — expect weak tracked attribution because these
  *      platforms allow NO clickable links in posts (bio link only).
  *
- *   2. Fit is strictly gated. Every entry carries ONLY visual/consumer fit-tags
- *      (`consumer`, `mobile-app`, `visual-demo`, `design`, `game`, `b2c`) plus the
- *      `shortform` marker — and NONE of the generic developer/B2B tags. Combined
- *      with the `shortformEligible` gate in `lib/channels.ts`, that means these
- *      never surface for a CLI, an API, or a B2B SaaS: they only appear when the
- *      product itself is visual and consumer-facing (a phone app, a game, a design
- *      tool). `defaultBanRisk` is LOW because the constraint is platform ToS and
- *      the algorithm, not a moderator removing your post.
+ *   2. Fit is decided by score + the LLM, not a hard gate. Every entry carries
+ *      ONLY visual/consumer fit-tags (`consumer`, `mobile-app`, `visual-demo`,
+ *      `design`, `game`, `b2c`) plus the `shortform` marker — and NONE of the
+ *      generic developer/B2B tags. So they score high for a visual consumer product
+ *      and near-zero for a CLI/API/B2B SaaS. The distribution plan hands every
+ *      short-form channel to the LLM, which makes the final per-ship call and drops
+ *      the ones it scores below the fit floor (see `lib/analysis.ts`).
+ *      `defaultBanRisk` is LOW because the constraint is platform ToS and the
+ *      algorithm, not a moderator removing your post.
  */
 export const shortform: Seed[] = [
   {

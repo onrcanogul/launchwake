@@ -1,17 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // getChannelDirectory reads the catalog + per-project signups from the Prisma
-// singleton; mock it so we can unit-test the short-form gating end-to-end. The
-// same mock covers projectTags.ts (cache read) — both import this "./db".
+// singleton; mock it so we can unit-test the ranking end-to-end.
 const dbMock = vi.hoisted(() => ({
   channel: { findMany: vi.fn() },
   event: { groupBy: vi.fn() },
-  project: { update: vi.fn() },
 }));
 vi.mock("./db", () => ({ db: dbMock }));
 
 import { getChannelDirectory } from "./catalog";
-import { classificationInputHash, type ProductClassification } from "./classify";
+import type { ClassifiableProject } from "./projectTags";
 
 // A catalog with a short-form channel plus ordinary ones.
 const CATALOG = [
@@ -53,71 +51,48 @@ const CATALOG = [
   },
 ];
 
-const CONSUMER_MOBILE: ProductClassification = {
-  audience: "b2c",
-  form: "mobile",
-  visualDemo: true,
-  confidence: "high",
-  reason: "A consumer iPhone photo editor.",
-};
-
-/** Stamp a project so its cached classification is a HIT (no LLM in the test). */
-function projectWith(
-  fields: { name: string; description?: string | null; url?: string | null },
-  classification: ProductClassification | null,
-) {
-  const base = {
-    id: "p1",
-    userId: "u1",
-    name: fields.name,
-    description: fields.description ?? null,
-    url: fields.url ?? null,
-  };
-  return {
-    ...base,
-    classificationJson: classification,
-    classificationHash: classification ? classificationInputHash(base) : null,
-  };
-}
+const project = (fields: {
+  name: string;
+  description?: string | null;
+  url?: string | null;
+}): ClassifiableProject => ({
+  id: "p1",
+  name: fields.name,
+  description: fields.description ?? null,
+  url: fields.url ?? null,
+});
 
 beforeEach(() => {
   dbMock.channel.findMany.mockReset().mockResolvedValue(CATALOG);
   dbMock.event.groupBy.mockReset().mockResolvedValue([]);
-  dbMock.project.update.mockReset().mockResolvedValue({});
 });
 
-describe("getChannelDirectory — short-form gating (consistent with buildPlan)", () => {
-  it("includes short-form rows for a project with a cached consumer classification", async () => {
+describe("getChannelDirectory — short-form is ranked by fit, not gated", () => {
+  it("ranks short-form at the top for a visual consumer product", async () => {
     const rows = await getChannelDirectory(
-      projectWith(
-        { name: "Snapthread", description: "stitch your clips", url: "https://snapthread.app" },
-        CONSUMER_MOBILE,
-      ),
+      project({
+        name: "Snapthread",
+        description: "a consumer mobile app to edit your photos",
+        url: "https://snapthread.app",
+      }),
     );
-    const tiktok = rows.find((r) => r.slug === "tiktok-app-demo");
-    expect(tiktok).toBeDefined();
-    // ...and it carries a real fit score, not a placeholder.
-    expect(tiktok!.fit).toBeGreaterThan(0);
-    // The cache hit means no classify write happened.
-    expect(dbMock.project.update).not.toHaveBeenCalled();
+    expect(rows[0].slug).toBe("tiktok-app-demo");
+    expect(rows[0].fit).toBeGreaterThan(0);
   });
 
-  it("excludes short-form rows for a project with no classification and vague text", async () => {
+  it("keeps short-form in the directory but ranks it below matching channels for a devtool", async () => {
     const rows = await getChannelDirectory(
-      projectWith({ name: "Toolbox", description: "a small utility", url: null }, null),
+      project({
+        name: "Migratedb",
+        description: "a command-line devtool for developers to run migrations",
+      }),
     );
-    expect(rows.some((r) => r.slug === "tiktok-app-demo")).toBe(false);
-    // The ordinary channels still rank.
-    expect(rows.some((r) => r.slug === "hn-show")).toBe(true);
-  });
-
-  it("excludes short-form for a low-confidence classification (conservative default)", async () => {
-    const rows = await getChannelDirectory(
-      projectWith(
-        { name: "Ambiguous", description: "a mobile thing" },
-        { ...CONSUMER_MOBILE, confidence: "low" },
-      ),
-    );
-    expect(rows.some((r) => r.slug === "tiktok-app-demo")).toBe(false);
+    const tiktokIdx = rows.findIndex((r) => r.slug === "tiktok-app-demo");
+    const hnIdx = rows.findIndex((r) => r.slug === "hn-show");
+    // Present (the directory lists the full catalog) but out-ranked by the real
+    // dev channel — no hard gate, just a lower fit score.
+    expect(tiktokIdx).toBeGreaterThan(-1);
+    expect(hnIdx).toBeLessThan(tiktokIdx);
+    expect(rows[tiktokIdx].fit).toBeLessThanOrEqual(rows[hnIdx].fit);
   });
 });

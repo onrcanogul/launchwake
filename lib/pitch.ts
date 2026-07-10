@@ -159,12 +159,8 @@ export async function getShipPitches(shipId: string): Promise<NewsletterOpportun
   if (!ship) return [];
 
   const catalog = await db.channel.findMany({ where: { platform: "NEWSLETTER" } });
-  // Shared fit-context (cache-only — newsletters carry no short-form channels, so
-  // this path never needs to pay for a fresh classify; it reuses one if present).
-  const { ctx } = await getProjectTagContext(ship.project, {
-    ship,
-    classifyOnMiss: false,
-  });
+  // Shared fit-context (keyword signals over product + ship text).
+  const { ctx } = await getProjectTagContext(ship.project, { ship });
   const ranked = matchChannels(catalog, ctx, MAX_NEWSLETTERS);
 
   const pitches = await db.newsletterPitch.findMany({ where: { shipId } });

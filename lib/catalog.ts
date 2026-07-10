@@ -22,10 +22,9 @@ export async function getChannelDirectory(
 ): Promise<DirectoryRow[]> {
   const catalog = await db.channel.findMany();
 
-  // Same shared fit-context as buildPlan → the directory admits (or excludes)
-  // short-form channels on the same classification gate the plan uses, instead of
-  // the raw-text heuristic alone. It ranks the FULL catalog, so an eligible
-  // short-form channel appears with its fit score; an ineligible one is dropped.
+  // Same shared fit-context as buildPlan (keyword signals). The directory ranks
+  // the FULL catalog by fit, so short-form channels sort by tag overlap like every
+  // other channel — high for a visual/consumer product, low for a devtool.
   const { ctx } = await getProjectTagContext(project);
   const scored = matchChannels(catalog, ctx, catalog.length);
 

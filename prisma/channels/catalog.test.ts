@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { assembleCatalog, channelCatalog, CATEGORIES } from "./index";
 import { SeedSchema } from "./types";
 import { shortform } from "./shortform";
-import { SHORTFORM_TAG, VISUAL_CONSUMER_TAGS } from "../../lib/channels";
+import { SHORTFORM_TAG } from "../../lib/channels";
 import { AccountRequirementsSchema } from "../../lib/accountReadiness";
 import { parseChannelCost } from "../../lib/channelCost";
 
@@ -110,9 +110,19 @@ describe("channel catalog", () => {
   });
 });
 
-describe("short-form video pack (fit-gated)", () => {
+describe("short-form video pack (tagging integrity)", () => {
   const GENERIC_TAGS = ["devtools", "saas", "developers", "b2b"];
-  const visual = new Set<string>(VISUAL_CONSUMER_TAGS);
+  // Short-form entries must stay tagged as visual/consumer (and free of generic
+  // dev/B2B tags) so they score high for a consumer product and sink for a devtool
+  // — the runtime no longer gates them, so this tagging IS the fit signal.
+  const visual = new Set<string>([
+    "consumer",
+    "mobile-app",
+    "visual-demo",
+    "design",
+    "game",
+    "b2c",
+  ]);
 
   it("ships several short-form channels", () => {
     expect(shortform.length).toBeGreaterThanOrEqual(3);

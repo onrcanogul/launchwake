@@ -37,15 +37,6 @@ export type MatchContext = {
    * favored over evergreen channels.
    */
   launchContext?: boolean;
-  /**
-   * Extra fit-tags from the LLM product classification (`lib/classify.ts`), merged
-   * into the derived signal set so the analysis — not keyword heuristics alone —
-   * can admit short-form channels for a genuinely consumer/visual product. Empty /
-   * omitted for the anonymous public paths (Launch Checker), which stay heuristic.
-   * A low-confidence classification contributes NO tags (see `classificationToTags`),
-   * preserving the conservative default: a devtool never gets short-form.
-   */
-  classificationTags?: string[];
 };
 
 export type ScoredChannel<C extends ChannelLike = ChannelLike> = {
@@ -55,47 +46,21 @@ export type ScoredChannel<C extends ChannelLike = ChannelLike> = {
 };
 
 /**
- * Short-form video fit-gate.
+ * Short-form video marker.
  *
- * Short-form channels (TikTok, Instagram Reels, YouTube Shorts) only work for
- * VISUAL / CONSUMER products — a screen-recorded demo of a phone app or a game,
- * not a CLI or a B2B API. They carry the `shortform` marker tag plus only
- * visual/consumer fit-tags (see `VISUAL_CONSUMER_TAGS`) and NONE of the generic
- * developer/B2B tags, so plain tag-overlap already excludes them for devtools.
- * `shortformEligible` makes that exclusion a hard guarantee: a short-form channel
- * is a candidate ONLY when the product positively matches one of its
- * visual/consumer tags — never padded in as filler when topical matches are thin.
+ * Short-form channels (TikTok, Instagram Reels, YouTube Shorts) are FORMATS, not
+ * moderated communities. They carry the `shortform` marker tag so downstream code
+ * (the ranking prompt, the offline why-line) can treat their `rules` as format
+ * guidance rather than community norms. Fit is NOT decided here by a hard gate:
+ * they compete in `matchChannels` on tag overlap like every other channel, and the
+ * distribution plan then hands them to the LLM, which judges — per ship — whether a
+ * visual demo actually fits this product. See `lib/analysis.ts`.
  */
 export const SHORTFORM_TAG = "shortform";
-
-/** Tags that legitimately justify a short-form video channel. */
-export const VISUAL_CONSUMER_TAGS = [
-  "consumer",
-  "mobile-app",
-  "visual-demo",
-  "design",
-  "game",
-  "b2c",
-] as const;
-
-const VISUAL_CONSUMER_SET = new Set<string>(VISUAL_CONSUMER_TAGS);
 
 /** A channel is short-form iff it carries the marker tag. */
 export function isShortformChannel(channel: Pick<ChannelLike, "tags">): boolean {
   return channel.tags.includes(SHORTFORM_TAG);
-}
-
-/**
- * True when `channel` may enter the candidate set for these product signals.
- * Non-short-form channels are always eligible; a short-form channel is eligible
- * only when at least one of its visual/consumer tags is an active product signal.
- */
-export function shortformEligible(
-  channel: Pick<ChannelLike, "tags">,
-  signals: Set<string>,
-): boolean {
-  if (!isShortformChannel(channel)) return true;
-  return channel.tags.some((t) => VISUAL_CONSUMER_SET.has(t) && signals.has(t));
 }
 
 /**
@@ -249,14 +214,6 @@ export function deriveSignalTags(ctx: MatchContext): Set<string> {
     tags.add("product");
   }
 
-  // LLM classification tags (audience/form/visual). These are what let the
-  // analysis admit short-form channels for a real consumer/visual product; a
-  // low-confidence classification passes an empty list, so nothing is added and
-  // the fail-closed short-form gate is preserved.
-  for (const t of ctx.classificationTags ?? []) {
-    tags.add(t);
-  }
-
   return tags;
 }
 
@@ -265,20 +222,14 @@ const LAUNCH_TAG = "launch";
 const LAUNCH_BOOST = 15;
 
 /**
- * Fit boost for a short-form video channel that has already cleared the
- * `shortformEligible` gate (i.e. the product positively matched a visual/consumer
- * tag). Without it, short-form channels — which only ever carry 2–3 distinctive
- * consumer tags — get buried beneath launch venues and every channel that matches
- * the universal `developers` baseline, and would never reach the candidate cutoff
- * even for a product they genuinely fit. The boost is safe by construction: it can
- * only apply to a product that is actually visual/consumer, never a devtool/B2B.
- */
-const SHORTFORM_FIT_BOOST = 20;
-
-/**
  * Rank the catalog for this product + ship and return the top `limit` candidates.
  * Scoring = weighted tag overlap; ties broken by lower ban risk, then name.
  * Always returns something (falls back to lowest-ban-risk channels).
+ *
+ * Short-form video channels are NOT gated here — they score on tag overlap like
+ * every other channel (so they naturally sink for a devtool and rise for a visual
+ * consumer product). The distribution plan then always hands them to the LLM,
+ * which makes the final per-ship fit call (see `lib/analysis.ts`).
  */
 export function matchChannels<C extends ChannelLike>(
   catalog: C[],
@@ -287,28 +238,17 @@ export function matchChannels<C extends ChannelLike>(
 ): ScoredChannel<C>[] {
   const signals = deriveSignalTags(ctx);
 
-  // Fit-gate short-form video channels BEFORE scoring: they may only compete when
-  // the product positively matches a visual/consumer tag, so they can never be
-  // padded into a developer/B2B plan as filler. Non-short-form channels pass
-  // through untouched, so this never empties the candidate set for a real product.
-  const eligible = catalog.filter((channel) => shortformEligible(channel, signals));
-
-  const scored: ScoredChannel<C>[] = eligible.map((channel) => {
+  const scored: ScoredChannel<C>[] = catalog.map((channel) => {
     const matchedTags = channel.tags.filter((t) => signals.has(t));
     // Overlap count is the core signal; tiny bonus for low ban risk so that,
     // all else equal, safer channels surface first. In a launch context, add a
     // deliberate boost so launch venues clear evergreen ones.
     const launchBoost =
       ctx.launchContext && channel.tags.includes(LAUNCH_TAG) ? LAUNCH_BOOST : 0;
-    // Eligible short-form channels (they only reach here for a visual/consumer
-    // product) get a fit boost so they compete for a candidate slot instead of
-    // being crowded out by launch venues and the universal developer baseline.
-    const shortformBoost = isShortformChannel(channel) ? SHORTFORM_FIT_BOOST : 0;
     const score =
       matchedTags.length * 10 -
       BAN_RISK_ORDER[channel.defaultBanRisk] +
-      launchBoost +
-      shortformBoost;
+      launchBoost;
     return { channel, score, matchedTags };
   });
 

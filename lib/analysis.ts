@@ -33,13 +33,15 @@ import type { BanRisk, Channel, Project, Ship } from "@prisma/client";
 /**
  * The analysis pipeline (the important one).
  *
- *   1. matchChannels() narrows the seeded catalog to candidates (constraint).
+ *   1. matchChannels() ranks the seeded catalog; selectCandidates() takes the top
+ *      slice PLUS every short-form channel, so the LLM always judges short-form.
  *   2. Claude ranks + justifies each candidate for THIS ship & product.
- *   3. banRisk = max(channel.defaultBanRisk, outcome signal)  ← NOT from the LLM.
- *   4. persist DistributionPlan + Recommendation[].
+ *   3. dropLowFitShortform() removes short-form the model scored below the floor.
+ *   4. banRisk = max(channel.defaultBanRisk, outcome signal)  ← NOT from the LLM.
+ *   5. persist DistributionPlan + Recommendation[].
  *
  * The LLM only ever sees — and can only rank — channels we hand it, so it can
- * never invent a community.
+ * never invent a community. It DOES decide short-form fit (there's no hard gate).
  */
 
 const MAX_CANDIDATES = 10;
@@ -79,15 +81,12 @@ export function buildAnalysisPrompt(
   input: PlanInput,
   candidates: ChannelLike[],
   outcomeContext?: Map<string, string>,
-  opts?: { launchContext?: boolean; classificationReason?: string },
+  opts?: { launchContext?: boolean },
 ) {
   const hasOutcomes = Boolean(outcomeContext && outcomeContext.size > 0);
-  // The classification reason is only useful to the model when there are actually
-  // short-form candidates to justify — that's when the format-specific why-line
-  // needs the product read ("a visual mobile editor → a before/after Reel fits").
+  // Only include the short-form judgment rule when there are actually short-form
+  // candidates to judge, so it never bloats an all-text-channel prompt.
   const hasShortform = candidates.some(isShortformChannel);
-  const classificationReason =
-    hasShortform && opts?.classificationReason ? opts.classificationReason : "";
   const system = [
     "You are LaunchWake's distribution strategist for technical founders.",
     "You are given a product, one 'ship' (a release/feature/blog worth sharing), and a FIXED list of candidate channels from a curated catalog.",
@@ -104,9 +103,8 @@ export function buildAnalysisPrompt(
       ? "- Some candidates include a 'past results' line — REAL outcomes from posting similar products there. Weight it heavily: a channel that produced signups should rank higher; one that got clicks but ZERO signups, or had removals, should rank LOWER even if it looks topically relevant. When past results change the call, say so in 'why' (e.g. 'drove 4% signups for similar tools last time')."
       : "",
     "- Some candidates include a 'cost' line (paid or freemium). Do NOT down-rank a channel because it costs money — rank on fit as usual. But when you recommend a paid or freemium channel, state the cost plainly in 'why' (e.g. 'submission starts at $39') so the founder can weigh spend against fit. Free channels need no cost mention.",
-    "- Some candidates are SHORT-FORM VIDEO channels (TikTok, Instagram Reels, YouTube Shorts) — their tags include 'shortform' and their 'rules' field is FORMAT guidance, not community rules. They only reach you when the product is genuinely visual and consumer-facing. For these, the 'why' MUST be about the visual demo format for THIS product specifically — a 2-second hook, a screen-recorded demo, a trending sound — and it must acknowledge the attribution ceiling (no clickable links in posts; bio-link only; expect weak tracked attribution). The 'ruleNote' should be the concrete format tip (e.g. 'open on the payoff in the first 2 seconds').",
-    classificationReason
-      ? "- The PRODUCT block includes a 'Product read' line — our classification of what this product is. Ground each short-form 'why' in it (e.g. 'your product is a visual mobile editor — a 10-second before/after Reel fits')."
+    hasShortform
+      ? "- Some candidates are SHORT-FORM VIDEO channels (TikTok, Instagram Reels, YouTube Shorts) — their tags include 'shortform' and their 'rules' field is FORMAT guidance, not community rules. YOU decide whether they fit THIS product. Short-form only works for a genuinely visual, consumer-facing product (a phone app, a game, a design/photo/video tool). If this product is a CLI, an API, a backend library, or a B2B/developer tool, give EVERY short-form channel a very LOW fitScore (under 40) — they are then dropped from the plan. When short-form DOES fit, the 'why' MUST be about the visual demo format for THIS product specifically — a 2-second hook, a screen-recorded demo, a trending sound — and it must acknowledge the attribution ceiling (no clickable links in posts; bio-link only; expect weak tracked attribution). The 'ruleNote' should be the concrete format tip (e.g. 'open on the payoff in the first 2 seconds')."
       : "",
     "- Do NOT assign ban risk; that is computed separately.",
     "- Respond with ONLY a JSON object, no prose, no code fences.",
@@ -127,9 +125,6 @@ export function buildAnalysisPrompt(
     input.project.url ? `URL: ${wrapUntrusted("product_url", input.project.url)}` : "",
     // githubRepo is validated to "owner/repo" upstream, so it's not free text.
     input.project.githubRepo ? `GitHub: ${input.project.githubRepo}` : "",
-    // Our own classification (trusted model output, not raw user text) — only
-    // rendered when short-form candidates are present, to steer the format why-line.
-    classificationReason ? `Product read: ${classificationReason}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -186,10 +181,18 @@ export function heuristicRank(
   const top = scored[0]?.score ?? 0;
   return {
     rankings: scored.map((s, i) => {
+      const isSf = isShortformChannel(s.channel);
+      // Offline there is no LLM to judge short-form fit, so fall back to tag
+      // overlap: a short-form channel that matched none of the product's
+      // visual/consumer tags is not a fit — give it a sub-floor score so the
+      // SHORTFORM_FIT_FLOOR drops it (mirrors what the LLM does online).
+      const shortformMiss = isSf && s.matchedTags.length === 0;
       // Map overlap score → 60..96 band; subtract rank index so equal-overlap
       // channels still form a clean descending order instead of tying.
       const norm = top > 0 ? s.score / top : 0;
-      const fitScore = Math.max(60, Math.min(96, Math.round(60 + norm * 36 - i)));
+      const fitScore = shortformMiss
+        ? 20
+        : Math.max(60, Math.min(96, Math.round(60 + norm * 36 - i)));
       const rule = firstSentence(s.channel.rules) ?? "Value-first; follow the community norms.";
       const matched =
         s.matchedTags.length > 0
@@ -203,10 +206,11 @@ export function heuristicRank(
           : cost.type === "freemium"
             ? ` Free option with paid tiers${cost.note ? ` (${cost.note})` : ""}.`
             : "";
-      // A short-form video channel only reaches this ranking for a visual/consumer
-      // product (the shortformEligible gate guarantees it), so lead the why-line
-      // with the demo/format angle specifically — not the generic template.
-      const why = isShortformChannel(s.channel)
+      // For a short-form channel that DID match (a genuine visual/consumer fit),
+      // lead the why-line with the demo/format angle specifically — not the
+      // generic template. A miss keeps the format line too, but its sub-floor
+      // score means it is dropped before it ever surfaces.
+      const why = isSf
         ? shortformWhy(s.channel.name, input.project.name)
         : `${input.ship.title} fits ${s.channel.name}'s audience (${matched}). Frame it around the problem it solves for ${input.project.name}'s users.${costSentence}`;
       return {
@@ -221,10 +225,10 @@ export function heuristicRank(
 }
 
 /**
- * Deterministic why-line for a short-form video channel. Only ever used for
- * visual/consumer products (the fit-gate excludes everything else), so it leads
- * with the FORMAT — a 2-second hook + a screen-recorded demo — and stays honest
- * about the bio-link-only attribution ceiling these platforms impose.
+ * Deterministic why-line for a short-form video channel — leads with the FORMAT
+ * (a 2-second hook + a screen-recorded demo) and stays honest about the bio-link-
+ * only attribution ceiling these platforms impose. Used for short-form channels
+ * that cleared the offline tag-overlap fit check; misses are dropped upstream.
  */
 function shortformWhy(channelName: string, productName: string): string {
   const name = productName.trim() || "your product";
@@ -242,6 +246,45 @@ export function computeBanRisk(channel: Channel, removals = 0): BanRisk {
   if (channel.defaultBanRisk === "HIGH" || removals >= 2) return "HIGH";
   if (channel.defaultBanRisk === "MEDIUM" || removals >= 1) return "MEDIUM";
   return "LOW";
+}
+
+/**
+ * Assemble the LLM candidate set: the top `limit` channels by heuristic fit, PLUS
+ * every short-form channel not already in that slice. This is what lets the AI
+ * decide short-form fit on EVERY plan — a short-form channel always reaches the
+ * model even when tag overlap alone wouldn't have floated it into the top slice.
+ * Pure → unit-testable.
+ */
+export function selectCandidates<C extends ChannelLike>(
+  ranked: ScoredChannel<C>[],
+  limit: number,
+): ScoredChannel<C>[] {
+  const top = ranked.slice(0, limit);
+  const inTop = new Set(top.map((s) => s.channel.slug));
+  const shortformExtras = ranked.filter(
+    (s) => isShortformChannel(s.channel) && !inTop.has(s.channel.slug),
+  );
+  return [...top, ...shortformExtras];
+}
+
+/**
+ * Minimum fitScore a short-form channel needs to stay in a plan. Below it, the
+ * ranker judged the visual-demo format a poor fit for this product (e.g. a CLI or
+ * a B2B tool), so the channel is dropped rather than shown as a weak, misleading
+ * suggestion at the bottom of the plan.
+ */
+export const SHORTFORM_FIT_FLOOR = 40;
+
+/**
+ * Drop short-form recommendations scored below the fit floor. Non-short-form
+ * channels are never floored — they keep the full ranked list. Pure → testable.
+ */
+export function dropLowFitShortform<
+  T extends { channel: Pick<ChannelLike, "tags">; fitScore: number },
+>(recs: T[]): T[] {
+  return recs.filter(
+    (r) => !isShortformChannel(r.channel) || r.fitScore >= SHORTFORM_FIT_FLOOR,
+  );
 }
 
 /**
@@ -263,19 +306,22 @@ export async function buildPlan(
   const launchContext =
     opts?.launchContext ?? ship.project.launchStage !== "LAUNCHED";
 
-  // Assemble the channel-fit context through the shared helper so the plan gates
-  // short-form channels IDENTICALLY to the Channels directory. It classifies the
-  // product (cached on the Project, re-run only on name/desc/url change) and folds
-  // the resulting tags into the signal set; low-confidence / unclassifiable →
-  // empty tags → the pure heuristic path, so a devtool is never handed TikTok.
-  const { ctx, classification } = await getProjectTagContext(ship.project, {
+  // Assemble the channel-fit context through the shared helper (keyword signals
+  // over the product + ship text — no product-type classification).
+  const { ctx } = await getProjectTagContext(ship.project, {
     ship,
     shipType: ship.type,
     launchContext,
   });
 
   const catalog = await db.channel.findMany();
-  const scored = matchChannels(catalog, ctx, MAX_CANDIDATES);
+  // Rank the full catalog, then take the top slice PLUS every short-form channel
+  // (selectCandidates), so the LLM ALWAYS gets to judge short-form fit for this
+  // ship. Short-form recs it scores below SHORTFORM_FIT_FLOOR are dropped below.
+  const scored = selectCandidates(
+    matchChannels(catalog, ctx, catalog.length),
+    MAX_CANDIDATES,
+  );
 
   const candidates = scored.map((s) => s.channel);
   const bySlug = new Map(catalog.map((c) => [c.slug, c]));
@@ -318,7 +364,6 @@ export async function buildPlan(
   if (llmConfigured()) {
     const { system, prompt } = buildAnalysisPrompt(input, candidates, outcomeContext, {
       launchContext,
-      classificationReason: classification?.reason,
     });
     try {
       ranking = await completeJSON({
@@ -387,6 +432,13 @@ export async function buildPlan(
     })
     .sort((a, b) => b.fitScore - a.fitScore);
 
+  // Drop short-form channels the ranker judged a poor fit for this product (below
+  // SHORTFORM_FIT_FLOOR) — this is where "the AI decides" becomes the plan: a
+  // devtool's TikTok/Reels/Shorts fall away instead of trailing the plan. Fall
+  // back to the full list on the (impossible) chance everything got floored.
+  const floored = dropLowFitShortform(enriched);
+  const finalRecs = floored.length > 0 ? floored : enriched;
+
   // Replace any existing plan for this ship (supports "Re-run").
   await db.distributionPlan.deleteMany({ where: { shipId } });
 
@@ -394,7 +446,7 @@ export async function buildPlan(
     data: {
       shipId,
       recs: {
-        create: enriched.map((e, i) => ({
+        create: finalRecs.map((e, i) => ({
           channelId: e.channel.id,
           rank: i,
           fitScore: e.fitScore,

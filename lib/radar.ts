@@ -193,10 +193,9 @@ async function fetchReddit(subs: string[], sinceDays = 7): Promise<RadarItem[]> 
 /** Subreddits relevant to this project, from the ranked catalog. */
 async function relevantSubreddits(project: ClassifiableProject): Promise<string[]> {
   const catalog = await db.channel.findMany({ where: { platform: "REDDIT" } });
-  // Shared fit-context (cache-only — this runs in the digest cron and Reddit has
-  // no short-form channels, so it never triggers a fresh classify; it just reuses
-  // a cached one to keep subreddit ranking consistent with the plan/directory).
-  const { ctx } = await getProjectTagContext(project, { classifyOnMiss: false });
+  // Shared fit-context (keyword signals) so subreddit ranking stays consistent
+  // with the plan and the directory.
+  const { ctx } = await getProjectTagContext(project);
   const scored = matchChannels(catalog, ctx, 4);
   return scored
     .map((s) => s.channel.url?.match(/reddit\.com\/r\/([^/]+)/i)?.[1])
