@@ -68,6 +68,36 @@ describe("deriveSignalTags", () => {
     expect(tags.has("blog")).toBe(true);
     expect(tags.has("writeup")).toBe(true);
   });
+
+  it("merges LLM classificationTags into the signal set", () => {
+    const tags = deriveSignalTags({
+      // Text has no consumer keyword — the tags come purely from classification.
+      projectText: "Snapthread — stitch your clips together",
+      shipText: "New filters",
+      shipType: "LAUNCH",
+      classificationTags: ["consumer", "mobile-app", "visual-demo"],
+    });
+    expect(tags.has("consumer")).toBe(true);
+    expect(tags.has("mobile-app")).toBe(true);
+    expect(tags.has("visual-demo")).toBe(true);
+    // baseline signal still present
+    expect(tags.has("developers")).toBe(true);
+  });
+
+  it("adds nothing extra when classificationTags is empty/omitted", () => {
+    const without = deriveSignalTags({
+      projectText: "a devtool",
+      shipText: "v2",
+      shipType: "LAUNCH",
+    });
+    const withEmpty = deriveSignalTags({
+      projectText: "a devtool",
+      shipText: "v2",
+      shipType: "LAUNCH",
+      classificationTags: [],
+    });
+    expect([...withEmpty].sort()).toEqual([...without].sort());
+  });
 });
 
 describe("matchChannels", () => {

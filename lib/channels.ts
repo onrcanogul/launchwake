@@ -37,6 +37,15 @@ export type MatchContext = {
    * favored over evergreen channels.
    */
   launchContext?: boolean;
+  /**
+   * Extra fit-tags from the LLM product classification (`lib/classify.ts`), merged
+   * into the derived signal set so the analysis — not keyword heuristics alone —
+   * can admit short-form channels for a genuinely consumer/visual product. Empty /
+   * omitted for the anonymous public paths (Launch Checker), which stay heuristic.
+   * A low-confidence classification contributes NO tags (see `classificationToTags`),
+   * preserving the conservative default: a devtool never gets short-form.
+   */
+  classificationTags?: string[];
 };
 
 export type ScoredChannel<C extends ChannelLike = ChannelLike> = {
@@ -238,6 +247,14 @@ export function deriveSignalTags(ctx: MatchContext): Set<string> {
   if (ctx.launchContext) {
     tags.add("launch");
     tags.add("product");
+  }
+
+  // LLM classification tags (audience/form/visual). These are what let the
+  // analysis admit short-form channels for a real consumer/visual product; a
+  // low-confidence classification passes an empty list, so nothing is added and
+  // the fail-closed short-form gate is preserved.
+  for (const t of ctx.classificationTags ?? []) {
+    tags.add(t);
   }
 
   return tags;

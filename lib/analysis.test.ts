@@ -64,6 +64,35 @@ describe("buildAnalysisPrompt", () => {
     expect(prompt).not.toMatch(/past results/i);
   });
 
+  it("renders the classification reason into context ONLY when short-form candidates are present", () => {
+    const reason = "a visual mobile photo editor — a before/after Reel fits";
+    const tiktok: ChannelLike = {
+      id: "sf",
+      slug: "tiktok-app-demo",
+      name: "TikTok — App Demo",
+      platform: "TIKTOK",
+      rules: "Hook in the first 2 seconds. Bio link only.",
+      defaultBanRisk: "LOW",
+      tags: ["shortform", "mobile-app", "consumer", "visual-demo"],
+    };
+
+    // With a short-form candidate → the product read is surfaced + the model is
+    // told to ground the format why-line in it.
+    const withShortform = buildAnalysisPrompt(input, [tiktok], undefined, {
+      classificationReason: reason,
+    });
+    expect(withShortform.prompt).toContain(`Product read: ${reason}`);
+    expect(withShortform.system).toMatch(/Product read/);
+
+    // Without any short-form candidate → the reason is suppressed (nothing to
+    // justify), so it never bloats an all-text-channel prompt.
+    const withoutShortform = buildAnalysisPrompt(input, candidates, undefined, {
+      classificationReason: reason,
+    });
+    expect(withoutShortform.prompt).not.toContain("Product read:");
+    expect(withoutShortform.system).not.toMatch(/Product read/);
+  });
+
   it("injects per-channel past results and the weighting rule when provided", () => {
     const outcomes = new Map<string, string>([
       ["r-saas", "past results for SaaS: 3 posts, 40 clicks, 0 signups, 0.0% conversion"],

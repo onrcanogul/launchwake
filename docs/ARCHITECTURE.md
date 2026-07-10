@@ -31,11 +31,17 @@ Tracked link clicks ──> /r/[code] route ──> Event ingest ──> attribu
   Enforces token budget; logs usage.
 - **`channels.ts`** — load catalog; `matchChannels(project, ship)` returns candidate channels
   by tag overlap BEFORE the LLM ranks them (constrains the option set).
+- **`classify.ts`** — `classifyProduct()`: one small, budget-guarded LLM call that reads WHAT a
+  product is (`audience`, `form`, `visualDemo`, `confidence`, `reason`) so the analysis — not
+  keyword heuristics alone — decides when short-form channels belong. `classificationToTags()`
+  (pure) maps that read to catalog fit-tags. Never invents channels; only gates candidate
+  selection. Cached on `Project`; see "Product classification" below.
 - **`analysis.ts`** — `buildPlan(ship)`:
-  1. `channels.matchChannels()` → candidate set.
-  2. LLM ranks candidates for THIS ship/product → fitScore, whyText, ruleNote, bestTime.
-  3. banRisk = max(channel.defaultBanRisk, signal from ChannelStat.removals).
-  4. persist `DistributionPlan` + `Recommendation[]`.
+  1. `classify.resolveProjectClassification()` → cached/fresh product classification → fit-tags.
+  2. `channels.matchChannels()` (with those tags) → candidate set.
+  3. LLM ranks candidates for THIS ship/product → fitScore, whyText, ruleNote, bestTime.
+  4. banRisk = max(channel.defaultBanRisk, signal from ChannelStat.removals).
+  5. persist `DistributionPlan` + `Recommendation[]`.
 - **`drafts.ts`** — `generateDraft(recommendation)` → platform-native `Draft` grounded in channel rules.
 - **`attribution.ts`** — `createTrackedLink(post)`, `ingest(shortCode, type)`, `rollup(projectId)`.
 - **`stats.ts`** — update `ChannelStat` from posts/events (flywheel); used by `analysis` re-ranking.
@@ -73,6 +79,40 @@ Tracked link clicks ──> /r/[code] route ──> Event ingest ──> attribu
 6. User generates drafts on demand (`drafts.generateDraft`).
 7. User posts manually → records a `Post` (+ tracked link).
 8. Clicks/signups ingest → `Event` → `stats` rollup → future plans re-ranked.
+
+### Product classification — LLM understanding gates short-form channels (`lib/classify.ts`)
+
+Short-form video channels (TikTok / Reels / Shorts) only work for genuinely visual, consumer
+products — a phone app, a game, a design/photo/video tool — never a CLI or a B2B API. Deciding
+that from a fixed keyword list is brittle (a bare "mobile" could be a devtool SDK), so the
+analysis **classifies the product with the LLM** and lets that read drive candidate selection.
+There is **no new user-facing form** — it runs off the fields we already have.
+
+- **One cheap call.** `classifyProduct()` returns strict, zod-validated JSON —
+  `{ audience: b2b|b2c|both, form: web|mobile|desktop|cli|library|game, visualDemo, confidence:
+  high|low, reason }` — over the product name/description/url + latest ship title/summary, every
+  field wrapped in the untrusted-data delimiter. It uses the standard `completeJSON` budget guard
+  + `maxTokens` clamp. **On any failure, or when the LLM is unconfigured, it returns `null`** and
+  the pipeline falls back to the pure `deriveSignalTags()` heuristic — never a blank plan.
+- **The golden rule holds.** The classifier never names or invents a channel. `classificationToTags()`
+  (pure, tested) maps the read to catalog fit-tags (`consumer`, `b2c`, `mobile-app`, `game`,
+  `desktop`, `visual-demo`); those tags are merged into `matchChannels()`'s signal set, which still
+  only ever hands the ranking LLM channels from the seeded catalog.
+- **Conservative by construction.** A `confidence: "low"` classification contributes **zero**
+  consumer/visual tags, so the short-form fit-gate (`shortformEligible`) stays closed — an ambiguous
+  product (or a devtool) is never handed TikTok. This preserves the prior fail-closed default.
+- **Cached on `Project`, zero repeat cost.** The result is persisted to
+  `Project.classificationJson` with `classifiedAt` and a `classificationHash` = sha256 of
+  name+description+url. `buildPlan` re-classifies **only** when that hash changes (the product was
+  edited); every repeat plan build for an unchanged product reuses the cache and makes no LLM call.
+  Ship title/summary enrich the one-time call but are deliberately **not** part of the hash — a
+  product's nature is stable across ships.
+- **Ranking why-line.** When short-form candidates survive into the candidate set, `buildPlan`
+  passes `classification.reason` into the ranking prompt as a `Product read:` line, so the
+  format-specific "why" can ground itself in it (e.g. "your product is a visual mobile editor — a
+  10-second before/after Reel fits"). It is suppressed when no short-form candidate is present.
+- **Public Launch Checker stays heuristic.** The anonymous checker has no `Project` row and never
+  classifies — it calls `matchChannels()` without classification tags, so its behavior is unchanged.
 
 ## Attribution
 

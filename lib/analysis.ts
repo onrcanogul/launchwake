@@ -12,6 +12,13 @@ import {
   type ChannelLike,
   type ScoredChannel,
 } from "./channels";
+import {
+  classifyProduct,
+  classificationToTags,
+  classificationInputHash,
+  ProductClassificationSchema,
+  type ProductClassification,
+} from "./classify";
 import { parseChannelCost, costPromptLine } from "./channelCost";
 import {
   productTagFor,
@@ -78,9 +85,15 @@ export function buildAnalysisPrompt(
   input: PlanInput,
   candidates: ChannelLike[],
   outcomeContext?: Map<string, string>,
-  opts?: { launchContext?: boolean },
+  opts?: { launchContext?: boolean; classificationReason?: string },
 ) {
   const hasOutcomes = Boolean(outcomeContext && outcomeContext.size > 0);
+  // The classification reason is only useful to the model when there are actually
+  // short-form candidates to justify — that's when the format-specific why-line
+  // needs the product read ("a visual mobile editor → a before/after Reel fits").
+  const hasShortform = candidates.some(isShortformChannel);
+  const classificationReason =
+    hasShortform && opts?.classificationReason ? opts.classificationReason : "";
   const system = [
     "You are LaunchWake's distribution strategist for technical founders.",
     "You are given a product, one 'ship' (a release/feature/blog worth sharing), and a FIXED list of candidate channels from a curated catalog.",
@@ -98,6 +111,9 @@ export function buildAnalysisPrompt(
       : "",
     "- Some candidates include a 'cost' line (paid or freemium). Do NOT down-rank a channel because it costs money — rank on fit as usual. But when you recommend a paid or freemium channel, state the cost plainly in 'why' (e.g. 'submission starts at $39') so the founder can weigh spend against fit. Free channels need no cost mention.",
     "- Some candidates are SHORT-FORM VIDEO channels (TikTok, Instagram Reels, YouTube Shorts) — their tags include 'shortform' and their 'rules' field is FORMAT guidance, not community rules. They only reach you when the product is genuinely visual and consumer-facing. For these, the 'why' MUST be about the visual demo format for THIS product specifically — a 2-second hook, a screen-recorded demo, a trending sound — and it must acknowledge the attribution ceiling (no clickable links in posts; bio-link only; expect weak tracked attribution). The 'ruleNote' should be the concrete format tip (e.g. 'open on the payoff in the first 2 seconds').",
+    classificationReason
+      ? "- The PRODUCT block includes a 'Product read' line — our classification of what this product is. Ground each short-form 'why' in it (e.g. 'your product is a visual mobile editor — a 10-second before/after Reel fits')."
+      : "",
     "- Do NOT assign ban risk; that is computed separately.",
     "- Respond with ONLY a JSON object, no prose, no code fences.",
     "",
@@ -117,6 +133,9 @@ export function buildAnalysisPrompt(
     input.project.url ? `URL: ${wrapUntrusted("product_url", input.project.url)}` : "",
     // githubRepo is validated to "owner/repo" upstream, so it's not free text.
     input.project.githubRepo ? `GitHub: ${input.project.githubRepo}` : "",
+    // Our own classification (trusted model output, not raw user text) — only
+    // rendered when short-form candidates are present, to steer the format why-line.
+    classificationReason ? `Product read: ${classificationReason}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -232,6 +251,71 @@ export function computeBanRisk(channel: Channel, removals = 0): BanRisk {
 }
 
 /**
+ * Resolve the product classification for a project.
+ *
+ * Uses the value cached on the Project when the product inputs (name/description/
+ * url) are unchanged — the hash gate makes repeat plan builds cost ZERO extra LLM
+ * calls. On a miss (first classification, edited product, or a drifted cached
+ * shape) it makes one cheap classify call and persists the result. Returns null
+ * when the product can't be classified (LLM unconfigured or the call failed), so
+ * the caller falls back to the pure `deriveSignalTags` heuristic.
+ */
+async function resolveProjectClassification(
+  project: Pick<
+    Project,
+    | "id"
+    | "userId"
+    | "name"
+    | "description"
+    | "url"
+    | "classificationJson"
+    | "classificationHash"
+  >,
+  ship: Pick<Ship, "title" | "summary">,
+): Promise<ProductClassification | null> {
+  const hash = classificationInputHash(project);
+
+  // Cache hit: product inputs unchanged since the last classification.
+  if (project.classificationHash === hash && project.classificationJson != null) {
+    const parsed = ProductClassificationSchema.safeParse(project.classificationJson);
+    if (parsed.success) return parsed.data;
+    // A drifted/invalid cached shape falls through to re-classify.
+  }
+
+  const classification = await classifyProduct(
+    {
+      name: project.name,
+      description: project.description,
+      url: project.url,
+      shipTitle: ship.title,
+      shipSummary: ship.summary,
+    },
+    project.userId,
+  );
+  if (!classification) return null;
+
+  // Persist so the next plan build for an unchanged product is free. Best-effort:
+  // a write hiccup must not fail the plan — we already hold the classification.
+  await db.project
+    .update({
+      where: { id: project.id },
+      data: {
+        classificationJson: classification,
+        classificationHash: hash,
+        classifiedAt: new Date(),
+      },
+    })
+    .catch((err) => {
+      captureError(err, {
+        at: "analysis.resolveProjectClassification",
+        reason: "cache_write_failed",
+      });
+    });
+
+  return classification;
+}
+
+/**
  * Build (or rebuild) the distribution plan for a ship. Returns the plan id.
  *
  * `launchContext` favors launch venues in ranking; when omitted it's derived
@@ -250,6 +334,15 @@ export async function buildPlan(
   const launchContext =
     opts?.launchContext ?? ship.project.launchStage !== "LAUNCHED";
 
+  // Let the analysis itself decide when short-form channels belong: classify the
+  // product (cached on the Project, re-run only on name/desc/url change) and turn
+  // that into fit-tags. Low-confidence / unclassifiable → empty tags → the pure
+  // heuristic path, so a devtool is never handed TikTok.
+  const classification = await resolveProjectClassification(ship.project, ship);
+  const classificationTags = classification
+    ? classificationToTags(classification)
+    : [];
+
   const catalog = await db.channel.findMany();
   const scored = matchChannels(
     catalog,
@@ -258,6 +351,7 @@ export async function buildPlan(
       shipText: `${ship.title} ${ship.summary ?? ""}`,
       shipType: ship.type,
       launchContext,
+      classificationTags,
     },
     MAX_CANDIDATES,
   );
@@ -303,6 +397,7 @@ export async function buildPlan(
   if (llmConfigured()) {
     const { system, prompt } = buildAnalysisPrompt(input, candidates, outcomeContext, {
       launchContext,
+      classificationReason: classification?.reason,
     });
     try {
       ranking = await completeJSON({

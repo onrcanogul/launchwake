@@ -160,6 +160,14 @@ model Project {
   name                 String
   description          String? // used as LLM context for fit scoring
   url                  String?
+  // Cached LLM product classification (audience/form/visualDemo/confidence/reason)
+  // from lib/classify.ts. Lets the analysis itself — not just keyword heuristics —
+  // decide when short-form channels belong. Re-run ONLY when name/description/url
+  // change: `classificationHash` is a sha256 of those inputs, so repeat plan builds
+  // cost zero extra LLM calls. Null until first classified (heuristic fallback).
+  classificationJson   Json?
+  classificationHash   String?
+  classifiedAt         DateTime?
   // Where this product is in its launch lifecycle. Set at onboarding; branches
   // the journey into Launch Mode (PRE_LAUNCH/UNANNOUNCED) vs Growth Mode
   // (LAUNCHED). Existing projects default to LAUNCHED (already in growth use).
