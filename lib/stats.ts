@@ -29,6 +29,11 @@ const BUCKET_PRIORITY = [
   "javascript",
   "frontend",
   "backend",
+  // Consumer / visual-first product buckets (the short-form-eligible ones).
+  "consumer",
+  "game",
+  "design",
+  "b2c",
   "b2b",
   "founders",
 ];
@@ -179,6 +184,10 @@ const BUCKET_LABELS: Record<string, string> = {
   javascript: "JS",
   frontend: "frontend",
   backend: "backend",
+  consumer: "consumer apps",
+  game: "games",
+  design: "design tools",
+  b2c: "consumer apps",
   b2b: "B2B",
   founders: "founder",
   general: "products like yours",

@@ -8,6 +8,7 @@ import {
 } from "./llm";
 import {
   matchChannels,
+  isShortformChannel,
   type ChannelLike,
   type ScoredChannel,
 } from "./channels";
@@ -96,6 +97,7 @@ export function buildAnalysisPrompt(
       ? "- Some candidates include a 'past results' line — REAL outcomes from posting similar products there. Weight it heavily: a channel that produced signups should rank higher; one that got clicks but ZERO signups, or had removals, should rank LOWER even if it looks topically relevant. When past results change the call, say so in 'why' (e.g. 'drove 4% signups for similar tools last time')."
       : "",
     "- Some candidates include a 'cost' line (paid or freemium). Do NOT down-rank a channel because it costs money — rank on fit as usual. But when you recommend a paid or freemium channel, state the cost plainly in 'why' (e.g. 'submission starts at $39') so the founder can weigh spend against fit. Free channels need no cost mention.",
+    "- Some candidates are SHORT-FORM VIDEO channels (TikTok, Instagram Reels, YouTube Shorts) — their tags include 'shortform' and their 'rules' field is FORMAT guidance, not community rules. They only reach you when the product is genuinely visual and consumer-facing. For these, the 'why' MUST be about the visual demo format for THIS product specifically — a 2-second hook, a screen-recorded demo, a trending sound — and it must acknowledge the attribution ceiling (no clickable links in posts; bio-link only; expect weak tracked attribution). The 'ruleNote' should be the concrete format tip (e.g. 'open on the payoff in the first 2 seconds').",
     "- Do NOT assign ban risk; that is computed separately.",
     "- Respond with ONLY a JSON object, no prose, no code fences.",
     "",
@@ -188,15 +190,32 @@ export function heuristicRank(
           : cost.type === "freemium"
             ? ` Free option with paid tiers${cost.note ? ` (${cost.note})` : ""}.`
             : "";
+      // A short-form video channel only reaches this ranking for a visual/consumer
+      // product (the shortformEligible gate guarantees it), so lead the why-line
+      // with the demo/format angle specifically — not the generic template.
+      const why = isShortformChannel(s.channel)
+        ? shortformWhy(s.channel.name, input.project.name)
+        : `${input.ship.title} fits ${s.channel.name}'s audience (${matched}). Frame it around the problem it solves for ${input.project.name}'s users.${costSentence}`;
       return {
         slug: s.channel.slug,
         fitScore,
-        why: `${input.ship.title} fits ${s.channel.name}'s audience (${matched}). Frame it around the problem it solves for ${input.project.name}'s users.${costSentence}`,
+        why,
         ruleNote: rule,
         bestTime: s.channel.bestTime ?? undefined,
       };
     }),
   };
+}
+
+/**
+ * Deterministic why-line for a short-form video channel. Only ever used for
+ * visual/consumer products (the fit-gate excludes everything else), so it leads
+ * with the FORMAT — a 2-second hook + a screen-recorded demo — and stays honest
+ * about the bio-link-only attribution ceiling these platforms impose.
+ */
+function shortformWhy(channelName: string, productName: string): string {
+  const name = productName.trim() || "your product";
+  return `Show ${name} in action: a 2-second hook plus a screen-recorded demo is the format ${channelName} rewards — post the video, not a link (bio-link only, so expect weak tracked attribution).`;
 }
 
 function firstSentence(text?: string | null): string | undefined {

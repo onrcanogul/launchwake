@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   deriveSignalTags,
   matchChannels,
+  isShortformChannel,
+  shortformEligible,
+  SHORTFORM_TAG,
   type ChannelLike,
 } from "./channels";
 
@@ -143,5 +146,166 @@ describe("matchChannels launch context", () => {
   it("adds launch/product signal tags only in launch context", () => {
     expect(deriveSignalTags({ ...ctx, launchContext: true }).has("launch")).toBe(true);
     expect(deriveSignalTags(ctx).has("launch")).toBe(false);
+  });
+});
+
+// ── Short-form video fit-gating ────────────────────────────
+describe("consumer/visual tag detection (deriveSignalTags)", () => {
+  it("tags a consumer mobile app with visual/consumer signals", () => {
+    const tags = deriveSignalTags({
+      projectText: "A consumer mobile app for iPhone to edit your photos",
+      shipText: "New photo filters",
+      shipType: "LAUNCH",
+    });
+    expect(tags.has("mobile-app")).toBe(true);
+    expect(tags.has("consumer")).toBe(true);
+  });
+
+  it("tags a game with the game/consumer signals", () => {
+    const tags = deriveSignalTags({
+      projectText: "A cozy pixel-art indie game about farming",
+      shipText: "1.0 launch",
+      shipType: "LAUNCH",
+    });
+    expect(tags.has("game")).toBe(true);
+    expect(tags.has("consumer")).toBe(true);
+  });
+
+  it("does NOT tag a CLI devtool as consumer/visual (fail-closed)", () => {
+    const tags = deriveSignalTags({
+      projectText: "A command-line devtool for developers to run Postgres migrations",
+      shipText: "CLI v2 release",
+      shipType: "LAUNCH",
+    });
+    for (const t of ["consumer", "mobile-app", "visual-demo", "game", "b2c"]) {
+      expect(tags.has(t), `should not derive "${t}"`).toBe(false);
+    }
+    // still a real, developer-tagged product
+    expect(tags.has("devtools")).toBe(true);
+  });
+});
+
+describe("shortformEligible / isShortformChannel", () => {
+  const tiktok: ChannelLike = {
+    id: "sf",
+    slug: "tiktok-app-demo",
+    name: "TikTok — App Demo",
+    platform: "TIKTOK",
+    defaultBanRisk: "LOW",
+    tags: [SHORTFORM_TAG, "mobile-app", "consumer", "visual-demo"],
+  };
+  const hn: ChannelLike = {
+    id: "hn",
+    slug: "hn-show",
+    name: "Show HN",
+    platform: "HACKERNEWS",
+    defaultBanRisk: "LOW",
+    tags: ["developers", "devtools", "launch"],
+  };
+
+  it("identifies short-form channels by the marker tag", () => {
+    expect(isShortformChannel(tiktok)).toBe(true);
+    expect(isShortformChannel(hn)).toBe(false);
+  });
+
+  it("gates a short-form channel out without a matching visual/consumer signal", () => {
+    expect(shortformEligible(tiktok, new Set(["developers", "devtools"]))).toBe(false);
+  });
+
+  it("admits a short-form channel when a visual/consumer signal matches", () => {
+    expect(shortformEligible(tiktok, new Set(["consumer", "developers"]))).toBe(true);
+  });
+
+  it("never gates a non-short-form channel", () => {
+    expect(shortformEligible(hn, new Set())).toBe(true);
+  });
+});
+
+describe("matchChannels short-form gating", () => {
+  const catalogWithShortform: ChannelLike[] = [
+    {
+      id: "sf-tt",
+      slug: "tiktok-app-demo",
+      name: "TikTok — App Demo",
+      platform: "TIKTOK",
+      defaultBanRisk: "LOW",
+      tags: [SHORTFORM_TAG, "mobile-app", "consumer", "visual-demo"],
+    },
+    {
+      id: "hn",
+      slug: "hn-show",
+      name: "Show HN",
+      platform: "HACKERNEWS",
+      defaultBanRisk: "LOW",
+      tags: ["developers", "devtools", "launch"],
+    },
+    {
+      id: "li",
+      slug: "linkedin",
+      name: "LinkedIn",
+      platform: "LINKEDIN",
+      defaultBanRisk: "LOW",
+      tags: ["b2b", "saas", "founders"],
+    },
+  ];
+
+  it("yields NO short-form candidates for a CLI devtool project", () => {
+    const ranked = matchChannels(
+      catalogWithShortform,
+      {
+        projectText:
+          "A command-line devtool for developers to run Postgres database migrations",
+        shipText: "CLI v2 release",
+        shipType: "LAUNCH",
+        launchContext: true,
+      },
+      10,
+    );
+    const slugs = ranked.map((r) => r.channel.slug);
+    expect(slugs).not.toContain("tiktok-app-demo");
+    expect(ranked.some((r) => r.channel.tags.includes(SHORTFORM_TAG))).toBe(false);
+    // ...but real dev channels still surface (the gate never empties the set).
+    expect(slugs).toContain("hn-show");
+  });
+
+  it("yields short-form candidates for a mobile consumer app", () => {
+    const ranked = matchChannels(
+      catalogWithShortform,
+      {
+        projectText: "A consumer mobile app for iPhone to edit photos and share Reels",
+        shipText: "New photo filters",
+        shipType: "LAUNCH",
+        launchContext: true,
+      },
+      10,
+    );
+    expect(ranked.map((r) => r.channel.slug)).toContain("tiktok-app-demo");
+  });
+
+  it("boosts an eligible short-form channel above a launch venue for a consumer app", () => {
+    // The fit boost must let short-form clear the candidate cutoff even against a
+    // launch-boosted venue — otherwise it never reaches a real product's plan.
+    const ranked = matchChannels(
+      catalogWithShortform,
+      {
+        projectText: "A consumer mobile app for iPhone to edit photos",
+        shipText: "First public launch",
+        shipType: "LAUNCH",
+        launchContext: true,
+      },
+      2,
+    );
+    expect(ranked[0].channel.slug).toBe("tiktok-app-demo");
+  });
+
+  it("never pads a short-form channel in as filler when matches are thin", () => {
+    // Empty context → matchChannels falls back to lowest-ban-risk channels, but a
+    // short-form channel must NOT be padded in without a positive visual match.
+    const ranked = matchChannels(
+      catalogWithShortform,
+      { projectText: "", shipText: "", shipType: "OTHER" },
+      10,
+    );
+    expect(ranked.some((r) => r.channel.tags.includes(SHORTFORM_TAG))).toBe(false);
   });
 });

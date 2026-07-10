@@ -5,6 +5,7 @@ import { newsletters } from "./newsletters";
 import { directories } from "./directories";
 import { communities } from "./communities";
 import { social } from "./social";
+import { shortform } from "./shortform";
 
 /**
  * The seed pipeline: category files → one validated, de-duplicated catalog.
@@ -22,6 +23,7 @@ export const CATEGORIES: Record<string, Seed[]> = {
   directories,
   communities,
   social,
+  shortform,
 };
 
 export type CatalogIssue = { kind: "invalid" | "duplicate"; slug: string; detail: string };

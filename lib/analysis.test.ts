@@ -104,6 +104,32 @@ describe("heuristicRank", () => {
     const saas = result.rankings.find((r) => r.slug === "r-saas")!;
     expect(hn.fitScore).toBeGreaterThan(saas.fitScore);
   });
+
+  it("leads a short-form channel with the demo/format angle (and the honest attribution ceiling)", () => {
+    // Short-form channels only reach ranking for a visual/consumer product, so the
+    // why-line must call out the demo/format angle specifically, not the generic
+    // template — the full-plan transparency requirement.
+    const tiktok: ChannelLike = {
+      id: "sf",
+      slug: "tiktok-app-demo",
+      name: "TikTok — App Demo",
+      platform: "TIKTOK",
+      audienceDesc: "consumers discovering apps",
+      rules: "Hook in the first 2 seconds. Bio link only.",
+      defaultBanRisk: "LOW",
+      bestTime: "Evenings",
+      tags: ["shortform", "mobile-app", "consumer", "visual-demo"],
+    };
+    const scored: ScoredChannel[] = [
+      { channel: tiktok, score: 30, matchedTags: ["mobile-app", "consumer"] },
+    ];
+    const why = heuristicRank(scored, input).rankings[0].why;
+    expect(why).toMatch(/demo/i);
+    expect(why).toMatch(/format/i);
+    expect(why).toMatch(/bio.link/i);
+    // grounded in the product name
+    expect(why).toContain(input.project.name);
+  });
 });
 
 describe("computeBanRisk", () => {

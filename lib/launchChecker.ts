@@ -267,6 +267,10 @@ export function heuristicWhy(
     case "BLUESKY":
     case "MASTODON":
       return `Open with a sharp hook about the problem ${name} solves — ${channelName} rewards a thread you engage with over a bare launch link.`;
+    case "TIKTOK":
+    case "INSTAGRAM":
+    case "YOUTUBE":
+      return `Show ${name} in action on ${channelName}: a 2-second hook and a screen-recorded demo is the format that lands — post the video and keep your one tracked link in the bio (posts can't hold a clickable link).`;
     case "DEVTO":
     case "BLOG":
     case "NEWSLETTER":

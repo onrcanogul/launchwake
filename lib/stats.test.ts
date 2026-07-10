@@ -21,12 +21,29 @@ describe("productTagFor", () => {
     const b = productTagFor("saas b2b analytics tool");
     expect(a).toBe(b);
   });
+  it("buckets a consumer mobile app as consumer", () => {
+    const tag = productTagFor("A consumer mobile app for iPhone to edit your photos");
+    expect(tag).toContain("consumer");
+  });
+  it("buckets a game as a game/consumer product", () => {
+    const tag = productTagFor("A cozy pixel-art indie game about farming");
+    expect(tag.split("-")).toContain("game");
+  });
+  it("does NOT bucket a CLI devtool as consumer (conservative)", () => {
+    const tag = productTagFor(
+      "A command-line devtool for developers to manage Postgres migrations",
+    );
+    expect(tag).not.toContain("consumer");
+    expect(tag).toContain("devtools");
+  });
 });
 
 describe("bucketLabel", () => {
   it("humanises the product bucket", () => {
     expect(bucketLabel("devtools-webdev")).toBe("dev-tools");
     expect(bucketLabel("saas-b2b")).toBe("SaaS");
+    expect(bucketLabel("consumer-b2c")).toBe("consumer apps");
+    expect(bucketLabel("game")).toBe("games");
     expect(bucketLabel("general")).toBe("products like yours");
   });
 });

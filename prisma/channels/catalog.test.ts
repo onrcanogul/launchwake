@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { assembleCatalog, channelCatalog, CATEGORIES } from "./index";
 import { SeedSchema } from "./types";
+import { shortform } from "./shortform";
+import { SHORTFORM_TAG, VISUAL_CONSUMER_TAGS } from "../../lib/channels";
 import { AccountRequirementsSchema } from "../../lib/accountReadiness";
 import { parseChannelCost } from "../../lib/channelCost";
 
@@ -105,6 +107,66 @@ describe("channel catalog", () => {
     expect(req("lobsters").level).toBe("required");
     expect(req("dir-alternativeto").minAccountAgeDays).toBe(7);
     expect(req("freecodecamp-news").minKarmaOrReputation?.value).toBe(3);
+  });
+});
+
+describe("short-form video pack (fit-gated)", () => {
+  const GENERIC_TAGS = ["devtools", "saas", "developers", "b2b"];
+  const visual = new Set<string>(VISUAL_CONSUMER_TAGS);
+
+  it("ships several short-form channels", () => {
+    expect(shortform.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("every entry carries the marker + a visual/consumer tag and NO generic dev/B2B tag", () => {
+    for (const c of shortform) {
+      expect(c.tags, `${c.slug} missing "${SHORTFORM_TAG}" marker`).toContain(
+        SHORTFORM_TAG,
+      );
+      expect(
+        c.tags.some((t) => visual.has(t)),
+        `${c.slug} has no visual/consumer tag`,
+      ).toBe(true);
+      for (const g of GENERIC_TAGS) {
+        expect(c.tags, `${c.slug} must not carry generic tag "${g}"`).not.toContain(g);
+      }
+    }
+  });
+
+  it("uses only the short-form platforms and LOW default ban risk", () => {
+    for (const c of shortform) {
+      expect(["TIKTOK", "INSTAGRAM", "YOUTUBE"]).toContain(c.platform);
+      // Platform ToS is the constraint here, not a mod queue.
+      expect(c.defaultBanRisk, `${c.slug} ban risk`).toBe("LOW");
+    }
+  });
+
+  it("rules are FORMAT intelligence: 2-second hook + an honest attribution caveat", () => {
+    for (const c of shortform) {
+      // The 2-second hook is the load-bearing format cue.
+      expect(/2[- ]second|first 2 seconds/i.test(c.rules), `${c.slug} hook`).toBe(true);
+      // Every entry is honest about attribution + a dedicated link.
+      expect(/attribution/i.test(c.rules), `${c.slug} attribution note`).toBe(true);
+      expect(/link/i.test(c.rules), `${c.slug} link guidance`).toBe(true);
+    }
+    // TikTok & Instagram allow NO in-post link — bio link only, weak tracking.
+    // YouTube is the honest exception (description links DO work), so it's excluded.
+    const bioOnly = shortform.filter(
+      (c) => c.platform === "TIKTOK" || c.platform === "INSTAGRAM",
+    );
+    expect(bioOnly.length).toBeGreaterThan(0);
+    for (const c of bioOnly) {
+      expect(/bio/i.test(c.rules), `${c.slug} bio-link caveat`).toBe(true);
+      expect(/weak/i.test(c.rules), `${c.slug} weak-attribution honesty`).toBe(true);
+    }
+  });
+
+  it("is registered in the assembled catalog with globally unique slugs", () => {
+    const { channels } = assembleCatalog();
+    const slugs = new Set(channels.map((c) => c.slug));
+    for (const c of shortform) {
+      expect(slugs.has(c.slug), `${c.slug} not in assembled catalog`).toBe(true);
+    }
   });
 });
 

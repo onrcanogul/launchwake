@@ -42,6 +42,8 @@ export type IconName =
   | "discord"
   | "slack"
   | "youtube"
+  | "tiktok"
+  | "instagram"
   | "rocket";
 
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -198,6 +200,19 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <rect x="3" y="6" width="18" height="12" rx="3" />
       <path d="M10.5 9.2l4.5 2.8-4.5 2.8z" />
+    </>
+  ),
+  tiktok: (
+    <>
+      <path d="M13.5 4v9.5a3.5 3.5 0 1 1-3.5-3.5" />
+      <path d="M13.5 4.5c.5 2 2.2 3.4 4.3 3.6" />
+    </>
+  ),
+  instagram: (
+    <>
+      <rect x="4" y="4" width="16" height="16" rx="4.5" />
+      <circle cx="12" cy="12" r="3.6" />
+      <circle cx="16.6" cy="7.4" r="0.5" />
     </>
   ),
   rocket: (

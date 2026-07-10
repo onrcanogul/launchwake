@@ -17,6 +17,8 @@ export type PlatformValue =
   | "BLUESKY"
   | "FORUM"
   | "YOUTUBE"
+  | "TIKTOK"
+  | "INSTAGRAM"
   | "BLOG"
   | "OTHER";
 
@@ -37,6 +39,8 @@ const PLATFORM_ICON: Record<PlatformValue, IconName> = {
   BLUESKY: "channels",
   FORUM: "rules",
   YOUTUBE: "youtube",
+  TIKTOK: "tiktok",
+  INSTAGRAM: "instagram",
   BLOG: "rss",
   OTHER: "channels",
 };
@@ -62,6 +66,8 @@ const PLATFORM_LABEL: Record<PlatformValue, string> = {
   BLUESKY: "Bluesky",
   FORUM: "Forums",
   YOUTUBE: "YouTube",
+  TIKTOK: "TikTok",
+  INSTAGRAM: "Instagram",
   BLOG: "Blogs",
   OTHER: "Other",
 };
