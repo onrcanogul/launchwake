@@ -15,14 +15,48 @@ describe("checkDraft — Reddit", () => {
     expect(r.worst).toBe("fail");
   });
 
-  it("warns on a promotional body and flags strict subs", () => {
+  it("fails a link in the body on a strict sub, and still flags promo tone", () => {
     const r = checkDraft({
       platform: "REDDIT",
       body: "How I built webhook alerts\n\nWe made a tool, check out our product at https://hookline.dev",
       channelRules: "heavily moderated. removed fast.",
     });
+    // A body URL on a strict sub is the classic AutoModerator removal.
+    expect(find(r, /Link in the post body/)?.level).toBe("fail");
     expect(find(r, /promotional/i)?.level).toBe("warn");
-    expect(find(r, /Strict self-promo/)?.level).toBe("warn");
+    expect(r.worst).toBe("fail");
+  });
+
+  it("warns (not fails) on a body link in a lenient sub", () => {
+    const r = checkDraft({
+      platform: "REDDIT",
+      body: "Sharing my side project\n\nBuilt this over the weekend: https://hookline.dev",
+      channelRules: "Sharing your side project is welcome here.",
+    });
+    expect(find(r, /Link in the post body/)?.level).toBe("warn");
+    expect(r.worst).toBe("warn");
+  });
+
+  it("fails a self-promo launch pitch with no link on a strict sub", () => {
+    const r = checkDraft({
+      platform: "REDDIT",
+      body:
+        "Over the past year I've been working on LaunchWake, a distribution co-pilot for founders. " +
+        "I'm excited to share it. Looking forward to any feedback from your own launches!",
+      channelRules: "Heavily moderated. Direct promotion is removed.",
+    });
+    expect(find(r, /launch pitch/i)?.level).toBe("fail");
+    expect(r.worst).toBe("fail");
+  });
+
+  it("warns on a launch pitch in a lenient sub", () => {
+    const r = checkDraft({
+      platform: "REDDIT",
+      body:
+        "I built a small tool for webhook alerts. I'm excited to share it — looking forward to any feedback.",
+      channelRules: "Share your side project here.",
+    });
+    expect(find(r, /launch pitch/i)?.level).toBe("warn");
   });
 
   it("passes a value-first question post", () => {

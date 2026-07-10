@@ -60,6 +60,28 @@ describe("buildDraftPrompt", () => {
     expect(prompt).toContain("Hookline");
     expect(prompt).toContain("Frame it problem-first");
   });
+
+  it("holds the draft to a shareable, non-marketer bar", () => {
+    const { system } = buildDraftPrompt(base);
+    expect(system).toMatch(/shareable/i);
+    expect(system).toMatch(/not a marketer/i);
+  });
+
+  it("withholds the URL from a Reddit draft and routes it to the first comment", () => {
+    const { prompt } = buildDraftPrompt({
+      ...base,
+      channel: {
+        name: "r/webdev",
+        platform: "REDDIT",
+        rules: "Strict 90/10 self-promo rule. No links in titles.",
+        tags: [],
+      },
+    });
+    // The Reddit style tells the founder to put the link in their first comment…
+    expect(prompt).toMatch(/first comment/i);
+    // …and the raw product URL is withheld so the model can't leak it into the body.
+    expect(prompt).not.toContain("https://hookline.dev");
+  });
 });
 
 describe("heuristicDraft", () => {

@@ -25,6 +25,16 @@ const URL_RE = /https?:\/\/[^\s)]+/i;
 const HYPE_RE =
   /\b(revolutionary|game[-\s]?chang(?:er|ing)|amazing|incredible|best[-\s]in[-\s]class|world[-\s]?class|cutting[-\s]edge|next[-\s]?gen|disrupt(?:ive)?|10x|magical?|insane|unbelievable|mind[-\s]?blowing)\b/i;
 
+// Launch-announcement / founder-story phrasing. A Reddit self-post built around
+// two or more of these reads as an ad, not a contribution — the top non-link
+// removal cause on self-promo-restricted subs.
+const PITCH_RE =
+  /\bi(?:'ve| have)?\s+(?:built|made|created|launched|shipped|been (?:building|working on|developing))\b|\bi'?m (?:excited|thrilled|happy|glad) to (?:share|announce|introduce)\b|\blooking forward to (?:any |your )?(?:feedback|insights?|thoughts)\b|\bwould love (?:your |any |some )?feedback\b|\bcheck (?:it|us|this) out\b|\bintroducing\s+\w+/gi;
+
+function pitchMarkers(s: string): number {
+  return (s.match(PITCH_RE) ?? []).length;
+}
+
 function hasUrl(s: string): boolean {
   return URL_RE.test(s);
 }
@@ -55,17 +65,56 @@ export function checkDraft(input: DraftCheckInput): SafetyReport {
 
   switch (platform) {
     case "REDDIT": {
+      // Reddit's AutoModerator removes self-posts that carry an outbound link.
+      // The safe pattern is a link-free post with the URL dropped in your OWN
+      // first comment. A link in the title is always fatal; a link in the body
+      // is fatal on strict/heavily-moderated subs and a caution everywhere else.
+      const strict = /heavily moderated|no product promotion|removed|flagged|banned|90\/10/.test(
+        rules,
+      );
+
       if (hasUrl(title))
         add(
           "fail",
           "Link in title",
-          "Reddit removes posts with a link in the title. Move it into the body or first comment.",
+          "Reddit removes posts with a link in the title. Drop the link in your first comment instead.",
         );
       else add("pass", "No link in title", "Title is link-free.");
 
+      const belowTitle = nonEmpty.slice(1).join("\n");
+      if (hasUrl(belowTitle)) {
+        if (strict)
+          add(
+            "fail",
+            "Link in the post body",
+            "This community's AutoModerator removes self-posts that contain an outbound link. Post the URL as your own first comment, not in the body.",
+          );
+        else
+          add(
+            "warn",
+            "Link in the post body",
+            "Many subs auto-remove self-posts with links. Safest to post the URL as your first comment, not in the body.",
+          );
+      } else
+        add(
+          "pass",
+          "No link in the body",
+          "Link-free — the URL belongs in your first comment.",
+        );
+
+      // A launch-announcement pitch (no link needed) is the other classic
+      // removal: pure self-promo violates the 90/10 rule. Fatal on strict subs,
+      // a caution elsewhere. A milder promo tone is only ever a caution.
+      const pitch = pitchMarkers(body) >= 2;
       const promotional =
-        bodyHasUrl && /\b(our|we|my|i built|check out|try it)\b/i.test(body) && !body.includes("?");
-      if (promotional)
+        /\b(our|we|my|i built|check out|try it)\b/i.test(body) && !body.includes("?");
+      if (pitch)
+        add(
+          strict ? "fail" : "warn",
+          "Reads as a self-promo launch pitch",
+          "This is a launch announcement about your product — subs remove these as ads. Lead with a specific, useful insight the community cares about, keep the product to a one-line mention, and end with a genuine question.",
+        );
+      else if (promotional)
         add(
           "warn",
           "Reads promotional (90/10)",
@@ -73,18 +122,11 @@ export function checkDraft(input: DraftCheckInput): SafetyReport {
         );
       else add("pass", "Value-first tone", "Reads like a contribution, not an ad.");
 
-      const strict = /heavily moderated|no product promotion|removed|90\/10/.test(rules);
-      if (strict && promotional)
-        add(
-          "warn",
-          "Strict self-promo rules",
-          "This community removes promo fast — keep links minimal and engage in the comments.",
-        );
-      else if (strict)
+      if (strict)
         add(
           "pass",
           "Community is strict",
-          "Heavily moderated, but your value-first framing fits.",
+          "Heavily moderated — your value-first, link-free framing fits.",
         );
       break;
     }

@@ -9,6 +9,7 @@ import {
 import { TONE_GUIDE, type DraftTone } from "./tones";
 import { draftLanguageRule, effectiveAudienceCode } from "./audience";
 import { isShortformChannel } from "./channels";
+import { checkDraft } from "./bansafety";
 import type { Channel, Draft, Project, Ship } from "@prisma/client";
 
 /**
@@ -75,7 +76,7 @@ const PLATFORM_STYLE: Record<string, string> = {
   HACKERNEWS:
     "Show HN format. Title line 'Show HN: <what it is>'. Lead with the problem you hit and the build story. No marketing adjectives. End with a genuine question to invite discussion.",
   REDDIT:
-    "Value-first per the 90/10 rule. Do NOT put a link in the title. Teach something useful; mention the tool only as context near the end.",
+    "Value-first per the 90/10 rule. Put NO link anywhere in the post — not the title, not the body; Reddit's AutoModerator removes self-posts with an outbound link, so the product URL goes in your FIRST COMMENT (posted separately by you), never in the draft. Do NOT write a launch announcement or founder story — no 'I built…', 'over the past year…', 'I'm excited to share…', 'looking forward to your feedback': that reads as an ad and gets removed. Instead lead with ONE concrete, specific problem or insight the community actually discusses, give real substance they can use even if they never touch the tool, and end with a genuine question inviting their own experience. Mention the tool only as a one-line footnote, by name, no URL. Plain, human language — no marketing buzzwords, no polished-essay AI register.",
   X: "Short thread. Hook in the very first line. Link last (or note it goes in a reply). Number the tweets 1/, 2/, 3/.",
   LINKEDIN:
     "Professional founder voice. Lead with a relatable pain. Put the link in the first comment, not the post body (LinkedIn throttles outbound links).",
@@ -96,11 +97,18 @@ export function buildDraftPrompt(
   audienceCode = "en",
 ) {
   const style = PLATFORM_STYLE[ctx.channel.platform] ?? PLATFORM_STYLE.OTHER;
+  // Reddit's AutoModerator removes self-posts that carry an outbound link, so the
+  // draft must stay link-free (the founder drops the URL in their own first
+  // comment). Withhold the raw product URL from the model here so it can't leak
+  // into the body — the linter (lib/bansafety.ts) is the deterministic backstop.
+  const withholdUrl = ctx.channel.platform === "REDDIT";
   const system = [
     "You write platform-native distribution drafts for a technical founder.",
     "The founder posts it themselves — never write as if auto-posting.",
     "Ground the draft in the channel's rules and the provided ruleNote (the safe way in).",
     "Be specific to the product and the ship. No hype, no emoji spam, no fake metrics.",
+    "Write like a specific human who built the thing, not a marketer: concrete details over adjectives, and cut any sentence that could appear in any other product's post.",
+    "\"Shareable\" means someone in this community would find it useful or interesting even if they never click through — earn the mention; the product is a footnote, not the subject.",
     TONE_GUIDE[tone],
     "Write the draft EXACTLY as it should be pasted — do NOT add 'Title:'/'Body:' labels, section headers, or meta commentary.",
     "For Show HN, the very first line must be the title, starting with 'Show HN:'.",
@@ -119,7 +127,9 @@ export function buildDraftPrompt(
     ctx.ruleNote ? `Safe way in for this post: ${ctx.ruleNote}` : "",
     "",
     `Product: ${wrapUntrusted("product_name", ctx.project.name)}`,
-    ctx.project.url ? `Product URL: ${wrapUntrusted("product_url", ctx.project.url)}` : "",
+    !withholdUrl && ctx.project.url
+      ? `Product URL: ${wrapUntrusted("product_url", ctx.project.url)}`
+      : "",
     ctx.project.description
       ? `About: ${wrapUntrusted("product_description", ctx.project.description)}`
       : "",
@@ -266,6 +276,51 @@ function firstSentence(text?: string | null): string | undefined {
   return (m ? m[1] : text).slice(0, 200);
 }
 
+/**
+ * Generate a text draft and self-repair it: if our own ban-safety linter says
+ * the draft would be REMOVED (a `fail`), regenerate ONCE with the specific
+ * failures fed back in, and keep the rewrite only if it's actually cleaner. We
+ * never hand the user a draft our linter flags as fatal when a cleaner one is
+ * available — the extra LLM call only fires when the first draft fails.
+ */
+async function completeTextDraft(
+  ctx: DraftContext,
+  tone: DraftTone,
+  audienceCode: string,
+  userId: string,
+): Promise<DraftResult> {
+  const { system, prompt } = buildDraftPrompt(ctx, tone, audienceCode);
+  const platform = ctx.channel.platform;
+  const channelRules = ctx.channel.rules;
+  const label = `draft:${platform}:${tone}:${audienceCode}`;
+
+  const first = await completeJSON({ userId, system, prompt, schema: DraftSchema, label });
+  const firstReport = checkDraft({ body: first.body, platform, channelRules });
+  if (firstReport.fails === 0) return first;
+
+  const fixes = firstReport.checks
+    .filter((c) => c.level === "fail")
+    .map((c) => `- ${c.label}: ${c.detail}`)
+    .join("\n");
+  const repaired = await completeJSON({
+    userId,
+    system,
+    prompt: [
+      prompt,
+      "",
+      "The draft you wrote would be REMOVED by this channel. Rewrite it from scratch so it passes every check below — keep it specific, human, and value-first, never a pitch:",
+      fixes,
+    ].join("\n"),
+    schema: DraftSchema,
+    label: `${label}:repair`,
+  });
+  const repairedReport = checkDraft({ body: repaired.body, platform, channelRules });
+  const cleaner =
+    repairedReport.fails < firstReport.fails ||
+    (repairedReport.fails === firstReport.fails && repairedReport.warns < firstReport.warns);
+  return cleaner ? repaired : first;
+}
+
 /** Generate (and persist) a draft for a recommendation. Idempotent per rec. */
 export async function generateDraft(
   recommendationId: string,
@@ -332,15 +387,8 @@ export async function generateDraft(
     });
   }
 
-  const prompt = buildDraftPrompt(ctx, tone, audienceCode);
   const result = llmConfigured()
-    ? await completeJSON({
-        userId: project.userId,
-        system: prompt.system,
-        prompt: prompt.prompt,
-        schema: DraftSchema,
-        label: `draft:${rec.channel.platform}:${tone}:${audienceCode}`,
-      })
+    ? await completeTextDraft(ctx, tone, audienceCode, project.userId)
     : heuristicDraft(ctx);
 
   return db.draft.upsert({
