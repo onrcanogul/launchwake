@@ -78,12 +78,12 @@ describe("buildAnalysisPrompt", () => {
       tags: ["shortform", "mobile-app", "consumer", "visual-demo"],
     };
 
-    // With a short-form candidate → the model is told IT decides fit and to score
-    // short-form very low for a non-visual/B2B product (so it gets dropped).
+    // With a short-form candidate → the model is told short-form is viable for
+    // MOST products and to drop it (score under 40) ONLY for a pure headless tool.
     const withShortform = buildAnalysisPrompt(input, [tiktok]);
     expect(withShortform.system).toMatch(/SHORT-FORM VIDEO/);
-    expect(withShortform.system).toMatch(/YOU decide/i);
-    expect(withShortform.system).toMatch(/very LOW fitScore/i);
+    expect(withShortform.system).toMatch(/MOST products/i);
+    expect(withShortform.system).toMatch(/under 40/i);
 
     // Without any short-form candidate → the rule is suppressed (nothing to judge),
     // so it never bloats an all-text-channel prompt.

@@ -104,7 +104,7 @@ export function buildAnalysisPrompt(
       : "",
     "- Some candidates include a 'cost' line (paid or freemium). Do NOT down-rank a channel because it costs money — rank on fit as usual. But when you recommend a paid or freemium channel, state the cost plainly in 'why' (e.g. 'submission starts at $39') so the founder can weigh spend against fit. Free channels need no cost mention.",
     hasShortform
-      ? "- Some candidates are SHORT-FORM VIDEO channels (TikTok, Instagram Reels, YouTube Shorts) — their tags include 'shortform' and their 'rules' field is FORMAT guidance, not community rules. YOU decide whether they fit THIS product. Short-form only works for a genuinely visual, consumer-facing product (a phone app, a game, a design/photo/video tool). If this product is a CLI, an API, a backend library, or a B2B/developer tool, give EVERY short-form channel a very LOW fitScore (under 40) — they are then dropped from the plan. When short-form DOES fit, the 'why' MUST be about the visual demo format for THIS product specifically — a 2-second hook, a screen-recorded demo, a trending sound — and it must acknowledge the attribution ceiling (no clickable links in posts; bio-link only; expect weak tracked attribution). The 'ruleNote' should be the concrete format tip (e.g. 'open on the payoff in the first 2 seconds')."
+      ? "- Some candidates are SHORT-FORM VIDEO channels (TikTok, Instagram Reels, YouTube Shorts) — their tags include 'shortform' and their 'rules' field is FORMAT guidance, not community rules. Treat short-form as a VIABLE channel for MOST products and score it on merit: any product with a visual, demoable, or 'show don't tell' angle and a consumer or prosumer audience (apps, games, design/photo/video/creative tools, e-commerce, content, education, health, consumer fintech — and most products with a real UI) should score it genuinely well. Give short-form a LOW fitScore (under 40, so it is dropped from the plan) ONLY for a product with essentially nothing to show on camera — a pure CLI, an API, an SDK, or a headless backend/infra/devops tool. A B2B SaaS with a usable UI is a middle case: a founder-POV or product-demo clip is a stretch but can work, so score it modestly (keep it in) rather than dropping it. When short-form fits, the 'why' MUST be about the visual demo format for THIS product specifically — a 2-second hook, a screen-recorded demo, a trending sound — and it must acknowledge the attribution ceiling (no clickable links in posts; bio-link only; expect weak tracked attribution). The 'ruleNote' should be the concrete format tip (e.g. 'open on the payoff in the first 2 seconds')."
       : "",
     "- Do NOT assign ban risk; that is computed separately.",
     "- Respond with ONLY a JSON object, no prose, no code fences.",
@@ -268,10 +268,11 @@ export function selectCandidates<C extends ChannelLike>(
 }
 
 /**
- * Minimum fitScore a short-form channel needs to stay in a plan. Below it, the
- * ranker judged the visual-demo format a poor fit for this product (e.g. a CLI or
- * a B2B tool), so the channel is dropped rather than shown as a weak, misleading
- * suggestion at the bottom of the plan.
+ * Minimum fitScore a short-form channel needs to stay in a plan. The prompt biases
+ * INCLUSIVE — short-form is a valid channel for most products — so below the floor
+ * lands only a product with nothing to show on camera (a pure CLI/API/SDK/headless
+ * backend), where a video channel would be a weak, misleading suggestion. Products
+ * with any visual angle (incl. most SaaS with a UI) score above it and stay.
  */
 export const SHORTFORM_FIT_FLOOR = 40;
 
