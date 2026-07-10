@@ -6,6 +6,7 @@ import { FieldError } from "@/components/ui/FieldError";
 import { CharCounter } from "@/components/ui/CharCounter";
 import { RepoPicker } from "@/components/github/RepoPicker";
 import { createProject, type OnboardingState } from "@/app/onboarding/actions";
+import { AUDIENCE_LANGUAGES, DEFAULT_AUDIENCE } from "@/lib/audience";
 import type { GithubRepo } from "@/lib/github";
 import type { OnboardingConnectMode } from "@/lib/onboarding";
 
@@ -76,6 +77,9 @@ export function OnboardingWizard({
   const [description, setDescription] = useState("");
 
   const [stage, setStage] = useState<LaunchStage | "">("");
+  // Target-audience language for generated drafts/plans (not the app UI, which
+  // stays English). Overridable later per-ship on the "Where to post" screen.
+  const [audienceLanguage, setAudienceLanguage] = useState<string>(DEFAULT_AUDIENCE);
 
   const [state, action, pending] = useActionState<OnboardingState, FormData>(
     createProject,
@@ -465,6 +469,30 @@ export function OnboardingWizard({
           />
           <CharCounter value={description} max={2000} />
           <FieldError id="err-review-description" message={fieldErrors.description} />
+
+          <label className="fl" style={{ marginTop: 16 }}>
+            Audience language{" "}
+            <span style={{ color: "var(--tx3)", fontWeight: 400 }}>
+              (drafts &amp; plans are written in this language)
+            </span>
+          </label>
+          <select
+            className="inp"
+            name="audienceLanguage"
+            value={audienceLanguage}
+            onChange={(e) => setAudienceLanguage(e.target.value)}
+          >
+            {AUDIENCE_LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+          <div className="fhint" style={{ marginTop: 6 }}>
+            Pick who this product is for — the app stays in English, but the copy
+            LaunchWake generates comes out in this language. You can override it
+            per ship later.
+          </div>
 
           {/* Carried from earlier steps. */}
           <input type="hidden" name="url" value={url} />

@@ -11,6 +11,7 @@ import { buildPlan } from "@/lib/analysis";
 import { captureLead } from "@/lib/leads";
 import { normalizeHttpUrl } from "@/lib/url";
 import { fieldErrorsFromZod } from "@/lib/formErrors";
+import { isAudienceLanguage, DEFAULT_AUDIENCE } from "@/lib/audience";
 
 const Schema = z.object({
   name: z.string().trim().min(1, "Product name is required").max(120),
@@ -42,6 +43,11 @@ const Schema = z.object({
   description: z.string().trim().max(2000).optional().or(z.literal("")),
   // The branching question — required. Drives Launch Mode vs Growth Mode.
   launchStage: z.enum(["PRE_LAUNCH", "UNANNOUNCED", "LAUNCHED"]),
+  // Audience language for generated drafts/analysis. Unknown/missing → English.
+  audienceLanguage: z
+    .string()
+    .optional()
+    .transform((v) => (isAudienceLanguage(v) ? v : DEFAULT_AUDIENCE)),
 });
 
 export type OnboardingState = {
@@ -63,6 +69,7 @@ export async function createProject(
     githubInstallationId: formData.get("githubInstallationId") || undefined,
     description: formData.get("description") || undefined,
     launchStage: formData.get("launchStage"),
+    audienceLanguage: formData.get("audienceLanguage") || undefined,
   });
   if (!parsed.success) {
     const { fieldErrors, formError } = fieldErrorsFromZod(parsed.error);
@@ -107,6 +114,7 @@ export async function createProject(
       githubInstallationId,
       description: parsed.data.description || null,
       launchStage,
+      audienceLanguage: parsed.data.audienceLanguage,
     },
   });
 

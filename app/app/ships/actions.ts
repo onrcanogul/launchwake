@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { buildPlan } from "@/lib/analysis";
 import { generateDraft } from "@/lib/drafts";
 import { isDraftTone, type DraftTone } from "@/lib/tones";
+import { isAudienceLanguage, DEFAULT_AUDIENCE } from "@/lib/audience";
 import { suggestShip, parseRepo } from "@/lib/github";
 import { recordPostForRecommendation } from "@/lib/attribution";
 import { resolveAccount } from "@/lib/team";
@@ -133,6 +134,25 @@ export async function rerunPlan(shipId: string): Promise<void> {
     select: { id: true },
   });
   if (!ship) notFound();
+  await buildPlan(shipId);
+  revalidatePath("/app/[project]/ships/[id]/plan", "page");
+}
+
+/**
+ * Override this ship's audience language (from the "Where to post" screen) and
+ * rebuild its plan in that language. An unknown code degrades to English. The
+ * rebuild replaces the plan (and clears stale drafts), so the whole ship — plan
+ * rationale and any drafts regenerated after — comes out in the new language.
+ */
+export async function setShipAudience(shipId: string, code: string): Promise<void> {
+  const accountId = await requireAccount();
+  const ship = await db.ship.findFirst({
+    where: { id: shipId, project: { userId: accountId } },
+    select: { id: true },
+  });
+  if (!ship) notFound();
+  const audienceLanguage = isAudienceLanguage(code) ? code : DEFAULT_AUDIENCE;
+  await db.ship.update({ where: { id: shipId }, data: { audienceLanguage } });
   await buildPlan(shipId);
   revalidatePath("/app/[project]/ships/[id]/plan", "page");
 }

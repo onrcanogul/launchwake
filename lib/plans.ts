@@ -35,8 +35,10 @@ export type ShipWithPlan = {
     status: ShipStatus;
     /** Chosen launch date (Launch Mode) — anchors account-readiness timing. */
     launchAt: Date | null;
+    /** Per-ship audience-language override (null = inherit project default). */
+    audienceLanguage: string | null;
   };
-  project: { id: string; name: string; userId: string };
+  project: { id: string; name: string; userId: string; audienceLanguage: string };
   recs: RecView[];
 };
 
@@ -48,7 +50,7 @@ export async function getShipWithPlan(
   const ship = await db.ship.findFirst({
     where: { id: shipId, project: { userId: ownerId } },
     include: {
-      project: { select: { id: true, name: true, userId: true } },
+      project: { select: { id: true, name: true, userId: true, audienceLanguage: true } },
       plan: {
         include: {
           recs: {
@@ -90,6 +92,7 @@ export async function getShipWithPlan(
       summary: ship.summary,
       status: ship.status,
       launchAt: ship.launchAt,
+      audienceLanguage: ship.audienceLanguage,
     },
     project: ship.project,
     recs,

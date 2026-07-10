@@ -13,6 +13,7 @@ import {
   type ScoredChannel,
 } from "./channels";
 import { getProjectTagContext } from "./projectTags";
+import { analysisLanguageRule, effectiveAudienceCode } from "./audience";
 import { parseChannelCost, costPromptLine } from "./channelCost";
 import {
   productTagFor,
@@ -81,7 +82,7 @@ export function buildAnalysisPrompt(
   input: PlanInput,
   candidates: ChannelLike[],
   outcomeContext?: Map<string, string>,
-  opts?: { launchContext?: boolean },
+  opts?: { launchContext?: boolean; audienceCode?: string },
 ) {
   const hasOutcomes = Boolean(outcomeContext && outcomeContext.size > 0);
   // Only include the short-form judgment rule when there are actually short-form
@@ -96,6 +97,9 @@ export function buildAnalysisPrompt(
     "- You may ONLY use channels from the provided candidate list. NEVER invent communities, subreddits, or platforms. Refer to each by its exact slug.",
     "- Ground the 'ruleNote' in the channel's stated rules — the concrete safe way in for this post (e.g. 'lead with the build story, no marketing tone').",
     "- 'why' must be specific to this product + ship, not generic. One or two sentences.",
+    // Localize the rationale AND bias ranking toward the target audience's
+    // language. Empty for an English audience (the prompt already defaults to it).
+    analysisLanguageRule(opts?.audienceCode ?? "en"),
     opts?.launchContext
       ? "- This is a FIRST public launch. Favor launch venues (Product Hunt, Show HN, launch-friendly communities) — rank them higher than evergreen posting channels, and frame 'why' around making the launch land."
       : "",
@@ -307,6 +311,13 @@ export async function buildPlan(
   const launchContext =
     opts?.launchContext ?? ship.project.launchStage !== "LAUNCHED";
 
+  // Effective output language: this ship's override, else the project default.
+  // Drives the language of the generated 'why'/'ruleNote' and the ranking bias.
+  const audienceCode = effectiveAudienceCode(
+    ship.audienceLanguage,
+    ship.project.audienceLanguage,
+  );
+
   // Assemble the channel-fit context through the shared helper (keyword signals
   // over the product + ship text — no product-type classification).
   const { ctx } = await getProjectTagContext(ship.project, {
@@ -365,6 +376,7 @@ export async function buildPlan(
   if (llmConfigured()) {
     const { system, prompt } = buildAnalysisPrompt(input, candidates, outcomeContext, {
       launchContext,
+      audienceCode,
     });
     try {
       ranking = await completeJSON({

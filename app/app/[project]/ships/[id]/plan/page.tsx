@@ -9,7 +9,9 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Note } from "@/components/ui/Note";
 import { Button } from "@/components/ui/Button";
 import { RerunButton } from "@/components/ship/RerunButton";
+import { AudiencePicker } from "@/components/ship/AudiencePicker";
 import { ShipSwitcher } from "@/components/ship/ShipSwitcher";
+import { effectiveAudienceCode } from "@/lib/audience";
 import { SyncActiveShip } from "@/components/ship/SyncActiveShip";
 import { AutoBuildPlan } from "@/components/ship/AutoBuildPlan";
 import { LaunchModeRail } from "@/components/ship/LaunchModeRail";
@@ -127,6 +129,15 @@ export default async function PlanPage({
               ships={ships}
               currentId={ship.id}
               mode="plan"
+            />
+          )}
+          {recs.length > 0 && (
+            <AudiencePicker
+              shipId={ship.id}
+              current={effectiveAudienceCode(
+                ship.audienceLanguage,
+                ws.project.audienceLanguage,
+              )}
             />
           )}
           {recs.length > 0 && <RerunButton shipId={ship.id} />}

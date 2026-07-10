@@ -160,6 +160,11 @@ model Project {
   name                 String
   description          String? // used as LLM context for fit scoring
   url                  String?
+  // Target-audience language for GENERATED content (drafts + analysis "why"/
+  // rules) and channel-ranking bias. This localizes OUTPUT only — the app UI
+  // stays English. BCP-47 primary subtag from lib/audience.ts; "en" default.
+  // A ship can override it per-plan (Ship.audienceLanguage).
+  audienceLanguage     String   @default("en")
   // Where this product is in its launch lifecycle. Set at onboarding; branches
   // the journey into Launch Mode (PRE_LAUNCH/UNANNOUNCED) vs Growth Mode
   // (LAUNCHED). Existing projects default to LAUNCHED (already in growth use).
@@ -195,6 +200,10 @@ model Ship {
   title      String
   summary    String? // what makes it worth sharing
   sourceUrl  String? // release URL / blog URL
+  // Per-ship override of the project's audience language (null = inherit the
+  // project default). Set from the "Where to post" screen so one ship can be
+  // planned/drafted for a different audience than the project's default.
+  audienceLanguage String? // BCP-47 primary subtag (lib/audience.ts) or null
   commitSha  String?
   status     ShipStatus        @default(NEW)
   // Chosen launch date (Launch Mode). Anchors the D-7..D+2 schedule, the

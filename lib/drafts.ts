@@ -7,6 +7,7 @@ import {
   UNTRUSTED_DATA_NOTICE,
 } from "./llm";
 import { TONE_GUIDE, type DraftTone } from "./tones";
+import { draftLanguageRule, effectiveAudienceCode } from "./audience";
 import type { Channel, Draft, Project, Ship } from "@prisma/client";
 
 /**
@@ -46,7 +47,11 @@ const PLATFORM_STYLE: Record<string, string> = {
   OTHER: "Match the community's norms; value-first, honest, concise.",
 };
 
-export function buildDraftPrompt(ctx: DraftContext, tone: DraftTone = "founder") {
+export function buildDraftPrompt(
+  ctx: DraftContext,
+  tone: DraftTone = "founder",
+  audienceCode = "en",
+) {
   const style = PLATFORM_STYLE[ctx.channel.platform] ?? PLATFORM_STYLE.OTHER;
   const system = [
     "You write platform-native distribution drafts for a technical founder.",
@@ -56,9 +61,13 @@ export function buildDraftPrompt(ctx: DraftContext, tone: DraftTone = "founder")
     TONE_GUIDE[tone],
     "Write the draft EXACTLY as it should be pasted — do NOT add 'Title:'/'Body:' labels, section headers, or meta commentary.",
     "For Show HN, the very first line must be the title, starting with 'Show HN:'.",
+    // Localize the draft to the target audience's language. Empty for English.
+    draftLanguageRule(audienceCode),
     UNTRUSTED_DATA_NOTICE,
     "Respond with ONLY a JSON object: {\"body\":string,\"safetyNote\":string}. safetyNote is one line on how to post safely here.",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const prompt = [
     `Channel: ${ctx.channel.name} [${ctx.channel.platform}]`,
@@ -141,14 +150,22 @@ export async function generateDraft(
     ruleNote: rec.ruleNote,
   };
 
-  const prompt = buildDraftPrompt(ctx, tone);
+  // Localize the draft to the ship's effective audience (ship override, else the
+  // project default) — the same resolution the plan uses, so a plan and its
+  // drafts always come out in one language.
+  const audienceCode = effectiveAudienceCode(
+    ship.audienceLanguage,
+    project.audienceLanguage,
+  );
+
+  const prompt = buildDraftPrompt(ctx, tone, audienceCode);
   const result = llmConfigured()
     ? await completeJSON({
         userId: project.userId,
         system: prompt.system,
         prompt: prompt.prompt,
         schema: DraftSchema,
-        label: `draft:${rec.channel.platform}:${tone}`,
+        label: `draft:${rec.channel.platform}:${tone}:${audienceCode}`,
       })
     : heuristicDraft(ctx);
 
