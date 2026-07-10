@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { matchChannels } from "./channels";
-import type { Project } from "@prisma/client";
+import { getProjectTagContext, type ClassifiableProject } from "./projectTags";
 
 /**
  * Launch radar — watch how products in the founder's category are launching on
@@ -191,17 +191,13 @@ async function fetchReddit(subs: string[], sinceDays = 7): Promise<RadarItem[]> 
 }
 
 /** Subreddits relevant to this project, from the ranked catalog. */
-async function relevantSubreddits(project: Pick<Project, "name" | "description" | "url">): Promise<string[]> {
+async function relevantSubreddits(project: ClassifiableProject): Promise<string[]> {
   const catalog = await db.channel.findMany({ where: { platform: "REDDIT" } });
-  const scored = matchChannels(
-    catalog,
-    {
-      projectText: `${project.name} ${project.description ?? ""} ${project.url ?? ""}`,
-      shipText: "",
-      shipType: "OTHER",
-    },
-    4,
-  );
+  // Shared fit-context (cache-only — this runs in the digest cron and Reddit has
+  // no short-form channels, so it never triggers a fresh classify; it just reuses
+  // a cached one to keep subreddit ranking consistent with the plan/directory).
+  const { ctx } = await getProjectTagContext(project, { classifyOnMiss: false });
+  const scored = matchChannels(catalog, ctx, 4);
   return scored
     .map((s) => s.channel.url?.match(/reddit\.com\/r\/([^/]+)/i)?.[1])
     .filter((x): x is string => Boolean(x));
@@ -209,7 +205,7 @@ async function relevantSubreddits(project: Pick<Project, "name" | "description" 
 
 /** The radar for a project — HN + Reddit launches in its category. Never throws. */
 export async function getLaunchRadar(
-  project: Pick<Project, "name" | "description" | "url">,
+  project: ClassifiableProject,
 ): Promise<RadarItem[]> {
   const queries = radarQueries(`${project.name} ${project.description ?? ""} ${project.url ?? ""}`);
   const subs = await relevantSubreddits(project).catch(() => []);

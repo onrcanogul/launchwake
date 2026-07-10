@@ -7,6 +7,7 @@ import {
   UNTRUSTED_DATA_NOTICE,
 } from "./llm";
 import { matchChannels } from "./channels";
+import { getProjectTagContext } from "./projectTags";
 import type { Channel, PitchStatus, Project, Ship } from "@prisma/client";
 
 /**
@@ -158,15 +159,13 @@ export async function getShipPitches(shipId: string): Promise<NewsletterOpportun
   if (!ship) return [];
 
   const catalog = await db.channel.findMany({ where: { platform: "NEWSLETTER" } });
-  const ranked = matchChannels(
-    catalog,
-    {
-      projectText: `${ship.project.name} ${ship.project.description ?? ""} ${ship.project.url ?? ""}`,
-      shipText: `${ship.title} ${ship.summary ?? ""}`,
-      shipType: ship.type as string,
-    },
-    MAX_NEWSLETTERS,
-  );
+  // Shared fit-context (cache-only — newsletters carry no short-form channels, so
+  // this path never needs to pay for a fresh classify; it reuses one if present).
+  const { ctx } = await getProjectTagContext(ship.project, {
+    ship,
+    classifyOnMiss: false,
+  });
+  const ranked = matchChannels(catalog, ctx, MAX_NEWSLETTERS);
 
   const pitches = await db.newsletterPitch.findMany({ where: { shipId } });
   const pitchByChannel = new Map(pitches.map((p) => [p.channelId, p]));

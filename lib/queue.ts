@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { matchChannels } from "./channels";
+import { getProjectTagContext } from "./projectTags";
 import type { QueuePhase, QueueTaskStatus } from "@prisma/client";
 
 /**
@@ -123,16 +124,30 @@ export function dueLabel(dueAt: Date, now: Date = new Date()): string {
 export async function generateQueueForShip(shipId: string): Promise<{ tasks: number }> {
   const ship = await db.ship.findUnique({
     where: { id: shipId },
-    include: { project: { select: { name: true, description: true, url: true } } },
+    include: {
+      project: {
+        select: {
+          id: true,
+          userId: true,
+          name: true,
+          description: true,
+          url: true,
+          classificationJson: true,
+          classificationHash: true,
+        },
+      },
+    },
   });
   if (!ship) return { tasks: 0 };
 
   const catalog = await db.channel.findMany();
-  const ctx = {
-    projectText: `${ship.project.name} ${ship.project.description ?? ""} ${ship.project.url ?? ""}`,
-    shipText: `${ship.title} ${ship.summary ?? ""}`,
-    shipType: ship.type as string,
-  };
+  // Shared fit-context (cache-only — the queue is generated right after buildPlan
+  // has already classified + cached, so this hits the cache; it keeps short-form
+  // channels in the queue consistent with the plan without a second LLM call).
+  const { ctx } = await getProjectTagContext(ship.project, {
+    ship,
+    classifyOnMiss: false,
+  });
 
   const perPhase: Partial<Record<QueuePhase, { id: string }[]>> = {};
   for (const phase of PHASE_ORDER) {

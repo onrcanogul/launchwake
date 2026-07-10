@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Icon, type IconName } from "@/components/Icon";
 import { relativeTime } from "@/lib/ships";
 import { getLaunchRadar, type RadarSource } from "@/lib/radar";
-import type { Project } from "@prisma/client";
+import type { ClassifiableProject } from "@/lib/projectTags";
 
 const SOURCE: Record<RadarSource, { icon: IconName; label: string }> = {
   HN: { icon: "hn", label: "Show HN" },
@@ -19,7 +19,7 @@ const SOURCE: Record<RadarSource, { icon: IconName; label: string }> = {
 export async function LaunchRadar({
   project,
 }: {
-  project: Pick<Project, "name" | "description" | "url">;
+  project: ClassifiableProject;
 }) {
   const items = await getLaunchRadar(project);
 

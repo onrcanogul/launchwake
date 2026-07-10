@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { matchChannels } from "./channels";
-import type { BanRisk, Platform, Project } from "@prisma/client";
+import { getProjectTagContext, type ClassifiableProject } from "./projectTags";
+import type { BanRisk, Platform } from "@prisma/client";
 
 export type DirectoryRow = {
   slug: string;
@@ -17,19 +18,16 @@ export type DirectoryRow = {
  * annotated with the user's own signups per channel (the flywheel view).
  */
 export async function getChannelDirectory(
-  project: Pick<Project, "id" | "name" | "description" | "url">,
+  project: ClassifiableProject,
 ): Promise<DirectoryRow[]> {
   const catalog = await db.channel.findMany();
 
-  const scored = matchChannels(
-    catalog,
-    {
-      projectText: `${project.name} ${project.description ?? ""} ${project.url ?? ""}`,
-      shipText: "",
-      shipType: "OTHER",
-    },
-    catalog.length,
-  );
+  // Same shared fit-context as buildPlan → the directory admits (or excludes)
+  // short-form channels on the same classification gate the plan uses, instead of
+  // the raw-text heuristic alone. It ranks the FULL catalog, so an eligible
+  // short-form channel appears with its fit score; an ineligible one is dropped.
+  const { ctx } = await getProjectTagContext(project);
+  const scored = matchChannels(catalog, ctx, catalog.length);
 
   // Signups per channel for this project (via posts → tracked link → events).
   const signupRows = await db.event.groupBy({

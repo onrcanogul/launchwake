@@ -12,13 +12,7 @@ import {
   type ChannelLike,
   type ScoredChannel,
 } from "./channels";
-import {
-  classifyProduct,
-  classificationToTags,
-  classificationInputHash,
-  ProductClassificationSchema,
-  type ProductClassification,
-} from "./classify";
+import { getProjectTagContext } from "./projectTags";
 import { parseChannelCost, costPromptLine } from "./channelCost";
 import {
   productTagFor,
@@ -251,71 +245,6 @@ export function computeBanRisk(channel: Channel, removals = 0): BanRisk {
 }
 
 /**
- * Resolve the product classification for a project.
- *
- * Uses the value cached on the Project when the product inputs (name/description/
- * url) are unchanged — the hash gate makes repeat plan builds cost ZERO extra LLM
- * calls. On a miss (first classification, edited product, or a drifted cached
- * shape) it makes one cheap classify call and persists the result. Returns null
- * when the product can't be classified (LLM unconfigured or the call failed), so
- * the caller falls back to the pure `deriveSignalTags` heuristic.
- */
-async function resolveProjectClassification(
-  project: Pick<
-    Project,
-    | "id"
-    | "userId"
-    | "name"
-    | "description"
-    | "url"
-    | "classificationJson"
-    | "classificationHash"
-  >,
-  ship: Pick<Ship, "title" | "summary">,
-): Promise<ProductClassification | null> {
-  const hash = classificationInputHash(project);
-
-  // Cache hit: product inputs unchanged since the last classification.
-  if (project.classificationHash === hash && project.classificationJson != null) {
-    const parsed = ProductClassificationSchema.safeParse(project.classificationJson);
-    if (parsed.success) return parsed.data;
-    // A drifted/invalid cached shape falls through to re-classify.
-  }
-
-  const classification = await classifyProduct(
-    {
-      name: project.name,
-      description: project.description,
-      url: project.url,
-      shipTitle: ship.title,
-      shipSummary: ship.summary,
-    },
-    project.userId,
-  );
-  if (!classification) return null;
-
-  // Persist so the next plan build for an unchanged product is free. Best-effort:
-  // a write hiccup must not fail the plan — we already hold the classification.
-  await db.project
-    .update({
-      where: { id: project.id },
-      data: {
-        classificationJson: classification,
-        classificationHash: hash,
-        classifiedAt: new Date(),
-      },
-    })
-    .catch((err) => {
-      captureError(err, {
-        at: "analysis.resolveProjectClassification",
-        reason: "cache_write_failed",
-      });
-    });
-
-  return classification;
-}
-
-/**
  * Build (or rebuild) the distribution plan for a ship. Returns the plan id.
  *
  * `launchContext` favors launch venues in ranking; when omitted it's derived
@@ -334,27 +263,19 @@ export async function buildPlan(
   const launchContext =
     opts?.launchContext ?? ship.project.launchStage !== "LAUNCHED";
 
-  // Let the analysis itself decide when short-form channels belong: classify the
-  // product (cached on the Project, re-run only on name/desc/url change) and turn
-  // that into fit-tags. Low-confidence / unclassifiable → empty tags → the pure
-  // heuristic path, so a devtool is never handed TikTok.
-  const classification = await resolveProjectClassification(ship.project, ship);
-  const classificationTags = classification
-    ? classificationToTags(classification)
-    : [];
+  // Assemble the channel-fit context through the shared helper so the plan gates
+  // short-form channels IDENTICALLY to the Channels directory. It classifies the
+  // product (cached on the Project, re-run only on name/desc/url change) and folds
+  // the resulting tags into the signal set; low-confidence / unclassifiable →
+  // empty tags → the pure heuristic path, so a devtool is never handed TikTok.
+  const { ctx, classification } = await getProjectTagContext(ship.project, {
+    ship,
+    shipType: ship.type,
+    launchContext,
+  });
 
   const catalog = await db.channel.findMany();
-  const scored = matchChannels(
-    catalog,
-    {
-      projectText: `${ship.project.name} ${ship.project.description ?? ""} ${ship.project.url ?? ""}`,
-      shipText: `${ship.title} ${ship.summary ?? ""}`,
-      shipType: ship.type,
-      launchContext,
-      classificationTags,
-    },
-    MAX_CANDIDATES,
-  );
+  const scored = matchChannels(catalog, ctx, MAX_CANDIDATES);
 
   const candidates = scored.map((s) => s.channel);
   const bySlug = new Map(catalog.map((c) => [c.slug, c]));
