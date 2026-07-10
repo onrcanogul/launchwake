@@ -44,6 +44,7 @@ export type IconName =
   | "youtube"
   | "tiktok"
   | "instagram"
+  | "video"
   | "rocket";
 
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -213,6 +214,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <rect x="4" y="4" width="16" height="16" rx="4.5" />
       <circle cx="12" cy="12" r="3.6" />
       <circle cx="16.6" cy="7.4" r="0.5" />
+    </>
+  ),
+  video: (
+    <>
+      <rect x="3" y="5" width="13" height="14" rx="2" />
+      <path d="M16 10l5-3v10l-5-3z" />
     </>
   ),
   rocket: (

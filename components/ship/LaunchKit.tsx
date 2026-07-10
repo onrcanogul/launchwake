@@ -9,6 +9,7 @@ import { ensureDraft, markPosted } from "@/app/app/ships/actions";
 import { trackClientEvent } from "@/components/analytics/TrackView";
 import { checkDraft, safetyVerdict } from "@/lib/bansafety";
 import { DRAFT_TONES, type DraftTone } from "@/lib/tones";
+import type { Storyboard } from "@/lib/drafts";
 import type { KitRec } from "@/lib/plans";
 
 /** Session key for unsaved per-rec draft edits (survive tab/page switches). */
@@ -18,6 +19,21 @@ const EDITS_KEY = "lw-kit-edits";
 function takeLabel(body: string): string {
   const words = body.replace(/\s+/g, " ").trim().split(" ");
   return words.slice(0, 4).join(" ") + (words.length > 4 ? "…" : "");
+}
+
+/** Flatten a video concept to plain text for the "Copy shot list" button. */
+function storyboardText(sb: Storyboard): string {
+  const lines = [
+    `HOOK (first 2s): ${sb.hook}`,
+    "",
+    "SHOT LIST:",
+    ...sb.beats.map((b, i) => `${i + 1}. ${b.label} — ${b.detail}`),
+  ];
+  if (sb.onScreenText.length) {
+    lines.push("", "ON-SCREEN TEXT:", ...sb.onScreenText.map((t) => `• ${t}`));
+  }
+  lines.push("", `SOUND: ${sb.sound}`);
+  return lines.join("\n");
 }
 
 export function LaunchKit({
@@ -89,6 +105,10 @@ export function LaunchKit({
   }, [activeId]);
 
   const active = recs.find((r) => r.id === activeId);
+  // Short-form channels (TikTok/Reels/Shorts) carry a video concept alongside
+  // the caption — the kit shows the shoot plan, not just a paragraph.
+  const sb = active?.draft?.storyboard ?? null;
+  const isShort = active?.shortform ?? false;
   const draftBody =
     active && active.draft ? (edits[active.id] ?? active.draft.body) : "";
   const edited = Boolean(
@@ -254,9 +274,59 @@ export function LaunchKit({
 
             {active.draft ? (
               <>
+                {sb && (
+                  <div className="storyboard">
+                    <div className="sb-head">
+                      <span className="sb-title">
+                        <Icon name="video" /> Video concept
+                      </span>
+                      <button
+                        className="btn btn-gh"
+                        onClick={() => copy(storyboardText(sb), "shots")}
+                        title="Copy the hook, shot list and sound as a shoot plan"
+                      >
+                        <Icon name={copied === "shots" ? "check" : "copy"} />{" "}
+                        {copied === "shots" ? "Copied" : "Copy shot list"}
+                      </button>
+                    </div>
+                    <div className="sb-hook">
+                      <span className="sb-k">Hook · first 2s</span>
+                      <p>{sb.hook}</p>
+                    </div>
+                    <ol className="sb-shots">
+                      {sb.beats.map((b, i) => (
+                        <li key={i}>
+                          <span className="sb-n">{i + 1}</span>
+                          <div>
+                            <b>{b.label}</b>
+                            <span>{b.detail}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                    {sb.onScreenText.length > 0 && (
+                      <div className="sb-row">
+                        <span className="sb-k">On-screen text</span>
+                        <div className="sb-chips">
+                          {sb.onScreenText.map((t, i) => (
+                            <span className="sb-chip" key={i}>
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="sb-row">
+                      <span className="sb-k">Sound</span>
+                      <span className="sb-sound">{sb.sound}</span>
+                    </div>
+                  </div>
+                )}
                 <div className="draft-controls">
                   <div className="tone-pick">
-                    <span className="tk-label">Next take:</span>
+                    <span className="tk-label">
+                      {isShort ? "Next concept:" : "Next take:"}
+                    </span>
                     <div className="seg">
                       {DRAFT_TONES.map((t) => (
                         <button
@@ -282,9 +352,16 @@ export function LaunchKit({
                     ) : (
                       <Icon name="refresh" />
                     )}
-                    {pending ? "Writing…" : "New take"}
+                    {pending
+                      ? isShort
+                        ? "Building…"
+                        : "Writing…"
+                      : isShort
+                        ? "New concept"
+                        : "New take"}
                   </button>
                 </div>
+                {sb && <span className="cap-label">Caption</span>}
                 <textarea
                   className="draft-edit"
                   value={draftBody}
@@ -292,7 +369,11 @@ export function LaunchKit({
                     setEdit(active.id, e.target.value, active.draft!.body)
                   }
                   spellCheck={false}
-                  aria-label="Draft — edit and re-check before posting"
+                  aria-label={
+                    sb
+                      ? "Caption — edit and re-check before posting"
+                      : "Draft — edit and re-check before posting"
+                  }
                 />
                 {(history[active.id]?.length ?? 0) > 0 && (
                   <div className="takes">
@@ -323,8 +404,9 @@ export function LaunchKit({
                 <p
                   style={{ color: "var(--tx2)", fontSize: 12.5, marginBottom: 12 }}
                 >
-                  No draft yet. Generate one grounded in this channel&apos;s
-                  rules — then copy, tweak, and post it yourself.
+                  {isShort
+                    ? "No video concept yet. Generate a hook, shot list, on-screen text and caption for this format — then shoot and post it yourself."
+                    : "No draft yet. Generate one grounded in this channel's rules — then copy, tweak, and post it yourself."}
                 </p>
                 <button
                   className="btn btn-p"
@@ -334,9 +416,15 @@ export function LaunchKit({
                   {pending ? (
                     <span className="lw-spin" aria-hidden />
                   ) : (
-                    <Icon name="kit" />
+                    <Icon name={isShort ? "video" : "kit"} />
                   )}
-                  {pending ? "Writing draft…" : "Generate draft"}
+                  {pending
+                    ? isShort
+                      ? "Building concept…"
+                      : "Writing draft…"
+                    : isShort
+                      ? "Generate video concept"
+                      : "Generate draft"}
                 </button>
               </div>
             )}

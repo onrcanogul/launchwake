@@ -44,6 +44,7 @@ export function ChannelCard({
   remind,
   benchmark,
   accountReadiness,
+  shortform,
 }: {
   data: ChannelCardData;
   draftHref: string;
@@ -53,6 +54,8 @@ export function ChannelCard({
   benchmark?: BenchmarkCardData | null;
   /** Launch-mode account-readiness detail; omit outside launch mode. */
   accountReadiness?: AccountReadinessBlock | null;
+  /** Short-form video channel — the kit produces a video concept, not text. */
+  shortform?: boolean;
 }) {
   const risk = RISK[data.banRisk];
   const fit = Math.max(0, Math.min(100, data.fitScore));
@@ -129,7 +132,7 @@ export function ChannelCard({
         <div className="act" style={{ display: "flex", gap: 8 }}>
           {remind && <RemindMenu {...remind} />}
           <Button variant="primary" href={draftHref}>
-            Get draft
+            {shortform ? "Get video concept" : "Get draft"}
           </Button>
         </div>
       </div>

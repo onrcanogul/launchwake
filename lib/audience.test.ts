@@ -89,7 +89,7 @@ const planInput: PlanInput = {
 const draftCtx: DraftContext = {
   project: { name: "Hookline", description: "webhook tool", url: "https://hookline.dev" },
   ship: { type: "FEATURE", title: "Slack alerts", summary: "Know when webhooks fail." },
-  channel: { name: "Hacker News — Show HN", platform: "HACKERNEWS", rules: "Build story first." },
+  channel: { name: "Hacker News — Show HN", platform: "HACKERNEWS", rules: "Build story first.", tags: [] },
   ruleNote: "Problem-first, no pitch.",
 };
 

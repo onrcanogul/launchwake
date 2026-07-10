@@ -337,6 +337,10 @@ model Draft {
   platform         Platform
   body             String
   safetyNote       String?
+  // Short-form video concept (TikTok/Reels/Shorts): { hook, beats[], onScreenText[],
+  // sound }. Null for text channels — there `body` is the whole draft; for
+  // short-form `body` is the caption and this holds the shootable storyboard.
+  storyboard       Json?
   createdAt        DateTime       @default(now())
 }
 

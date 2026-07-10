@@ -205,6 +205,7 @@ export default async function PlanPage({
                 }}
                 draftHref={`/app/${project}/ships/${ship.id}/kit?rec=${rec.id}`}
                 settingsHref={settingsHref}
+                shortform={rec.shortform}
                 benchmark={benchmarkFor(rec.channelSlug)}
                 accountReadiness={readinessFor(rec)}
                 remind={
@@ -244,6 +245,7 @@ export default async function PlanPage({
                     }}
                     draftHref={settingsHref}
                     settingsHref={settingsHref}
+                    shortform={rec.shortform}
                     benchmark={benchmarkFor(rec.channelSlug)}
                     accountReadiness={readinessFor(rec)}
                   />

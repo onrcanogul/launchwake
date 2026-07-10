@@ -1,8 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   buildDraftPrompt,
+  buildShotBriefPrompt,
   heuristicDraft,
+  heuristicShotBrief,
   DraftSchema,
+  ShotBriefSchema,
+  StoryboardSchema,
+  parseStoryboard,
   type DraftContext,
 } from "./drafts";
 
@@ -21,8 +26,30 @@ const base: DraftContext = {
     name: "Hacker News — Show HN",
     platform: "HACKERNEWS",
     rules: "Lead with the build story. No marketing tone.",
+    tags: [],
   },
   ruleNote: "Frame it problem-first, no pitch.",
+};
+
+/** A visual consumer product on a short-form video channel. */
+const shortformCtx: DraftContext = {
+  project: {
+    name: "Framecut",
+    description: "one-tap video editor for iPhone",
+    url: "https://framecut.app",
+  },
+  ship: {
+    type: "LAUNCH",
+    title: "Auto-captions that match your voice",
+    summary: "Captions render in under two seconds, styled to your brand.",
+  },
+  channel: {
+    name: "TikTok — App Demo",
+    platform: "TIKTOK",
+    rules: "Hook in the first 2 seconds. Screen-record the demo. No clickable links — bio only.",
+    tags: ["shortform", "mobile-app", "consumer", "visual-demo"],
+  },
+  ruleNote: "Lead with the most satisfying 2-second moment.",
 };
 
 describe("buildDraftPrompt", () => {
@@ -46,10 +73,80 @@ describe("heuristicDraft", () => {
   it("produces an X thread with numbered tweets", () => {
     const d = heuristicDraft({
       ...base,
-      channel: { name: "X", platform: "X", rules: null },
+      channel: { name: "X", platform: "X", rules: null, tags: [] },
     });
     expect(d.body).toContain("1/");
     expect(d.body).toContain("https://hookline.dev");
+  });
+});
+
+describe("buildShotBriefPrompt (short-form video)", () => {
+  it("asks for a shootable concept, not a paragraph", () => {
+    const { system, prompt } = buildShotBriefPrompt(shortformCtx);
+    expect(system).toMatch(/shootable concept/i);
+    expect(system).toMatch(/hook/i);
+    expect(system).toMatch(/shot list/i);
+    // The JSON shape the model must return is spelled out.
+    expect(system).toMatch(/"beats"/);
+    expect(prompt).toContain("Framecut");
+    expect(prompt).toContain("Lead with the most satisfying");
+  });
+
+  it("tells TikTok/Instagram the CTA link goes in bio (no tappable caption link)", () => {
+    const { system } = buildShotBriefPrompt(shortformCtx);
+    expect(system).toMatch(/link in bio/i);
+    expect(system).not.toMatch(/link in the description/i);
+  });
+
+  it("tells YouTube Shorts the link can go in the description", () => {
+    const { system } = buildShotBriefPrompt({
+      ...shortformCtx,
+      channel: { ...shortformCtx.channel, platform: "YOUTUBE" },
+    });
+    expect(system).toMatch(/link in the description/i);
+  });
+});
+
+describe("heuristicShotBrief", () => {
+  it("produces a schema-valid video concept with a hook, shots, and caption", () => {
+    const brief = heuristicShotBrief(shortformCtx);
+    expect(() => ShotBriefSchema.parse(brief)).not.toThrow();
+    expect(brief.beats.length).toBeGreaterThanOrEqual(2);
+    expect(brief.hook).toMatch(/Framecut/);
+    expect(brief.caption).toContain("Framecut");
+    // TikTok has no tappable caption link — the offline CTA says "in bio".
+    expect(brief.caption).toMatch(/link in bio/i);
+  });
+
+  it("routes the CTA to the description for YouTube Shorts", () => {
+    const brief = heuristicShotBrief({
+      ...shortformCtx,
+      channel: { ...shortformCtx.channel, platform: "YOUTUBE" },
+    });
+    expect(brief.caption).toMatch(/link in the description/i);
+  });
+
+  it("splits into a caption (body) and a persisted storyboard", () => {
+    const brief = heuristicShotBrief(shortformCtx);
+    const { caption, safetyNote, ...storyboard } = brief;
+    expect(caption.length).toBeGreaterThan(0);
+    expect(safetyNote?.length ?? 0).toBeGreaterThan(0);
+    // What we persist as Draft.storyboard round-trips through the reader.
+    expect(parseStoryboard(storyboard)).not.toBeNull();
+    expect(() => StoryboardSchema.parse(storyboard)).not.toThrow();
+  });
+});
+
+describe("parseStoryboard", () => {
+  it("returns null for null/garbage and a typed value for valid JSON", () => {
+    expect(parseStoryboard(null)).toBeNull();
+    expect(parseStoryboard({ nope: true })).toBeNull();
+    const { caption, safetyNote, ...storyboard } = heuristicShotBrief(shortformCtx);
+    void caption;
+    void safetyNote;
+    // Simulate a JSON round-trip through the DB column.
+    const roundTripped = parseStoryboard(JSON.parse(JSON.stringify(storyboard)));
+    expect(roundTripped?.beats.length).toBe(storyboard.beats.length);
   });
 });
 
@@ -71,7 +168,7 @@ describe("prompt-injection hygiene", () => {
     const ctx: DraftContext = {
       ...base,
       ship: { ...base.ship, summary: injected },
-      channel: { name: "X", platform: "X", rules: null },
+      channel: { name: "X", platform: "X", rules: null, tags: [] },
     };
     const draft = heuristicDraft(ctx);
     // Output is always constrained by the zod schema before it's used.

@@ -5,6 +5,8 @@ import {
   type AccountRequirements,
 } from "./accountReadiness";
 import { parseChannelCost, type ChannelCost } from "./channelCost";
+import { isShortformChannel } from "./channels";
+import { parseStoryboard, type Storyboard } from "./drafts";
 import type { BanRisk, Platform, ShipType, ShipStatus } from "@prisma/client";
 
 export type RecView = {
@@ -20,6 +22,8 @@ export type RecView = {
   ruleNote: string | null;
   outcomeNote: string | null;
   hasDraft: boolean;
+  /** Short-form video channel (TikTok/Reels/Shorts) — the kit produces a video concept. */
+  shortform: boolean;
   /** Seeded account-readiness data for this channel (null when none). */
   accountRequirements: AccountRequirements | null;
   /** Normalized cost to post here (absent seed → free). Drives the cost badge. */
@@ -80,6 +84,7 @@ export async function getShipWithPlan(
       ruleNote: r.ruleNote,
       outcomeNote: r.outcomeNote,
       hasDraft: Boolean(r.draft),
+      shortform: isShortformChannel(r.channel),
       accountRequirements: parseAccountRequirements(r.channel.accountRequirements),
       cost: parseChannelCost(r.channel.cost),
     })) ?? [];
@@ -117,7 +122,14 @@ export type KitRec = {
   ruleNote: string | null;
   channelRules: string | null;
   bestTime: string | null;
-  draft: { body: string; safetyNote: string | null } | null;
+  /** Short-form video channel — the draft carries a `storyboard` video concept. */
+  shortform: boolean;
+  draft: {
+    body: string;
+    safetyNote: string | null;
+    /** Shootable video concept for short-form channels; null for text channels. */
+    storyboard: Storyboard | null;
+  } | null;
   post: { url: string | null; trackedUrl: string | null } | null;
 };
 
@@ -160,8 +172,13 @@ export async function getShipKit(
         ruleNote: r.ruleNote,
         channelRules: r.channel.rules,
         bestTime: r.channel.bestTime,
+        shortform: isShortformChannel(r.channel),
         draft: r.draft
-          ? { body: r.draft.body, safetyNote: r.draft.safetyNote }
+          ? {
+              body: r.draft.body,
+              safetyNote: r.draft.safetyNote,
+              storyboard: parseStoryboard(r.draft.storyboard),
+            }
           : null,
         post: post
           ? {
