@@ -59,6 +59,35 @@ describe("checkDraft — Reddit", () => {
     expect(find(r, /launch pitch/i)?.level).toBe("warn");
   });
 
+  it("fails a product mention — even a footnote — on a no-promotion sub", () => {
+    const body =
+      "Here's how I pick a channel for a dev tool: match the format to what the sub already upvotes.\n\n" +
+      "What's worked for you?\n\n" +
+      "*Footnote: I recently worked on Hookline, a tool for webhook alerts.*";
+    const r = checkDraft({
+      platform: "REDDIT",
+      body,
+      channelRules: "Technical articles only, no product promotion.",
+      productName: "Hookline",
+    });
+    expect(find(r, /no-promotion sub/i)?.level).toBe("fail");
+    expect(r.worst).toBe("fail");
+  });
+
+  it("allows the same footnote on a promo-friendly sub", () => {
+    const body =
+      "Here's how I pick a channel for a dev tool: match the format to what the sub already upvotes.\n\n" +
+      "What's worked for you?\n\n" +
+      "*Footnote: I recently worked on Hookline, a tool for webhook alerts.*";
+    const r = checkDraft({
+      platform: "REDDIT",
+      body,
+      channelRules: "Share your side project here.",
+      productName: "Hookline",
+    });
+    expect(r.worst).toBe("pass");
+  });
+
   it("passes a value-first question post", () => {
     const r = checkDraft({
       platform: "REDDIT",

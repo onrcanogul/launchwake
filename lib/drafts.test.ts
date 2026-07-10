@@ -67,6 +67,20 @@ describe("buildDraftPrompt", () => {
     expect(system).toMatch(/not a marketer/i);
   });
 
+  it("demands specific substance and bans any promo on no-promotion subs (Reddit)", () => {
+    const { prompt } = buildDraftPrompt({
+      ...base,
+      channel: {
+        name: "r/programming",
+        platform: "REDDIT",
+        rules: "Technical articles only, no product promotion.",
+        tags: [],
+      },
+    });
+    expect(prompt).toMatch(/concrete|specific/i);
+    expect(prompt).toMatch(/do NOT mention the product/i);
+  });
+
   it("withholds the URL from a Reddit draft and routes it to the first comment", () => {
     const { prompt } = buildDraftPrompt({
       ...base,

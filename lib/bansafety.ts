@@ -43,16 +43,24 @@ function countUrls(s: string): number {
   return (s.match(/https?:\/\//gi) ?? []).length;
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export type DraftCheckInput = {
   body: string;
   platform: string;
   channelRules?: string | null;
+  /** The user's product name — lets us catch a self-promo mention on subs that
+   * ban promotion outright (e.g. r/programming), even a footnote plug. */
+  productName?: string | null;
 };
 
 export function checkDraft(input: DraftCheckInput): SafetyReport {
   const { platform } = input;
   const body = input.body ?? "";
   const rules = (input.channelRules ?? "").toLowerCase();
+  const productName = input.productName ?? null;
   const lines = body.split("\n").map((l) => l.trim());
   const nonEmpty = lines.filter(Boolean);
   const title = nonEmpty[0] ?? "";
@@ -121,6 +129,26 @@ export function checkDraft(input: DraftCheckInput): SafetyReport {
           "Most subs enforce a ~90/10 rule. Lead with value or a question; mention the tool as a footnote.",
         );
       else add("pass", "Value-first tone", "Reads like a contribution, not an ad.");
+
+      // Subs that ban promotion outright (r/programming: "no product promotion",
+      // "articles only") remove ANY product mention — even a value-first post
+      // with a footnote plug. Catch the product name or a plug pattern.
+      const bansPromoOutright =
+        /\bno (?:product |self[-\s]?)?promotion\b|\bno self[-\s]?promo\b|\barticles only\b|\bno (?:ads|advertising|marketing)\b/i.test(
+          rules,
+        );
+      const plug =
+        /(^|\n)\s*\*?\s*footnote\s*:/i.test(body) ||
+        /\b(?:worked on|built|made|created|launched|maintain|building)\b[^.\n]*\b(?:tool|app|product|service|platform|saas|library|extension|plugin)\b/i.test(
+          body,
+        ) ||
+        (productName ? new RegExp(`\\b${escapeRegExp(productName)}\\b`, "i").test(body) : false);
+      if (bansPromoOutright && plug)
+        add(
+          "fail",
+          "Product mention on a no-promotion sub",
+          "This sub bans promotion outright — even a footnote plug is removed. Cut the product mention entirely; contribute pure value and let people find you via your profile.",
+        );
 
       if (strict)
         add(

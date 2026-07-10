@@ -76,7 +76,7 @@ const PLATFORM_STYLE: Record<string, string> = {
   HACKERNEWS:
     "Show HN format. Title line 'Show HN: <what it is>'. Lead with the problem you hit and the build story. No marketing adjectives. End with a genuine question to invite discussion.",
   REDDIT:
-    "Value-first per the 90/10 rule. Put NO link anywhere in the post — not the title, not the body; Reddit's AutoModerator removes self-posts with an outbound link, so the product URL goes in your FIRST COMMENT (posted separately by you), never in the draft. Do NOT write a launch announcement or founder story — no 'I built…', 'over the past year…', 'I'm excited to share…', 'looking forward to your feedback': that reads as an ad and gets removed. Instead lead with ONE concrete, specific problem or insight the community actually discusses, give real substance they can use even if they never touch the tool, and end with a genuine question inviting their own experience. Mention the tool only as a one-line footnote, by name, no URL. Plain, human language — no marketing buzzwords, no polished-essay AI register.",
+    "Value-first per the 90/10 rule. Put NO link anywhere in the post — not the title, not the body; Reddit's AutoModerator removes self-posts with an outbound link, so the product URL goes in your FIRST COMMENT (posted separately by you), never in the draft. Do NOT write a launch announcement or founder story — no 'I built…', 'over the past year…', 'I'm excited to share…', 'looking forward to your feedback': that reads as an ad and gets removed. Lead with ONE concrete, specific problem or insight the community actually discusses, and back it with a REAL detail — a specific number, actual technical specifics, or a concrete lesson from THIS ship. No generic platitudes ('every platform has its own culture', 'meaningful engagement', 'the sea of communities') — if you have nothing specific to say, say less. End with a genuine question inviting their own experience. Mention the tool at most as a one-line footnote, by name, no URL — and if the channel's rules forbid promotion outright (e.g. 'no product promotion', 'articles only'), do NOT mention the product AT ALL, not even a footnote; contribute pure value and let people find you via your profile. Plain, human language — no marketing buzzwords, no polished-essay AI register.",
   X: "Short thread. Hook in the very first line. Link last (or note it goes in a reply). Number the tweets 1/, 2/, 3/.",
   LINKEDIN:
     "Professional founder voice. Lead with a relatable pain. Put the link in the first comment, not the post body (LinkedIn throttles outbound links).",
@@ -292,10 +292,11 @@ async function completeTextDraft(
   const { system, prompt } = buildDraftPrompt(ctx, tone, audienceCode);
   const platform = ctx.channel.platform;
   const channelRules = ctx.channel.rules;
+  const productName = ctx.project.name;
   const label = `draft:${platform}:${tone}:${audienceCode}`;
 
   const first = await completeJSON({ userId, system, prompt, schema: DraftSchema, label });
-  const firstReport = checkDraft({ body: first.body, platform, channelRules });
+  const firstReport = checkDraft({ body: first.body, platform, channelRules, productName });
   if (firstReport.fails === 0) return first;
 
   const fixes = firstReport.checks
@@ -314,7 +315,7 @@ async function completeTextDraft(
     schema: DraftSchema,
     label: `${label}:repair`,
   });
-  const repairedReport = checkDraft({ body: repaired.body, platform, channelRules });
+  const repairedReport = checkDraft({ body: repaired.body, platform, channelRules, productName });
   const cleaner =
     repairedReport.fails < firstReport.fails ||
     (repairedReport.fails === firstReport.fails && repairedReport.warns < firstReport.warns);
