@@ -7,6 +7,7 @@ import { CharCounter } from "@/components/ui/CharCounter";
 import { RepoPicker } from "@/components/github/RepoPicker";
 import { createProject, type OnboardingState } from "@/app/onboarding/actions";
 import type { GithubRepo } from "@/lib/github";
+import type { OnboardingConnectMode } from "@/lib/onboarding";
 
 // The first invalid one (in this order) is focused after a failed submit; the
 // wizard also jumps to the step that owns it.
@@ -45,16 +46,16 @@ function repoName(fullName: string): string {
 
 export function OnboardingWizard({
   repos,
-  appConnected,
+  connectMode,
   reposError,
   installUrl,
   installationId,
 }: {
   /** Repos the GitHub App installation granted (private included). */
   repos: GithubRepo[];
-  /** An installation exists and its repos loaded. */
-  appConnected: boolean;
-  /** An installation exists but listing its repos failed. */
+  /** Which first-run connect experience leads (see lib/onboarding). */
+  connectMode: OnboardingConnectMode;
+  /** An installation exists but listing its repos failed (reconnect hint). */
   reposError: boolean;
   /** GitHub App install URL (null when the App isn't configured). */
   installUrl: string | null;
@@ -64,8 +65,9 @@ export function OnboardingWizard({
   const [step, setStep] = useState(0);
 
   // Connection: pick a repo from the installation, or fill product details
-  // manually. Default to manual only when there's no App to connect to at all.
-  const [manual, setManual] = useState(!appConnected && !installUrl);
+  // manually. Email / magic-link users (no GitHub) start in manual entry with
+  // GitHub offered as an optional card; GitHub users lead with picker/install.
+  const [manual, setManual] = useState(connectMode === "manual-first");
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
 
   const [name, setName] = useState("");
@@ -165,7 +167,7 @@ export function OnboardingWizard({
           </p>
 
           {/* Connected → repo picker (private repos included). */}
-          {!manual && appConnected && (
+          {!manual && connectMode === "picker" && (
             <div>
               <label className="fl">Your GitHub repos</label>
               {selectedRepo ? (
@@ -204,8 +206,8 @@ export function OnboardingWizard({
             </div>
           )}
 
-          {/* Not connected → install CTA (App configured) + manual fallback. */}
-          {!manual && !appConnected && (
+          {/* GitHub-authed, App not installed → install CTA + manual fallback. */}
+          {!manual && connectMode === "connect" && (
             <div>
               {reposError && (
                 <div className="form-msg" role="status" style={{ marginBottom: 12 }}>
@@ -230,6 +232,32 @@ export function OnboardingWizard({
 
           {manual && (
             <div>
+              {/* Email / magic-link users: manual entry leads, GitHub is an
+                  optional add-on (link a repo for auto-detected ships). */}
+              {connectMode === "manual-first" && installUrl && (
+                <div className="conn" style={{ marginBottom: 18 }}>
+                  <div className="connrow">
+                    <div className="ic">
+                      <Icon name="github" />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <b>Connect GitHub for auto-detection</b>
+                      <p>
+                        Optional — link a repo (public or private) and new
+                        releases turn into plans automatically. Read-only.
+                      </p>
+                    </div>
+                    <a
+                      href={installUrl}
+                      className="btn btn-s"
+                      style={{ marginLeft: "auto" }}
+                    >
+                      Connect
+                    </a>
+                  </div>
+                </div>
+              )}
+
               <label className="fl">Product name</label>
               <input
                 className="inp"
@@ -313,7 +341,9 @@ export function OnboardingWizard({
                 message={fieldErrors.description}
               />
 
-              {(appConnected || installUrl) && (
+              {/* Only when there's a GitHub screen to return to (manual-first
+                  users use the optional card above instead). */}
+              {(connectMode === "picker" || connectMode === "connect") && (
                 <button
                   type="button"
                   className="linklike"

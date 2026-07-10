@@ -59,6 +59,19 @@ export async function getUserGithubToken(userId: string): Promise<string | null>
   return account?.access_token ?? null;
 }
 
+/**
+ * Whether the user signed in with GitHub (has a linked OAuth Account). Drives the
+ * onboarding branch: GitHub users lead with the repo picker / install CTA, while
+ * email / magic-link users go straight to manual entry. See `lib/onboarding.ts`.
+ */
+export async function hasLinkedGithubAccount(userId: string): Promise<boolean> {
+  const account = await db.account.findFirst({
+    where: { userId, provider: "github" },
+    select: { id: true },
+  });
+  return account !== null;
+}
+
 /** List the authenticated user's repos (needs their OAuth access token). */
 export async function listUserRepos(accessToken: string): Promise<GithubRepo[]> {
   const res = await fetch(

@@ -5,9 +5,11 @@ import {
   githubAppConfigured,
   appInstallUrl,
   listInstallationRepos,
+  hasLinkedGithubAccount,
   GH_INSTALLATION_COOKIE,
   type GithubRepo,
 } from "@/lib/github";
+import { onboardingConnectMode } from "@/lib/onboarding";
 import { resolveAccount } from "@/lib/team";
 import { getPlanUsage, entitlementViolation } from "@/lib/billing";
 import { resolveActiveProjectId } from "@/lib/projects";
@@ -60,8 +62,9 @@ export default async function OnboardingPage() {
 
   // Repo picker source: the GitHub App installation (private repos included).
   // The install callback stashed the installation id in a cookie; with it we
-  // list the granted repos. No installation → the wizard shows "Connect GitHub"
-  // (install) plus the de-emphasized manual owner/repo fallback.
+  // list the granted repos. The branch (picker / connect / manual-first) then
+  // depends on whether the user came in through GitHub at all — email/magic-link
+  // users skip the picker and go straight to manual entry. See lib/onboarding.
   const appConfigured = githubAppConfigured();
   const installationId = appConfigured
     ? ((await cookies()).get(GH_INSTALLATION_COOKIE)?.value ?? null)
@@ -76,11 +79,19 @@ export default async function OnboardingPage() {
     }
   }
 
+  const githubLinked = await hasLinkedGithubAccount(userId);
+  const connectMode = onboardingConnectMode({
+    appConfigured,
+    installationId,
+    reposError,
+    githubLinked,
+  });
+
   return (
     <div className="ob">
       <OnboardingWizard
         repos={repos}
-        appConnected={installationId !== null && !reposError}
+        connectMode={connectMode}
         reposError={reposError}
         installUrl={appConfigured ? appInstallUrl("onboarding") : null}
         installationId={installationId}

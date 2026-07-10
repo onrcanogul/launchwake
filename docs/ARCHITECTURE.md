@@ -21,8 +21,12 @@ Tracked link clicks ──> /r/[code] route ──> Event ingest ──> attribu
 - **`env.ts`** — zod-validated env vars.
 - **`db.ts`** — Prisma client singleton.
 - **`auth.ts`** — Auth.js config (GitHub provider + email). Session helpers.
-- **`github.ts`** — OAuth token use; list repos; fetch latest release/commit/changelog;
-  verify + handle webhook payloads → create `Ship`.
+- **`github.ts`** — repo reads via **either** an OAuth token (public / legacy) **or** a
+  GitHub App installation token (private repos); list repos; fetch latest
+  release/commit/changelog; verify + handle webhook payloads → create `Ship`. App JWT +
+  installation-token minting/caching live here too. See "GitHub integration" below.
+- **`onboarding.ts`** — `onboardingConnectMode()`, the pure first-run branch decision
+  (picker / connect / manual-first).
 - **`llm.ts`** — Anthropic wrapper. Typed prompt functions returning zod-validated JSON.
   Enforces token budget; logs usage.
 - **`channels.ts`** — load catalog; `matchChannels(project, ship)` returns candidate channels
@@ -198,6 +202,44 @@ number never reaches a locked client). Surfaces: the plan benchmark strip, the r
 column, the public **State of Developer Launches** board, and a one-line Launch Checker teaser
 (`getCheckerBenchmark`, served from the precomputed table).
 
+## GitHub integration — two auth sources, one interface
+
+Repo reads (releases, commits, repo metadata → `Ship`s) come from **either** of two
+credentials, and every fetcher in `lib/github.ts` takes an optional `accessToken`, so the
+two are interchangeable with no behavior change for existing projects:
+
+- **OAuth / public (legacy).** Public repos need no auth; the login OAuth app stays
+  profile+email scope only. This is the anonymous **Launch Checker** path and the default
+  for existing projects.
+- **GitHub App installation (private repos).** A *separate* GitHub App the user **installs**
+  (picking which repos to grant on GitHub's own screen) gives **read-only** access —
+  **Contents (read) + Metadata**, nothing else: no write, no issues, no PRs. We authenticate
+  as the installation via a short-lived RS256 app JWT → an installation access token, cached
+  ~50 min (they expire at 60): `generateAppJwt`, `getInstallationToken`,
+  `listInstallationRepos`.
+
+**Installation flow.** "Connect GitHub" → the App install URL (`appInstallUrl`) → GitHub →
+`/api/github/setup` callback (`parseSetupCallback`). During onboarding (no project yet) the
+installation id is bridged in a short-lived httpOnly cookie (`GH_INSTALLATION_COOKIE`); once
+a repo is picked it's persisted on `Project.githubInstallationId`. The picker lists
+installation repos (public **and** private, private flagged with a lock).
+
+**Onboarding branches** (`onboardingConnectMode`, pure, in `lib/onboarding.ts`):
+- *picker* — App installed → repo picker over the granted repos.
+- *connect* — signed in with GitHub, App not installed → read-only "Connect GitHub" install
+  CTA, manual entry as fallback.
+- *manual-first* — email / magic-link user (no GitHub linked) → straight to manual product
+  entry (name/url/description) with an **optional** "Connect GitHub for auto-detection" card.
+  The wizard always completes without GitHub.
+
+**Webhooks.** App installations deliver release/push events centrally to
+`/api/github/webhook` with an `installation` id. Routing maps installation + repo → `Project`
+(installation-scoped first, disambiguating the same repo across accounts), falling back to
+repo-only for legacy per-project webhooks. Signatures are verified against any applicable
+secret — the project's own `webhookSecret`, `GITHUB_APP_WEBHOOK_SECRET`, or the
+deployment-wide `GITHUB_WEBHOOK_SECRET` (`verifyWebhookSignatureAny`) — then the delivery
+flows through the existing `WebhookDelivery` idempotency + retry pipeline unchanged.
+
 ## Security & guards
 
 - No auto-posting anywhere (product principle).
@@ -208,5 +250,9 @@ column, the public **State of Developer Launches** board, and a one-line Launch 
 
 ## Environments
 
-`.env.example` keys: `DATABASE_URL`, `NEXTAUTH_SECRET`, `GITHUB_ID`, `GITHUB_SECRET`,
-`ANTHROPIC_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `INNGEST_*`, `APP_URL`.
+`.env.example` keys: `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`, `AUTH_GITHUB_ID`,
+`AUTH_GITHUB_SECRET` (login OAuth), `EMAIL_SERVER`/`EMAIL_FROM` (magic link),
+`GITHUB_APP_ID`/`GITHUB_APP_PRIVATE_KEY`/`GITHUB_APP_SLUG`/`GITHUB_APP_WEBHOOK_SECRET`
+(installation-based private-repo access), `GITHUB_WEBHOOK_SECRET`, `ANTHROPIC_API_KEY` /
+`OPENAI_API_KEY`, `STRIPE_*`, `POLAR_*`, `INNGEST_*`. All third-party keys are optional to
+boot (validated in `lib/env.ts`); each feature guards its own at the point of use.
