@@ -278,6 +278,8 @@
     "basedOnRepo": "Based on your repo description.",
     "rankedFrom": "Ranked from LaunchWake's catalog of {count} communities.",
     "banRiskSuffix": "ban risk",
+    "ruleHeadsUp": "Heads up:",
+    "thinNote": "We need more context about your product to rank the right communities — sign up and add a description to get the full, tailored plan.",
     "rulesLink": "Rules & ban risk",
     "lockedName": "Channel #{rank} — locked",
     "lockedSub": "Sign up to reveal",

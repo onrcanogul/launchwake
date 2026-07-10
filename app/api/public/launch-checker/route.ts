@@ -2,7 +2,11 @@ import { NextResponse, after } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { parseRepo, getRepoMeta, getLatestRelease } from "@/lib/github";
-import { buildPublicPlan, type PublicPlanInput } from "@/lib/launchChecker";
+import {
+  buildPublicPlan,
+  enrichPublicPlanWhy,
+  type PublicPlanInput,
+} from "@/lib/launchChecker";
 import { rateLimitDurable, clientIp } from "@/lib/ratelimit";
 import { captureAnon, EVENTS } from "@/lib/analytics";
 
@@ -82,7 +86,11 @@ export async function POST(req: Request) {
     ship: ship ? { type: ship.type, title: ship.title, summary: ship.summary } : null,
   };
 
-  const plan = buildPublicPlan(catalog, input);
+  const basePlan = buildPublicPlan(catalog, input);
+  // Enrich the revealed cards with product-specific why-lines via ONE batched,
+  // budget-capped LLM call (synthetic "public" bucket). Never throws: on a
+  // missing key, exhausted budget, or provider error the heuristic copy stands.
+  const plan = await enrichPublicPlanWhy(basePlan);
   // Funnel: top of the activation funnel for logged-out visitors. After the
   // response so a slow analytics host can't delay the checker.
   after(() => captureAnon(EVENTS.launchCheckerRun, { has_release: Boolean(ship) }));

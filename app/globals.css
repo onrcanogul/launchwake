@@ -3237,6 +3237,29 @@ tbody tr {
   margin-top: 10px;
   line-height: 1.5;
 }
+/* Surprise-rule caution line — one concrete, actionable gotcha from the rules */
+.rec-rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 9px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--tx2);
+}
+.rec-rule svg {
+  width: 13px;
+  height: 13px;
+  margin-top: 2px;
+  flex: none;
+  stroke: var(--tx3);
+  stroke-width: 1.6;
+  fill: none;
+}
+.rec-rule b {
+  color: var(--tx);
+  font-weight: 600;
+}
 .rec-meta {
   display: flex;
   gap: 16px;
@@ -3246,6 +3269,29 @@ tbody tr {
   border-top: 1px solid var(--line);
   font-size: 11.5px;
   color: var(--tx3);
+}
+/* Thin-context honesty note — shown when we lack product signal to rank well */
+.lc-thin {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg1);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tx2);
+}
+.lc-thin svg {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  flex: none;
+  stroke: var(--tx3);
+  stroke-width: 1.6;
+  fill: none;
 }
 .rec-meta .k {
   display: inline-flex;

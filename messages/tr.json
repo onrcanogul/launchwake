@@ -278,6 +278,8 @@
     "basedOnRepo": "Depo açıklaman temel alındı.",
     "rankedFrom": "LaunchWake'in {count} topluluktan oluşan kataloğuna göre sıralandı.",
     "banRiskSuffix": "ban riski",
+    "ruleHeadsUp": "Dikkat:",
+    "thinNote": "Doğru toplulukları sıralamak için ürünün hakkında daha fazla bağlama ihtiyacımız var — kaydol ve bir açıklama ekleyerek tam, sana özel planı al.",
     "rulesLink": "Kurallar ve ban riski",
     "lockedName": "Kanal #{rank} — kilitli",
     "lockedSub": "Görmek için kaydol",

@@ -120,6 +120,13 @@ function Results({
         ))}
       </div>
 
+      {plan.thinContext && (
+        <div className="lc-thin" role="note">
+          <Icon name="rules" />
+          <span>{t("thinNote")}</span>
+        </div>
+      )}
+
       <EmailGate
         moreCount={moreCount}
         repo={repoName}
@@ -151,6 +158,14 @@ function RecCard({ rec }: { rec: PublicRec }) {
         </div>
       </div>
       <div className="rec-why">{rec.why}</div>
+      {rec.ruleHighlight && (
+        <div className="rec-rule">
+          <Icon name="shield" />
+          <span>
+            <b>{t("ruleHeadsUp")}</b> {rec.ruleHighlight}
+          </span>
+        </div>
+      )}
       <div className="rec-meta">
         <span className="k">
           <span className="dot" style={{ background: riskMeta.color }} aria-hidden />
