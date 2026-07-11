@@ -35,6 +35,20 @@ function pitchMarkers(s: string): number {
   return (s.match(PITCH_RE) ?? []).length;
 }
 
+// Generic AI-slop / filler phrasing. A self-post whose only concrete content is
+// the product plug — everything around it interchangeable platitude — is exactly
+// what Reddit's site-wide spam filter removes ("removed by Reddit's filters"),
+// even from an account in good standing. Enumerated from real removed drafts;
+// kept tight so a genuinely substantive post (which leads with a specific number,
+// technical detail, or concrete lesson) does not trip it. Apostrophes allow the
+// straight and curly forms an LLM may emit.
+const PLATITUDE_RE =
+  /\bneedle in a haystack\b|\blandscape of\b|\bnavigating the\b|\b(?:cultural|distinct) nuances?\b|\bmeaningful engagement\b|\bmaximi[sz]es? (?:visibility|engagement|interaction|reach)\b|\bsea of (?:communities|platforms|options|choices)\b|\bhas its own (?:set of )?(?:rules|culture|norms|nuances)\b|\bown set of rules\b|\bit[’']?s not just about\b|\bwhen it comes to\b|\bat just the right time\b|\bdig(?:ging|ged)? (?:deep(?:er)? )?into the specifics\b|\bworth investing time\b/gi;
+
+function platitudeMarkers(s: string): number {
+  return (s.match(PLATITUDE_RE) ?? []).length;
+}
+
 function hasUrl(s: string): boolean {
   return URL_RE.test(s);
 }
@@ -130,9 +144,8 @@ export function checkDraft(input: DraftCheckInput): SafetyReport {
         );
       else add("pass", "Value-first tone", "Reads like a contribution, not an ad.");
 
-      // Subs that ban promotion outright (r/programming: "no product promotion",
-      // "articles only") remove ANY product mention — even a value-first post
-      // with a footnote plug. Catch the product name or a plug pattern.
+      // A self-promo plug — a footnote, a "built/building <tool>" phrasing, or
+      // the product named outright. Two failure modes hang off this.
       const bansPromoOutright =
         /\bno (?:product |self[-\s]?)?promotion\b|\bno self[-\s]?promo\b|\barticles only\b|\bno (?:ads|advertising|marketing)\b/i.test(
           rules,
@@ -143,11 +156,34 @@ export function checkDraft(input: DraftCheckInput): SafetyReport {
           body,
         ) ||
         (productName ? new RegExp(`\\b${escapeRegExp(productName)}\\b`, "i").test(body) : false);
+
+      // 1) Subs that ban promotion outright (r/programming: "no product
+      // promotion", "articles only") remove ANY product mention — even a
+      // value-first post with a footnote plug.
+      const slop = platitudeMarkers(body) >= 2;
       if (bansPromoOutright && plug)
         add(
           "fail",
           "Product mention on a no-promotion sub",
           "This sub bans promotion outright — even a footnote plug is removed. Cut the product mention entirely; contribute pure value and let people find you via your profile.",
+        );
+      // 2) Even where promotion is allowed (r/SideProject etc.), a plug wrapped
+      // in generic platitude — where the ONLY concrete content is the product
+      // mention — is what Reddit's spam filter removes as an ad, regardless of
+      // account standing. Fail it so the self-repair loop rewrites with real
+      // substance or drops the plug.
+      else if (plug && slop)
+        add(
+          "fail",
+          "Self-promo wrapped in generic filler",
+          "The only concrete thing here is the product mention — the rest is interchangeable platitude ('needle in a haystack', 'cultural nuances', 'maximises visibility'). Reddit's spam filter removes these as ads even from accounts in good standing. Lead with ONE real specific — a number, a technical detail, a concrete lesson from this ship — or cut the plug entirely.",
+        );
+      // 3) Filler with no plug still gets downranked/filtered as low-effort.
+      else if (slop)
+        add(
+          "warn",
+          "Generic filler / AI register",
+          "This reads as generic AI-slop — stacked platitudes with nothing specific. Even without a plug it gets downranked. Replace the filler with one concrete detail only you could write.",
         );
 
       if (strict)
