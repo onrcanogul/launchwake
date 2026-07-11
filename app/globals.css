@@ -3827,6 +3827,30 @@ tbody tr {
   flex: none;
 }
 
+/* ── Demo entry ─────────────────────────────────────────────
+   A subtle "or just see an example" affordance under the hero checker that
+   links into the full /demo product tour. */
+.lp-sample {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: 720px;
+  margin: 12px auto 0;
+}
+.lp-sample-q {
+  font-size: 12.5px;
+  color: var(--tx3);
+}
+.lp-sample-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  fill: none;
+}
+
 /* "Works with" channel logo strip — muted line icons, brighten on hover. */
 .lp-works {
   margin: 40px auto 0;
@@ -6255,4 +6279,267 @@ tbody tr {
   color: var(--tx3);
   font-style: normal;
   font-size: 11px;
+}
+
+/* ── Demo (public product tour at /demo) ──────────────────── */
+.demo-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  background: var(--acd);
+  border-bottom: 1px solid var(--acb);
+  font-size: 12.5px;
+  color: var(--tx2);
+}
+.demo-banner > svg {
+  width: 15px;
+  height: 15px;
+  stroke: var(--ac);
+  stroke-width: 1.7;
+  fill: none;
+  flex: none;
+}
+.demo-banner-tx b {
+  color: var(--tx);
+  font-weight: 600;
+}
+.demo-banner-cta {
+  margin-left: auto;
+  flex: none;
+  height: 30px;
+}
+@media (max-width: 620px) {
+  .demo-banner-tx {
+    font-size: 11.5px;
+  }
+}
+
+.demo-callout {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  background: var(--bg1);
+  margin-bottom: 18px;
+}
+.demo-callout-ic {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--acd);
+  color: var(--ac);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.demo-callout-ic svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  fill: none;
+}
+.demo-callout-t {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.demo-callout-p {
+  font-size: 12.5px;
+  color: var(--tx2);
+  line-height: 1.55;
+  margin-top: 3px;
+}
+
+/* "Sign up to interact" nudge used where the real screen has live controls. */
+.demo-lock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line2);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--tx3);
+}
+.demo-lock svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--tx3);
+  stroke-width: 1.6;
+  fill: none;
+  flex: none;
+}
+.demo-lock a {
+  color: var(--ac);
+}
+
+/* Read-only launch-kit drafts */
+.demo-kit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Safety/pitch notes sit under a full-width draft, so drop the 600px cap and
+   let them span the whole panel to match. */
+.demo-kit .note {
+  max-width: none;
+}
+.demo-draftbody {
+  white-space: pre-wrap;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--tx);
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 0;
+}
+.demo-story {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.demo-story li {
+  display: flex;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--tx2);
+  line-height: 1.5;
+}
+.demo-story li b {
+  color: var(--tx);
+  font-weight: 600;
+  flex: none;
+  min-width: 92px;
+}
+
+/* Shared demo table (results rollup, channel directory) */
+.demo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.demo-table th {
+  text-align: left;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--tx3);
+  font-weight: 600;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.demo-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--tx2);
+}
+.demo-table tr:last-child td {
+  border-bottom: none;
+}
+.demo-table td b {
+  color: var(--tx);
+  font-weight: 600;
+}
+.demo-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.demo-tablewrap {
+  overflow-x: auto;
+}
+
+/* Generic read-only card list (radar / queue / newsletters) */
+.demo-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.demo-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg1);
+  padding: 14px 16px;
+}
+.demo-card-hd {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.demo-card-hd .demo-pill {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--tx3);
+  border: 1px solid var(--line2);
+  border-radius: 5px;
+  padding: 2px 7px;
+}
+.demo-card-body {
+  font-size: 12.5px;
+  color: var(--tx2);
+  line-height: 1.55;
+  margin-top: 8px;
+}
+.demo-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--tx3);
+}
+.demo-card-meta b {
+  color: var(--tx2);
+  font-weight: 550;
+}
+
+/* Feed recent-ship rows */
+.demo-feed-list {
+  display: flex;
+  flex-direction: column;
+}
+.demo-feed-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.demo-feed-row:last-child {
+  border-bottom: none;
+}
+.demo-feed-row .t {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--tx);
+}
+.demo-feed-row .m {
+  font-size: 11.5px;
+  color: var(--tx3);
+  margin-top: 1px;
+}
+.demo-feed-row .r {
+  margin-left: auto;
+  text-align: right;
+  font-size: 11.5px;
+  color: var(--tx3);
+}
+.demo-feed-row .r b {
+  color: var(--tx);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }

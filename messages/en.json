@@ -1,4 +1,8 @@
 {
+  "SampleReport": {
+    "prompt": "Prefer to see it first?",
+    "trigger": "See a sample report"
+  },
   "Nav": {
     "launchChecker": "Launch Checker",
     "channels": "Channels",

@@ -1,4 +1,8 @@
 {
+  "SampleReport": {
+    "prompt": "Önce bir örneğe bakmak ister misin?",
+    "trigger": "Örnek raporu gör"
+  },
   "Nav": {
     "launchChecker": "Launch Checker",
     "channels": "Kanallar",

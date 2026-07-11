@@ -8,6 +8,8 @@
 export const EVENTS = {
   /** Marketing landing page rendered in a browser. Anonymous. */
   landingView: "landing_view",
+  /** Visitor entered the `/demo` product tour (from the landing hero). Anonymous. */
+  demoOpened: "demo_opened",
   /** Public login-less Launch Checker produced a plan. Anonymous. */
   launchCheckerRun: "launch_checker_run",
   /** A new user account was created (Auth.js createUser). */
@@ -31,7 +33,11 @@ export type AnalyticsEvent = (typeof EVENTS)[keyof typeof EVENTS];
  * UI-interaction moments the server can't observe belong here — everything
  * else is captured server-side where it can't be spoofed.
  */
-export const CLIENT_EVENTS = [EVENTS.landingView, EVENTS.draftCopied] as const;
+export const CLIENT_EVENTS = [
+  EVENTS.landingView,
+  EVENTS.demoOpened,
+  EVENTS.draftCopied,
+] as const;
 
 export type ClientAnalyticsEvent = (typeof CLIENT_EVENTS)[number];
 

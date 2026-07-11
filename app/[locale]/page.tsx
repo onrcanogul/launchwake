@@ -5,6 +5,7 @@ import { alternatesFor, type Locale } from "@/i18n/paths";
 import { PublicShell } from "@/components/public/PublicShell";
 import { TrackView } from "@/components/analytics/TrackView";
 import { LaunchChecker } from "@/components/public/LaunchChecker";
+import NextLink from "next/link";
 import { EarlyAccessSignup } from "@/components/public/EarlyAccessSignup";
 import { PUBLIC_FREE_RECS } from "@/lib/launchChecker";
 import { PricingCards } from "@/components/public/PricingCards";
@@ -45,6 +46,7 @@ export default async function LandingPage(props: {
   setRequestLocale(locale);
   const t = await getTranslations("Landing");
   const tc = await getTranslations("Common");
+  const tsr = await getTranslations("SampleReport");
 
   const pains = t.raw("pains") as { q: string; p: string }[];
   const steps = t.raw("steps") as { t: string; h: string; p: string }[];
@@ -85,6 +87,17 @@ export default async function LandingPage(props: {
             {t("heroTryHeadline")}
           </div>
           <LaunchChecker freeCount={PUBLIC_FREE_RECS} />
+        </div>
+
+        {/* Entry to the full /demo product tour. Plain next/link (not the
+            locale-aware Link): /demo is not a localized route, so it must never
+            gain a /tr prefix. */}
+        <div className="lp-sample">
+          <span className="lp-sample-q">{tsr("prompt")}</span>
+          <NextLink href="/demo" className="btn btn-s lp-sample-btn">
+            <Icon name="results" />
+            {tsr("trigger")}
+          </NextLink>
         </div>
 
         <div className="lp-works">
