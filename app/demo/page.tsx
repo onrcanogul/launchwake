@@ -24,7 +24,12 @@ export default function DemoFeedPage() {
             Every release, feature and post you ship — and what each one drove.
           </div>
         </div>
-        <Button variant="primary" icon="plus" href="/demo/plan">
+        <Button
+          variant="primary"
+          icon="plus"
+          disabled
+          title="Creating a ship needs a real account"
+        >
           New ship
         </Button>
       </div>

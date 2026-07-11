@@ -19,11 +19,19 @@ import { DEMO_PROJECT, DEMO_SHIP, DEMO_CHANNEL_TOTAL } from "@/lib/demoData";
 
 const START_HREF = `/login?callbackUrl=${encodeURIComponent("/onboarding")}`;
 
-type NavItem = { href: string; label: string; icon: IconName; count?: number; exact?: boolean };
+type NavItem = {
+  href: string;
+  label: string;
+  icon: IconName;
+  count?: number;
+  exact?: boolean;
+  /** Shown greyed-out and non-interactive (creating a ship needs a real account). */
+  disabled?: boolean;
+};
 
 const WORKSPACE_NAV: NavItem[] = [
   { href: "/demo", label: "Ship feed", icon: "grid", exact: true },
-  { href: START_HREF, label: "New ship", icon: "plus" },
+  { href: "#", label: "New ship", icon: "plus", disabled: true },
   { href: "/demo/channels", label: "Channels", icon: "channels", count: DEMO_CHANNEL_TOTAL },
   { href: "/demo/radar", label: "Intent Radar", icon: "target" },
   { href: "/demo/results", label: "Results", icon: "results" },
@@ -64,18 +72,33 @@ export function DemoShell({ children }: { children: ReactNode }) {
       ? pathname === item.href
       : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
-  const renderNav = (item: NavItem) => (
-    <Link
-      key={item.href}
-      href={item.href}
-      className={["nav", isActive(item) ? "on" : ""].join(" ")}
-      onClick={() => setDrawerOpen(false)}
-    >
-      <Icon name={item.icon} />
-      {item.label}
-      {item.count !== undefined && <span className="cnt">{item.count}</span>}
-    </Link>
-  );
+  const renderNav = (item: NavItem) => {
+    if (item.disabled) {
+      return (
+        <span
+          key={item.label}
+          className="nav nav-off"
+          aria-disabled="true"
+          title="Creating a ship needs a real account"
+        >
+          <Icon name={item.icon} />
+          {item.label}
+        </span>
+      );
+    }
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={["nav", isActive(item) ? "on" : ""].join(" ")}
+        onClick={() => setDrawerOpen(false)}
+      >
+        <Icon name={item.icon} />
+        {item.label}
+        {item.count !== undefined && <span className="cnt">{item.count}</span>}
+      </Link>
+    );
+  };
 
   return (
     <div className="app">

@@ -6282,6 +6282,15 @@ tbody tr {
 }
 
 /* ── Demo (public product tour at /demo) ──────────────────── */
+/* A disabled sidebar item (e.g. New ship — creating needs a real account). */
+.nav.nav-off {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.nav.nav-off:hover {
+  background: none;
+  color: var(--tx2);
+}
 .demo-banner {
   display: flex;
   align-items: center;
